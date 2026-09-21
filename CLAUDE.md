@@ -34,9 +34,6 @@ Those files change upstream; this one only records what is different **here**.
 - `tools/eal-benchmark/index.html` — **a verbatim vendored copy** of
   `tools/eal-benchmark/index.html` upstream.
 - `.nojekyll` — serve files as-is on GitHub Pages.
-- `.github/workflows/pages.yml` — publishes the site on every push to
-  `main`. Upstream has no workflow (it deploys from a branch); this repo
-  carries one so deploying doesn't depend on a settings toggle.
 
 ## Syncing the EAL tool
 
