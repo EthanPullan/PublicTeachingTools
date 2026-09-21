@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Fill in a Div 3 EAL annotation benchmark on screen and download a completed PDF named after the student and date. Pulls names from your shared Class Lists, or type a new one.">
+<meta name="description" content="Fill in a Div 2/3 EAL annotation benchmark on screen and download a completed PDF. Build the file name yourself by dragging the parts you want — first name, last name, ASN, year, month, date — into order.">
 <meta name="theme-color" content="#1f3d35">
 <title>EAL Benchmark PDF Template</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23e0982e'/%3E%3C/svg%3E">
@@ -105,6 +105,32 @@
   .seg button:not(:first-child){border-left:1px solid var(--line);}
   .seg button.active{background:var(--board);color:#fff;}
 
+  /* file-name builder — drag the parts into the order you want them in the name */
+  .fn-drop{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-height:44px;
+    border:1px dashed var(--line);border-radius:10px;background:var(--panel-2);padding:7px;}
+  .fn-drop.over{border-color:var(--accent);background:var(--accent-soft);}
+  .fn-empty{margin:0;padding:3px 4px;font-size:12px;color:var(--muted);}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);
+    border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600;color:var(--ink);
+    cursor:grab;user-select:none;font-family:inherit;}
+  .chip:active{cursor:grabbing;}
+  .chip.dragging{opacity:.4;}
+  .chip[disabled]{opacity:.38;cursor:not-allowed;}
+  .chip .x{border:none;background:none;padding:0 1px;font-size:14px;line-height:1;cursor:pointer;color:var(--muted);}
+  .fn-drop .chip{background:var(--board);border-color:var(--board);color:#fff;}
+  .fn-drop .chip .x{color:rgba(255,255,255,.75);}
+  .fn-drop .chip .x:hover{color:#fff;}
+  .chip .chip-text{width:9ch;border:none;border-radius:6px;padding:2px 6px;
+    background:rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:600;}
+  .chip .chip-text::placeholder{color:rgba(255,255,255,.6);}
+  .fn-pal{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}
+  .fn-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;}
+  .fn-foot label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .fn-foot select{width:auto;}
+  .fn-preview{flex:1;min-width:190px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;
+    background:var(--panel-2);font-family:var(--mono);font-size:12.5px;word-break:break-all;}
+  .fn-preview.bad{color:var(--muted);}
+
   /* The rubric is far wider than the form, so on a desktop it steps outside the
      reading column and centres on the viewport instead of scrolling sideways. */
   @media (min-width:1060px){
@@ -136,6 +162,24 @@
   </header>
 
   <main class="wrap">
+
+    <section class="card">
+      <h3 class="section-title">File name</h3>
+      <div class="fn-drop" id="fnDrop" role="list" aria-label="File name parts, in order"></div>
+      <p class="hint">Drag parts in, out, and around to set the order — the PDF is named to match.
+        Click a part below to add it; with a part focused, use ← and → to move it and Delete to remove it.</p>
+      <div class="fn-pal" id="fnPal" aria-label="Parts you can add"></div>
+      <div class="fn-foot">
+        <label for="fnSep">Separator</label>
+        <select id="fnSep">
+          <option value="">none</option>
+          <option value=" ">space</option>
+          <option value="_">underscore</option>
+          <option value="-">hyphen</option>
+        </select>
+        <div class="fn-preview" id="fnPreview" aria-live="polite"></div>
+      </div>
+    </section>
 
     <section class="card">
       <h3 class="section-title">Division</h3>
@@ -288,6 +332,7 @@
     vocabLP:$('vocabLP'), syntaxLP:$('syntaxLP'), discourseLP:$('discourseLP'), overallLP:$('overallLP'),
     nextStepsArea:$('nextStepsArea'), nextStepsHint:$('nextStepsHint'),
     downloadBtn:$('downloadBtn'), clearBtn:$('clearBtn'), progressPill:$('progressPill'),
+    fnDrop:$('fnDrop'), fnPal:$('fnPal'), fnSep:$('fnSep'), fnPreview:$('fnPreview'),
   };
 
   /* ---------- division ----------
@@ -681,34 +726,271 @@
     return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   }
   function formatDateLong(dt){ return MONTHS[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear(); }
-  function formatDateFile(dt){ return MONTHS[dt.getMonth()] + ' ' + dt.getDate() + ' ' + dt.getFullYear(); }
   function nameParts(full){
     const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
     if(!parts.length) return null;
     return { first: parts[0], last: parts[parts.length - 1] };
   }
-  function safeToken(s){ return String(s || '').toUpperCase().replace(/[^A-Z-]/g, ''); }
+  /* The name is assembled from whatever parts the teacher dragged into the
+     builder, in their order. Digits must survive — ASN and the date parts are
+     numeric — so this strips only what Windows, macOS and Drive reject. */
+  function safeFilePart(s){
+    return String(s == null ? '' : s)
+      .replace(/[\\/:*?"<>|]/g, '')
+      .replace(/[\x00-\x1f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function filenameParts(){
+    return fnTemplate.map(t => {
+      const def = FN_PARTS[t.id];
+      return { id: t.id, label: def.label, value: safeFilePart(def.get(t.value)) };
+    });
+  }
   function buildFilename(){
-    const np = nameParts(els.nameInput.value);
-    const dt = parseISODate(els.dateInput.value);
-    if(!np || !dt) return null;
-    const last = safeToken(np.last);
-    const initial = safeToken(np.first).charAt(0);
-    if(!last || !initial) return null;
-    return last + initial + ' ' + formatDateFile(dt) + '.pdf';
+    const parts = filenameParts().map(p => p.value).filter(Boolean);
+    if(!parts.length) return null;
+    const name = safeFilePart(parts.join(fnSep));
+    return name ? name + '.pdf' : null;
   }
 
   /* ---------- validation ---------- */
   function validate(){
     const missing = [];
-    if(!nameParts(els.nameInput.value)) missing.push('student name');
-    if(!parseISODate(els.dateInput.value)) missing.push('date');
+    const noName = !nameParts(els.nameInput.value);
+    const noDate = !parseISODate(els.dateInput.value);
+    if(noName) missing.push('student name');
+    if(noDate) missing.push('date');
+    if(!fnTemplate.length){ missing.push('at least one file name part'); return missing; }
+    /* A part with nothing behind it would silently drop out of the name, so
+       block the download — but don't repeat what the two checks above said. */
+    filenameParts().forEach(p => {
+      if(p.value) return;
+      if((p.id === 'first' || p.id === 'last') && noName) return;
+      if((p.id === 'year' || p.id === 'month' || p.id === 'date') && noDate) return;
+      missing.push(p.label.toLowerCase() + ' (file name)');
+    });
     return missing;
   }
   function refreshValidity(){
     const missing = validate();
     els.downloadBtn.disabled = missing.length > 0;
     els.downloadBtn.title = missing.length ? 'Missing: ' + missing.join(', ') : '';
+  }
+
+  /* ---------- file-name builder ----------
+     The order of the chips in #fnDrop *is* the template. It's a preference
+     rather than form data, so it lives under its own key and survives
+     "Clear form". */
+  const FN_LS = 'teachingtools:ealBenchmark:filename';
+  const FN_PARTS = {
+    first: { label:'First', get: () => (nameParts(els.nameInput.value) || {}).first || '' },
+    last:  { label:'Last',  get: () => (nameParts(els.nameInput.value) || {}).last  || '' },
+    asn:   { label:'ASN',   get: () => els.asnInput.value },
+    year:  { label:'Year',  get: () => { const d = parseISODate(els.dateInput.value); return d ? String(d.getFullYear()) : ''; } },
+    month: { label:'Month', get: () => { const d = parseISODate(els.dateInput.value); return d ? MONTHS[d.getMonth()] : ''; } },
+    date:  { label:'Date',  get: () => { const d = parseISODate(els.dateInput.value); return d ? String(d.getDate()) : ''; } },
+    text:  { label:'Text',  custom:true, get: v => v || '' },
+  };
+  const FN_ORDER = ['first','last','asn','year','month','date','text'];
+  const FN_DEFAULT = [{ id:'first' }, { id:'last' }];
+
+  let fnTemplate = FN_DEFAULT.map(p => ({ id:p.id, value:'' }));
+  let fnSep = '';
+  let fnDrag = null;
+
+  function saveFnTemplate(){
+    try{ localStorage.setItem(FN_LS, JSON.stringify({ version:1, sep:fnSep, parts:fnTemplate })); }
+    catch(e){ /* storage unavailable / full — the builder still works this session */ }
+  }
+  function loadFnTemplate(){
+    try{
+      const d = JSON.parse(localStorage.getItem(FN_LS) || 'null');
+      if(!d || !Array.isArray(d.parts)) return false;
+      fnTemplate = d.parts
+        .filter(p => p && FN_PARTS[p.id])
+        .map(p => ({ id:p.id, value: typeof p.value === 'string' ? p.value : '' }));
+      fnSep = typeof d.sep === 'string' ? d.sep : '';
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function fnCommit(focusIndex){
+    renderFnTemplate();
+    renderFnPalette();
+    saveFnTemplate();
+    updateFnPreview();
+    refreshValidity();
+    if(focusIndex != null){
+      const chip = els.fnDrop.querySelectorAll('.chip')[focusIndex];
+      if(chip) chip.focus();
+    }
+  }
+  function addFnPart(id, at){
+    const def = FN_PARTS[id];
+    if(!def) return;
+    if(!def.custom && fnTemplate.some(t => t.id === id)) return;  // one of each is plenty
+    const part = { id, value:'' };
+    const i = (at == null || at > fnTemplate.length) ? fnTemplate.length : Math.max(0, at);
+    fnTemplate.splice(i, 0, part);
+    fnCommit(i);
+  }
+
+  function renderFnTemplate(){
+    els.fnDrop.innerHTML = '';
+    if(!fnTemplate.length){
+      const p = document.createElement('p');
+      p.className = 'fn-empty';
+      p.textContent = 'Drag a part here, or click one below.';
+      els.fnDrop.appendChild(p);
+      return;
+    }
+    fnTemplate.forEach((t, i) => {
+      const def = FN_PARTS[t.id];
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.draggable = true;
+      chip.tabIndex = 0;
+      chip.setAttribute('role', 'listitem');
+      chip.setAttribute('aria-label', def.label + ', position ' + (i + 1) + ' of ' + fnTemplate.length);
+
+      if(def.custom){
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'chip-text';
+        inp.value = t.value || '';
+        inp.placeholder = 'text';
+        inp.draggable = false;
+        inp.setAttribute('aria-label', 'Custom file name text');
+        // Let the field take the pointer instead of starting a drag.
+        inp.addEventListener('mousedown', e => { chip.draggable = false; });
+        inp.addEventListener('blur', () => { chip.draggable = true; });
+        inp.addEventListener('input', () => {
+          t.value = inp.value;
+          saveFnTemplate(); updateFnPreview(); refreshValidity();
+        });
+        chip.appendChild(inp);
+      }else{
+        chip.appendChild(document.createTextNode(def.label));
+      }
+
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'x';
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Remove ' + def.label);
+      x.addEventListener('click', e => { e.stopPropagation(); fnTemplate.splice(i, 1); fnCommit(); });
+      chip.appendChild(x);
+
+      chip.addEventListener('dragstart', e => {
+        fnDrag = { from:'template', index:i };
+        chip.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try{ e.dataTransfer.setData('text/plain', t.id); }catch(err){}
+      });
+      chip.addEventListener('dragend', () => { chip.classList.remove('dragging'); fnDrag = null; });
+      chip.addEventListener('keydown', e => {
+        if(e.target.tagName === 'INPUT' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        if(e.key === 'ArrowLeft' && i > 0){
+          e.preventDefault(); fnTemplate.splice(i - 1, 0, fnTemplate.splice(i, 1)[0]); fnCommit(i - 1);
+        }else if(e.key === 'ArrowRight' && i < fnTemplate.length - 1){
+          e.preventDefault(); fnTemplate.splice(i + 1, 0, fnTemplate.splice(i, 1)[0]); fnCommit(i + 1);
+        }else if(e.key === 'Delete' || e.key === 'Backspace'){
+          e.preventDefault(); fnTemplate.splice(i, 1); fnCommit(Math.max(0, i - 1));
+        }
+      });
+      els.fnDrop.appendChild(chip);
+    });
+  }
+
+  function renderFnPalette(){
+    els.fnPal.innerHTML = '';
+    FN_ORDER.forEach(id => {
+      const def = FN_PARTS[id];
+      const used = !def.custom && fnTemplate.some(t => t.id === id);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = def.label;
+      chip.disabled = used;
+      chip.draggable = !used;
+      chip.title = used ? def.label + ' is already in the name' : 'Add ' + def.label;
+      chip.addEventListener('click', () => addFnPart(id));
+      chip.addEventListener('dragstart', e => {
+        if(used){ e.preventDefault(); return; }
+        fnDrag = { from:'palette', id };
+        e.dataTransfer.effectAllowed = 'copy';
+        try{ e.dataTransfer.setData('text/plain', id); }catch(err){}
+      });
+      chip.addEventListener('dragend', () => { fnDrag = null; });
+      els.fnPal.appendChild(chip);
+    });
+  }
+
+  /* Where in the row does the pointer sit? Chips wrap, so compare against each
+     chip's own line before its horizontal midpoint. */
+  function fnDropIndex(x, y){
+    const chips = els.fnDrop.querySelectorAll('.chip');
+    for(let i = 0; i < chips.length; i++){
+      const r = chips[i].getBoundingClientRect();
+      if(y < r.bottom && x < r.left + r.width / 2) return i;
+    }
+    return chips.length;
+  }
+
+  els.fnDrop.addEventListener('dragover', e => {
+    if(!fnDrag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = fnDrag.from === 'palette' ? 'copy' : 'move';
+    els.fnDrop.classList.add('over');
+  });
+  els.fnDrop.addEventListener('dragleave', e => {
+    if(!els.fnDrop.contains(e.relatedTarget)) els.fnDrop.classList.remove('over');
+  });
+  els.fnDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    els.fnDrop.classList.remove('over');
+    if(!fnDrag) return;
+    const at = fnDropIndex(e.clientX, e.clientY);
+    if(fnDrag.from === 'palette'){
+      addFnPart(fnDrag.id, at);
+    }else{
+      const [moved] = fnTemplate.splice(fnDrag.index, 1);
+      const to = Math.max(0, Math.min(at > fnDrag.index ? at - 1 : at, fnTemplate.length));
+      fnTemplate.splice(to, 0, moved);
+      fnCommit(to);
+    }
+    fnDrag = null;
+  });
+
+  /* Dragging a chip back onto the palette takes it out of the name. */
+  els.fnPal.addEventListener('dragover', e => {
+    if(fnDrag && fnDrag.from === 'template'){ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+  });
+  els.fnPal.addEventListener('drop', e => {
+    if(!fnDrag || fnDrag.from !== 'template') return;
+    e.preventDefault();
+    fnTemplate.splice(fnDrag.index, 1);
+    fnCommit();
+    fnDrag = null;
+  });
+
+  els.fnSep.addEventListener('change', () => {
+    fnSep = els.fnSep.value;
+    saveFnTemplate(); updateFnPreview(); refreshValidity();
+  });
+
+  function updateFnPreview(){
+    const name = buildFilename();
+    els.fnPreview.textContent = name || 'Add a part to name the file';
+    els.fnPreview.classList.toggle('bad', !name);
+  }
+
+  function initFilenameBuilder(){
+    loadFnTemplate();
+    els.fnSep.value = fnSep;
+    renderFnTemplate();
+    renderFnPalette();
   }
 
   /* ---------- PDF generation (hand-built, no library — Helvetica is a standard PDF font) ---------- */
@@ -1045,6 +1327,7 @@
   function onAnyInput(){
     updateBoxHint(els.contextArea, els.contextHint, CONTEXT_MAX_LINES, CONTEXT_WIDTH);
     updateBoxHint(els.nextStepsArea, els.nextStepsHint, NEXTSTEPS_MAX_LINES, NEXTSTEPS_WIDTH);
+    updateFnPreview();
     refreshValidity();
     updateAddBtn();
     saveDraft();
@@ -1059,6 +1342,7 @@
   loadDraft();
   renderStudentSelect();
   renderRosterUi();
+  initFilenameBuilder();
   if(!els.dateInput.value) els.dateInput.value = todayISO();
   onAnyInput();
 })();

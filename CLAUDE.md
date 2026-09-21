@@ -31,23 +31,32 @@ Those files change upstream; this one only records what is different **here**.
 
 - `index.html` — the launcher. Its `:root` tokens and component CSS are lifted
   verbatim from upstream's homepage so the two sites stay visually identical.
-- `tools/eal-benchmark/index.html` — **a verbatim vendored copy** of
-  `tools/eal-benchmark/index.html` upstream.
+- `tools/eal-benchmark/index.html` — **forked from upstream.** This repo is the
+  source of truth for the tool; it has diverged and is no longer a copy.
 - `.nojekyll` — serve files as-is on GitHub Pages.
 
-## Syncing the EAL tool
+## The EAL tool has forked from upstream
 
-The tool is a plain copy, kept byte-identical so a refresh is a `cp` and a
-`diff`, never a merge:
+It began as a verbatim copy of `tools/eal-benchmark/index.html` in
+TeachingTools, but the file-name builder was added here, so the two have
+diverged.
 
-```bash
-git clone --depth 1 https://github.com/EthanPullan/TeachingTools /tmp/tt
-cp /tmp/tt/tools/eal-benchmark/index.html tools/eal-benchmark/index.html
-diff /tmp/tt/tools/eal-benchmark/index.html tools/eal-benchmark/index.html   # expect no output
-```
+**Never `cp` the tool from TeachingTools** — that would silently delete the
+file-name builder. Edit it here. If a fix belongs on both sites, make it here
+and port it upstream by hand.
 
-**Do not hand-edit the vendored file.** Fix it upstream and re-copy, or the
-next sync conflicts.
+### What diverged
+
+- A **File name** card at the top of the tool. Draggable chips — First, Last,
+  ASN, Year, Month, Date, and a repeatable free-text part — set the order of
+  the downloaded PDF's name, with a separator picker and a live preview.
+  Reorder by dragging, or focus a chip and use ← / → and Delete.
+- The chosen order is a *preference*, not form data: it is saved under
+  `teachingtools:ealBenchmark:filename`, separate from the draft, so
+  "Clear form" leaves it alone.
+- `safeToken()` and `formatDateFile()` are gone, replaced by `safeFilePart()`.
+  The old helper stripped every digit (`[^A-Z-]`), which would have erased the
+  ASN and the date parts outright.
 
 ## Commit / PR rules — IMPORTANT
 

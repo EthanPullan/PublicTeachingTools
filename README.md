@@ -11,7 +11,7 @@ works offline, and can be downloaded on its own.
 
 | Tool | What it does |
 | --- | --- |
-| [EAL Benchmark PDF Template](https://ethanpullan.github.io/PublicTeachingTools/tools/eal-benchmark/) | Fill in a Div 3 EAL annotation benchmark on screen, then download a PDF named after the student and date |
+| [EAL Benchmark PDF Template](https://ethanpullan.github.io/PublicTeachingTools/tools/eal-benchmark/) | Fill in a Div 2/3 EAL annotation benchmark on screen, then download a PDF whose file name you build yourself by dragging the parts you want into order |
 
 ## About
 
