@@ -131,6 +131,13 @@
     background:var(--panel-2);font-family:var(--mono);font-size:12.5px;word-break:break-all;}
   .fn-preview.bad{color:var(--muted);}
 
+  /* student work — a PDF picked here is re-saved under the form's file name */
+  .sw-drop{display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    border:1px dashed var(--line);border-radius:10px;background:var(--panel-2);padding:10px;}
+  .sw-drop.over{border-color:var(--accent);background:var(--accent-soft);}
+  .sw-file{flex:1;min-width:160px;font-size:12.5px;color:var(--muted);word-break:break-all;}
+  .sw-file.has{color:var(--ink);font-weight:600;}
+
   /* The rubric is far wider than the form, so on a desktop it steps outside the
      reading column and centres on the viewport instead of scrolling sideways. */
   @media (min-width:1060px){
@@ -309,6 +316,21 @@
       <p class="hint" id="nextStepsHint"></p>
     </section>
 
+    <section class="card">
+      <h3 class="section-title">Student work</h3>
+      <div class="sw-drop" id="swDrop">
+        <input type="file" id="swInput" accept="application/pdf,.pdf" hidden>
+        <button class="btn small" id="swPickBtn" type="button">Choose PDF…</button>
+        <span class="sw-file" id="swFile">or drop the student’s work here</span>
+        <button class="btn small" id="swClearBtn" type="button" hidden>Remove</button>
+      </div>
+      <div class="fn-foot">
+        <div class="fn-preview" id="swPreview" aria-live="polite"></div>
+        <button class="btn primary" id="swDownloadBtn" type="button" disabled><span class="ic">⭳</span>Download renamed</button>
+      </div>
+      <p class="hint">Add the PDF of the work this annotation goes with, and it’s saved again under the same file name as above with STUDENT_WORK on the end — so the two sit side by side in a folder.</p>
+    </section>
+
     <p class="hint">Nothing here is uploaded anywhere — the form autosaves to this browser only, and the PDF is built and downloaded locally.</p>
   </main>
 
@@ -333,6 +355,8 @@
     nextStepsArea:$('nextStepsArea'), nextStepsHint:$('nextStepsHint'),
     downloadBtn:$('downloadBtn'), clearBtn:$('clearBtn'), progressPill:$('progressPill'),
     fnDrop:$('fnDrop'), fnPal:$('fnPal'), fnSep:$('fnSep'), fnPreview:$('fnPreview'),
+    swDrop:$('swDrop'), swInput:$('swInput'), swPickBtn:$('swPickBtn'), swFile:$('swFile'),
+    swClearBtn:$('swClearBtn'), swPreview:$('swPreview'), swDownloadBtn:$('swDownloadBtn'),
   };
 
   /* ---------- division ----------
@@ -753,6 +777,12 @@
     const name = safeFilePart(parts.join(fnSep));
     return name ? name + '.pdf' : null;
   }
+  /* The student-work copy takes the same name with STUDENT_WORK on the end,
+     joined by the chosen separator (or an underscore when there is none). */
+  function buildStudentWorkFilename(){
+    const name = buildFilename();
+    return name ? name.replace(/\.pdf$/, '') + (fnSep || '_') + 'STUDENT_WORK.pdf' : null;
+  }
 
   /* ---------- validation ---------- */
   function validate(){
@@ -776,6 +806,9 @@
     const missing = validate();
     els.downloadBtn.disabled = missing.length > 0;
     els.downloadBtn.title = missing.length ? 'Missing: ' + missing.join(', ') : '';
+    els.swDownloadBtn.disabled = !studentWork || missing.length > 0;
+    els.swDownloadBtn.title = !studentWork ? 'Choose the student’s PDF first'
+      : missing.length ? 'Missing: ' + missing.join(', ') : '';
   }
 
   /* ---------- file-name builder ----------
@@ -984,6 +1017,9 @@
     const name = buildFilename();
     els.fnPreview.textContent = name || 'Add a part to name the file';
     els.fnPreview.classList.toggle('bad', !name);
+    const swName = buildStudentWorkFilename();
+    els.swPreview.textContent = swName || 'Add a part to name the file';
+    els.swPreview.classList.toggle('bad', !swName);
   }
 
   function initFilenameBuilder(){
@@ -1278,6 +1314,50 @@
     toast('Downloaded ' + filename, 'ok');
   });
 
+  /* ---------- student work ----------
+     Held in memory only: a PDF is too big for localStorage, and it belongs to
+     one student, so it isn't part of the draft. */
+  let studentWork = null;
+
+  function isPdf(file){ return file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)); }
+  function setStudentWork(file){
+    if(file && !isPdf(file)){ toast('That isn’t a PDF — choose a .pdf file.', 'err'); return; }
+    studentWork = file || null;
+    els.swInput.value = '';
+    renderStudentWork();
+    refreshValidity();
+  }
+  function renderStudentWork(){
+    els.swFile.textContent = studentWork ? studentWork.name : 'or drop the student’s work here';
+    els.swFile.classList.toggle('has', !!studentWork);
+    els.swClearBtn.hidden = !studentWork;
+    els.swPickBtn.textContent = studentWork ? 'Replace…' : 'Choose PDF…';
+  }
+
+  els.swPickBtn.addEventListener('click', ()=> els.swInput.click());
+  els.swInput.addEventListener('change', ()=> setStudentWork(els.swInput.files[0]));
+  els.swClearBtn.addEventListener('click', ()=> setStudentWork(null));
+  els.swDrop.addEventListener('dragover', e => { e.preventDefault(); els.swDrop.classList.add('over'); });
+  els.swDrop.addEventListener('dragleave', ()=> els.swDrop.classList.remove('over'));
+  els.swDrop.addEventListener('drop', e => {
+    e.preventDefault(); els.swDrop.classList.remove('over');
+    const file = e.dataTransfer.files[0];
+    if(file) setStudentWork(file);
+  });
+
+  els.swDownloadBtn.addEventListener('click', ()=>{
+    if(!studentWork){ toast('Choose the student’s PDF first.', 'err'); return; }
+    const missing = validate();
+    if(missing.length){ toast('Missing: ' + missing.join(', ') + '.', 'err'); return; }
+    const filename = buildStudentWorkFilename();
+    const url = URL.createObjectURL(studentWork);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    toast('Downloaded ' + filename, 'ok');
+  });
+
   /* ---------- clear / autosave ---------- */
   function fieldEls(){
     return [els.nameInput, els.dateInput, els.gradeSelect, els.asnInput, els.teacherInput, els.subjectInput,
@@ -1293,6 +1373,7 @@
     els.classSelect.value = ''; renderStudentSelect();
     rubricDates = {}; renderRubricPreview();
     els.dateInput.value = todayISO();
+    studentWork = null;
     onAnyInput();
   });
 
@@ -1328,6 +1409,7 @@
     updateBoxHint(els.contextArea, els.contextHint, CONTEXT_MAX_LINES, CONTEXT_WIDTH);
     updateBoxHint(els.nextStepsArea, els.nextStepsHint, NEXTSTEPS_MAX_LINES, NEXTSTEPS_WIDTH);
     updateFnPreview();
+    renderStudentWork();
     refreshValidity();
     updateAddBtn();
     saveDraft();

@@ -59,6 +59,10 @@ and port it upstream by hand.
 - `safeToken()` and `formatDateFile()` are gone, replaced by `safeFilePart()`.
   The old helper stripped every digit (`[^A-Z-]`), which would have erased the
   ASN and the date parts outright.
+- A **Student work** card near the bottom. Pick or drop a PDF and it is
+  downloaded again under the form's file name plus `STUDENT_WORK`, joined by
+  the chosen separator (an underscore when that is "none"). The file is held
+  in memory only. It is not in the draft, and "Clear form" drops it.
 
 ## Graph Paper — how it's built
 
