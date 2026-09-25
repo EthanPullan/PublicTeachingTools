@@ -20,10 +20,9 @@ Those files change upstream; this one only records what is different **here**.
 
 - **Scope is a curated subset.** Upstream carries ~20 tools; this site carries
   only the EAL Benchmark tool and Graph Paper.
-- **No Class Lists.** The shared roster panel (localStorage
-  `teachingtools:rosters`) is not on this homepage. The EAL tool handles its
-  absence on its own — it hides the class pickers and falls back to a typed
-  name — so nothing needs patching to keep that working.
+- **No shared Class Lists.** The shared roster panel (localStorage
+  `teachingtools:rosters`) is not on this homepage, and the EAL tool no
+  longer reads it. The tool has its own class list instead (see below).
 - **The homepage has no JavaScript at all.** `index.html` is a pure static
   launcher. Keep it that way unless there's a real reason not to.
 
@@ -59,9 +58,18 @@ and port it upstream by hand.
 - `safeToken()` and `formatDateFile()` are gone, replaced by `safeFilePart()`.
   The old helper stripped every digit (`[^A-Z-]`), which would have erased the
   ASN and the date parts outright.
-- Picking a student from the class list keeps **grade, context and next
-  steps**, which are usually shared across a class. It still clears ASN, the
-  LP scores and the rubric dates. Upstream clears all of them.
+- Its own **Class list** card near the top replaces upstream's shared-roster
+  pickers and "Add to class" button. It is a small table of name and ASN, typed
+  in or pasted as two columns from a spreadsheet (a digits-only column is
+  taken as the ASN). It is saved under `teachingtools:ealBenchmark:class` as
+  `{ students: [{ name, asn, done }] }`. The table always ends in one blank
+  row, and typing into it starts the next student. `done` is set when that
+  student's benchmark is downloaded and drives the ✓ in the picker and the
+  "n / m downloaded" pill. "Untick all" resets it. The old
+  `teachingtools:ealBenchmark:completed` log is no longer used.
+- Picking a student fills in **name and ASN**, and keeps **grade, context and
+  next steps**, which are usually shared across a class. It clears the LP
+  scores and rubric dates. Upstream clears all of them.
 - A **Student work** card near the bottom. Pick or drop a PDF, often a
   whole class scanned into one file, click the pages for this student (or
   type `3-4`), and those pages are saved as their own PDF. It is named after

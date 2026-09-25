@@ -138,6 +138,24 @@
   .sw-file{flex:1;min-width:160px;font-size:12.5px;color:var(--muted);word-break:break-all;}
   .sw-file.has{color:var(--ink);font-weight:600;}
   a.btn{text-decoration:none;}
+
+  /* class list — a small spreadsheet of names and ASNs, typed or pasted in once */
+  .cls summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;margin:0;}
+  .cls summary::-webkit-details-marker{display:none;}
+  .cls summary::before{content:'▸';font-size:11px;color:var(--muted);transition:transform .12s;}
+  .cls[open] summary::before{transform:rotate(90deg);}
+  .cls[open] summary{margin-bottom:12px;}
+  .cls summary .count{font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--muted);}
+  .cls-table{width:100%;border-collapse:collapse;margin-top:10px;}
+  .cls-table th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    text-align:left;padding:0 6px 6px 0;}
+  .cls-table th.n,.cls-table td.n{width:28px;text-align:right;padding-right:8px;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .cls-table td{padding:0 6px 6px 0;}
+  .cls-table td.asn{width:34%;}
+  .cls-table td.x{width:30px;padding-right:0;}
+  .cls-table tr.done input[data-f="name"]{text-decoration:line-through;text-decoration-color:var(--ok);}
+  .cls-x{border:none;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:4px 6px;border-radius:6px;}
+  .cls-x:hover{color:var(--danger);background:var(--danger-soft);}
   .sw-combine{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:600;cursor:pointer;}
   .sw-combine input{width:16px;height:16px;margin:0;accent-color:var(--board);}
   .sw-combine.off{opacity:.45;cursor:not-allowed;}
@@ -212,6 +230,22 @@
     </section>
 
     <section class="card">
+      <details class="cls" id="classCard">
+        <summary class="section-title">Class list <span class="count" id="classCount"></span></summary>
+        <p class="hint">Put your students in once at the start — type them, or copy the name and ASN columns from a spreadsheet and paste them into the table.
+          Then choose each student under “Student” and their name and ASN fill in. The list is saved in this browser only.</p>
+        <table class="cls-table">
+          <thead><tr><th class="n">#</th><th>Legal name (first &amp; last)</th><th>ASN</th><th></th></tr></thead>
+          <tbody id="classBody"></tbody>
+        </table>
+        <div class="fn-foot">
+          <button class="btn small" id="classUntickBtn" type="button" title="Start the class again: mark every student as not yet downloaded">Untick all</button>
+          <button class="btn small danger" id="classClearBtn" type="button">Clear list</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
       <h3 class="section-title">Division</h3>
       <div class="seg" id="divisionSeg" role="group" aria-label="Division">
         <button type="button" data-division="2">Division 2</button>
@@ -221,23 +255,16 @@
 
     <section class="card">
       <h3 class="section-title">Student</h3>
-      <div class="row cols2" id="classPickers">
-        <div class="field">
-          <label for="classSelect">Class</label>
-          <select id="classSelect"></select>
-        </div>
+      <div class="row" id="classPicker" hidden>
         <div class="field">
           <label for="studentSelect">From class list</label>
           <select id="studentSelect"></select>
         </div>
       </div>
       <div class="row">
-        <div class="name-row">
-          <div class="field">
-            <label for="nameInput">Legal student name (first &amp; last)</label>
-            <input type="text" id="nameInput" autocomplete="off" placeholder="e.g. Ada Lovelace">
-          </div>
-          <button class="btn small" id="addToClassBtn" title="Add this name to the selected class list">＋ Add to class</button>
+        <div class="field">
+          <label for="nameInput">Legal student name (first &amp; last)</label>
+          <input type="text" id="nameInput" autocomplete="off" placeholder="e.g. Ada Lovelace">
         </div>
       </div>
     </section>
@@ -378,15 +405,15 @@
 <script>
 (function(){
   const $ = id => document.getElementById(id);
-  const ROSTER_LS = 'teachingtools:rosters';
   const DRAFT_LS  = 'teachingtools:ealBenchmark:draft';
-  const DONE_LS   = 'teachingtools:ealBenchmark:completed';
+  const CLASS_LS  = 'teachingtools:ealBenchmark:class';
 
   const els = {
     divisionSeg:$('divisionSeg'), rubricTable:$('rubricTable'),
-    classPickers:$('classPickers'), classSelect:$('classSelect'), studentSelect:$('studentSelect'),
-    studentHint:$('studentHint'),
-    nameInput:$('nameInput'), addToClassBtn:$('addToClassBtn'),
+    classCard:$('classCard'), classCount:$('classCount'), classBody:$('classBody'),
+    classUntickBtn:$('classUntickBtn'), classClearBtn:$('classClearBtn'),
+    classPicker:$('classPicker'), studentSelect:$('studentSelect'),
+    nameInput:$('nameInput'),
     dateInput:$('dateInput'), gradeSelect:$('gradeSelect'), asnInput:$('asnInput'),
     teacherInput:$('teacherInput'), subjectInput:$('subjectInput'),
     contextArea:$('contextArea'), contextHint:$('contextHint'),
@@ -603,134 +630,175 @@
     setTimeout(()=>{ t.remove(); }, 3600);
   }
 
-  /* ---------- shared class lists (read-only + best-effort append) ---------- */
-  let rosters = [];
-  function loadRosters(){
-    rosters = [];
+  /* ---------- class list ----------
+     This tool's own list of students — name and ASN — typed or pasted in
+     once, then picked from under "Student". It is saved under its own key;
+     nothing is read from or written to other sites' class lists. `done`
+     marks a student whose benchmark has been downloaded. */
+  let classList = [];   // { name, asn, done }, in the order the teacher entered them
+
+  function loadClass(){
+    classList = [];
     try{
-      const d = JSON.parse(localStorage.getItem(ROSTER_LS) || 'null');
-      if(d && Array.isArray(d.classes)){
-        rosters = d.classes.map(c=>({
-          name: (c && c.name != null) ? String(c.name).trim() : '',
-          students: (c && Array.isArray(c.students)) ? c.students.map(s=>String(s).trim()).filter(Boolean) : []
-        })).filter(c=>c.name && c.students.length);
+      const d = JSON.parse(localStorage.getItem(CLASS_LS) || 'null');
+      if(d && Array.isArray(d.students)){
+        classList = d.students.map(x => ({
+          name: String((x && x.name) || '').trim(), asn: String((x && x.asn) || '').trim(), done: !!(x && x.done),
+        })).filter(x => x.name || x.asn);
       }
     }catch(e){ /* unreadable — start empty */ }
   }
-  function saveRosterAdd(className, studentName){
+  function saveClass(){
     try{
-      const d = JSON.parse(localStorage.getItem(ROSTER_LS) || 'null');
-      const classes = (d && Array.isArray(d.classes)) ? d.classes : [];
-      const cls = classes.find(c=>c && (c.name||'').trim().toLowerCase() === className.toLowerCase());
-      if(!cls) return false;
-      if(!Array.isArray(cls.students)) cls.students = [];
-      if(cls.students.some(s=>String(s).trim().toLowerCase() === studentName.toLowerCase())) return true; // already there
-      cls.students.push(studentName);
-      localStorage.setItem(ROSTER_LS, JSON.stringify({
-        type:'teachingtools-rosters', version:1, source:'eal-benchmark', savedAt:Date.now(), classes
-      }));
-      return true;
-    }catch(e){ return false; }
+      const students = classList.filter(x => x.name.trim() || x.asn.trim())
+        .map(x => ({ name: x.name.trim(), asn: x.asn.trim(), done: !!x.done }));
+      localStorage.setItem(CLASS_LS, JSON.stringify({ students }));
+    }catch(e){ /* storage unavailable / full — ignore */ }
   }
+  const namedStudents = () => classList.filter(x => x.name.trim());
+  const sameName = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-  /* ---------- per-student "downloaded" tracking (this tool only) ---------- */
-  function loadCompleted(){
-    try{ const a = JSON.parse(localStorage.getItem(DONE_LS) || '[]'); return Array.isArray(a) ? a : []; }
-    catch(e){ return []; }
-  }
-  function markCompleted(className, studentName){
-    try{
-      const list = loadCompleted();
-      list.push({ cls: className || '', name: studentName, at: Date.now() });
-      localStorage.setItem(DONE_LS, JSON.stringify(list.slice(-3000)));
-    }catch(e){ /* ignore */ }
-  }
-  function isCompleted(className, studentName){
-    return loadCompleted().some(r=>r.cls === (className||'') && r.name === studentName);
-  }
-
-  /* ---------- class / student pickers ---------- */
-  function renderClassSelect(){
-    const prev = els.classSelect.value;
-    els.classSelect.innerHTML = '';
-    const noneOpt = document.createElement('option');
-    noneOpt.value = ''; noneOpt.textContent = rosters.length ? '— Choose a class —' : 'No saved classes yet';
-    els.classSelect.appendChild(noneOpt);
-    rosters.forEach(c=>{
-      const o = document.createElement('option');
-      o.value = c.name; o.textContent = c.name + ' (' + c.students.length + ')';
-      els.classSelect.appendChild(o);
+  // The table always ends in one blank row; typing into it starts the next student.
+  function classRow(x, i){
+    const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    tr.classList.toggle('done', !!x.done);
+    const cell = (cls, el) => { const td = document.createElement('td'); if(cls) td.className = cls; if(el) td.appendChild(el); tr.appendChild(td); return td; };
+    cell('n').textContent = i + 1;
+    ['name', 'asn'].forEach(f => {
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.autocomplete = 'off'; inp.dataset.f = f; inp.value = x[f];
+      inp.placeholder = f === 'name' ? 'First Last' : 'ASN';
+      inp.setAttribute('aria-label', (f === 'name' ? 'Name' : 'ASN') + ', row ' + (i + 1));
+      cell(f === 'asn' ? 'asn' : '', inp);
     });
-    if(rosters.some(c=>c.name === prev)) els.classSelect.value = prev;
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'cls-x'; del.textContent = '×';
+    del.title = 'Remove this student'; del.setAttribute('aria-label', 'Remove row ' + (i + 1));
+    cell('x', del);
+    return tr;
   }
-  function currentClass(){
-    return rosters.find(c=>c.name === els.classSelect.value) || null;
+  function renderClassTable(){
+    els.classBody.textContent = '';
+    classList.forEach((x, i) => els.classBody.appendChild(classRow(x, i)));
+    const blank = classRow({ name: '', asn: '' }, classList.length);
+    blank.querySelector('.cls-x').hidden = true;
+    els.classBody.appendChild(blank);
+    renderClassMeta();
   }
+  function renderClassMeta(){
+    const n = namedStudents().length;
+    els.classCount.textContent = n ? '(' + n + ' student' + (n === 1 ? '' : 's') + ')' : '';
+    renderStudentSelect();
+  }
+
+  els.classBody.addEventListener('input', e => {
+    const inp = e.target.closest('input');
+    if(!inp) return;
+    const tr = inp.closest('tr'), i = +tr.dataset.i;
+    if(i === classList.length){
+      // The blank row just became a student — give it a remove button and add a new blank row.
+      classList.push({ name: '', asn: '', done: false });
+      tr.querySelector('.cls-x').hidden = false;
+      const blank = classRow({ name: '', asn: '' }, classList.length);
+      blank.querySelector('.cls-x').hidden = true;
+      els.classBody.appendChild(blank);
+    }
+    classList[i][inp.dataset.f] = inp.value;
+    saveClass(); renderClassMeta();
+  });
+  els.classBody.addEventListener('click', e => {
+    const del = e.target.closest('.cls-x');
+    if(!del) return;
+    classList.splice(+del.closest('tr').dataset.i, 1);
+    saveClass(); renderClassTable();
+  });
+  // Enter moves down a row, like a spreadsheet.
+  els.classBody.addEventListener('keydown', e => {
+    if(e.key !== 'Enter') return;
+    const inp = e.target.closest('input');
+    if(!inp) return;
+    e.preventDefault();
+    const next = inp.closest('tr').nextElementSibling;
+    if(next) next.querySelector('input[data-f="' + inp.dataset.f + '"]').focus();
+  });
+  /* Pasting several lines — e.g. two columns copied from a spreadsheet — fills
+     rows from the one pasted into. A column of only digits is taken as the ASN,
+     so the columns can be in either order. */
+  els.classBody.addEventListener('paste', e => {
+    const inp = e.target.closest('input');
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if(!inp || !/[\t\n]/.test(text.trim())) return;
+    e.preventDefault();
+    const rows = text.replace(/\r/g, '').split('\n').map(l => l.split('\t').map(c => c.trim())).filter(r => r.some(Boolean));
+    let i = +inp.closest('tr').dataset.i;
+    const startField = inp.dataset.f;
+    rows.forEach(cols => {
+      let name, asn;
+      if(cols.length === 1) (startField === 'asn' ? (asn = cols[0]) : (name = cols[0]));
+      else{
+        const digits = c => /^[\d\s-]+$/.test(c);
+        [name, asn] = digits(cols[0]) && !digits(cols[1]) ? [cols[1], cols[0]] : [cols[0], cols[1]];
+      }
+      if(i >= classList.length) classList.push({ name: '', asn: '', done: false });
+      if(name != null) classList[i].name = name;
+      if(asn != null) classList[i].asn = asn;
+      i++;
+    });
+    saveClass(); renderClassTable();
+    toast('Added ' + rows.length + ' row' + (rows.length === 1 ? '' : 's') + ' to the class list.', 'ok');
+  });
+  els.classUntickBtn.addEventListener('click', () => {
+    classList.forEach(x => { x.done = false; });
+    saveClass(); renderClassTable();
+  });
+  els.classClearBtn.addEventListener('click', () => {
+    if(namedStudents().length && !confirm('Remove every student from the class list?')) return;
+    classList = [];
+    saveClass(); renderClassTable();
+  });
+
+  /* ---------- student picker ---------- */
   function renderStudentSelect(){
-    const cls = currentClass();
+    const list = namedStudents();
+    els.classPicker.hidden = !list.length;
     els.studentSelect.innerHTML = '';
     const opt0 = document.createElement('option');
-    opt0.value = ''; opt0.textContent = cls ? '— Choose a student —' : 'Pick a class first';
+    opt0.value = ''; opt0.textContent = '— Choose a student —';
     els.studentSelect.appendChild(opt0);
-    if(cls){
-      cls.students.slice().sort((a,b)=>a.localeCompare(b)).forEach(name=>{
-        const o = document.createElement('option');
-        o.value = name;
-        o.textContent = (isCompleted(cls.name, name) ? '✓ ' : '') + name;
-        els.studentSelect.appendChild(o);
-      });
-    }
-    els.studentSelect.disabled = !cls;
+    list.forEach(x => {
+      const o = document.createElement('option');
+      o.value = classList.indexOf(x);
+      o.textContent = (x.done ? '✓ ' : '') + x.name.trim();
+      els.studentSelect.appendChild(o);
+    });
+    const cur = list.find(x => sameName(x.name, els.nameInput.value));
+    els.studentSelect.value = cur ? classList.indexOf(cur) : '';
     renderProgress();
   }
   function renderProgress(){
-    const cls = currentClass();
-    if(!cls || !cls.students.length){ els.progressPill.hidden = true; return; }
-    const done = cls.students.filter(n=>isCompleted(cls.name, n)).length;
-    els.progressPill.hidden = false;
-    els.progressPill.textContent = done + ' / ' + cls.students.length + ' downloaded';
+    const list = namedStudents();
+    els.progressPill.hidden = !list.length;
+    els.progressPill.textContent = list.filter(x => x.done).length + ' / ' + list.length + ' downloaded';
   }
-  /* With no saved Class Lists the pickers are hidden rather than shown empty, so
-     a copy of this file passed to someone else is just "type the name". */
-  function renderRosterUi(){
-    const hasRosters = rosters.length > 0;
-    els.classPickers.hidden = !hasRosters;
-    els.addToClassBtn.hidden = !hasRosters;
+  function markCompleted(name){
+    const x = namedStudents().find(s => sameName(s.name, name));
+    if(!x) return;
+    x.done = true;
+    saveClass(); renderClassTable();
   }
 
-  els.classSelect.addEventListener('change', ()=>{ renderStudentSelect(); updateAddBtn(); });
   els.studentSelect.addEventListener('change', ()=>{
-    const name = els.studentSelect.value;
-    if(!name) return;
-    els.nameInput.value = name;
+    const x = classList[+els.studentSelect.value];
+    if(els.studentSelect.value === '' || !x) return;
+    els.nameInput.value = x.name.trim();
+    els.asnInput.value = x.asn.trim();
     /* A new student record — clear what belongs to one student. Grade,
        context and next steps are usually shared across a class's benchmarks,
        so they carry over. */
-    els.asnInput.value = '';
     els.vocabLP.value = ''; els.syntaxLP.value = ''; els.discourseLP.value = ''; els.overallLP.value = '';
     rubricDates = {}; renderRubricPreview();
     onAnyInput();
-  });
-  els.nameInput.addEventListener('input', updateAddBtn);
-  function updateAddBtn(){
-    const cls = currentClass();
-    const name = els.nameInput.value.trim();
-    const already = cls && cls.students.some(s=>s.toLowerCase() === name.toLowerCase());
-    els.addToClassBtn.disabled = !cls || !name || already;
-    els.addToClassBtn.title = !cls ? 'Choose a class first' : already ? 'Already in this class' : 'Add this name to the selected class list';
-  }
-  els.addToClassBtn.addEventListener('click', ()=>{
-    const cls = currentClass();
-    const name = els.nameInput.value.trim();
-    if(!cls || !name) return;
-    if(saveRosterAdd(cls.name, name)){
-      loadRosters(); renderClassSelect(); els.classSelect.value = cls.name; renderStudentSelect();
-      els.studentSelect.value = name;
-      toast('Added “' + name + '” to ' + cls.name + '.', 'ok');
-    }else{
-      toast('Could not save to the class list.', 'err');
-    }
-    updateAddBtn();
   });
 
   /* ---------- text measuring / wrapping (shared by the on-screen hints and the PDF) ---------- */
@@ -1339,11 +1407,7 @@
   }
 
   function buildBenchmarkBlob(){ return bytesToBlob(buildPdf(buildContentStream(collectValues()))); }
-  function markStudentDone(){
-    const cls = currentClass();
-    markCompleted(cls ? cls.name : '', els.nameInput.value.trim());
-    renderStudentSelect();
-  }
+  function markStudentDone(){ markCompleted(els.nameInput.value); }
 
   els.downloadBtn.addEventListener('click', ()=>{
     const missing = validate();
@@ -2092,7 +2156,6 @@
   els.clearBtn.addEventListener('click', ()=>{
     if(hasAnyValue() && !confirm('Clear every field on this form?')) return;
     fieldEls().forEach(el => { el.value = ''; });
-    els.classSelect.value = ''; renderStudentSelect();
     rubricDates = {}; renderRubricPreview();
     els.dateInput.value = todayISO();
     if(swDoc && swDoc.pages.length > 1){ swSel = new Set(); swLast = null; els.swRange.value = ''; }
@@ -2108,7 +2171,6 @@
     try{
       const draft = {};
       fieldEls().forEach(el => { draft[el.id] = el.value; });
-      draft.classSelect = els.classSelect.value;
       draft.division = division;
       draft.rubricDates = rubricDates;
       localStorage.setItem(DRAFT_LS, JSON.stringify(draft));
@@ -2121,7 +2183,6 @@
       if(d.division && DIVISIONS[d.division]) division = d.division;
       renderDivision(); // rebuild the grade options for the restored division before restoring its value
       fieldEls().forEach(el => { if(d[el.id] != null) el.value = d[el.id]; });
-      if(d.classSelect) els.classSelect.value = d.classSelect;
       if(d.rubricDates && typeof d.rubricDates === 'object'){ rubricDates = d.rubricDates; renderRubricPreview(); }
       return true;
     }catch(e){ return false; }
@@ -2133,19 +2194,18 @@
     updateFnPreview();
     renderStudentWork();
     refreshValidity();
-    updateAddBtn();
+    renderStudentSelect();
     saveDraft();
   }
   fieldEls().forEach(el => el.addEventListener('input', onAnyInput));
   fieldEls().forEach(el => el.addEventListener('change', onAnyInput));
 
   /* ---------- init ---------- */
-  loadRosters();
-  renderClassSelect();
+  loadClass();
   renderDivision();
   loadDraft();
-  renderStudentSelect();
-  renderRosterUi();
+  renderClassTable();
+  els.classCard.open = !namedStudents().length;
   initFilenameBuilder();
   if(!els.dateInput.value) els.dateInput.value = todayISO();
   onAnyInput();
