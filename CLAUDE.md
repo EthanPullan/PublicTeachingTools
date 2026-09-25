@@ -59,10 +59,21 @@ and port it upstream by hand.
 - `safeToken()` and `formatDateFile()` are gone, replaced by `safeFilePart()`.
   The old helper stripped every digit (`[^A-Z-]`), which would have erased the
   ASN and the date parts outright.
-- A **Student work** card near the bottom. Pick or drop a PDF and it is
-  downloaded again under the form's file name plus `STUDENT_WORK`, joined by
-  the chosen separator (an underscore when that is "none"). The file is held
-  in memory only. It is not in the draft, and "Clear form" drops it.
+- A **Student work** card near the bottom. Pick or drop a PDF, often a
+  whole class scanned into one file, click the pages for this student (or
+  type `3-4`), and those pages are saved as their own PDF. It is named after
+  the form's file name plus `STUDENT_WORK`, joined by the chosen separator
+  (an underscore when that is "none"). The file is held in memory only, not
+  in the draft. "Clear form" keeps the scan loaded and only clears the page
+  selection, and pages already saved are faded.
+- **`PdfDoc`** is a hand-built PDF reader behind that card, with no library
+  (upstream rules out CDNs). It follows the cross-reference table, including
+  xref streams, object streams and incremental updates, and falls back to
+  scanning for objects when the table is damaged. It previews each page from
+  its largest JPEG, which is how scanners store pages. It writes the chosen
+  pages into a new PDF by copying their objects byte for byte, and trims a
+  shared `/XObject` dictionary to what each page's content actually uses.
+  Encrypted or unreadable files fall back to saving the whole PDF renamed.
 
 ## Graph Paper — how it's built
 

@@ -137,6 +137,26 @@
   .sw-drop.over{border-color:var(--accent);background:var(--accent-soft);}
   .sw-file{flex:1;min-width:160px;font-size:12.5px;color:var(--muted);word-break:break-all;}
   .sw-file.has{color:var(--ink);font-weight:600;}
+  a.btn{text-decoration:none;}
+  .sw-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:12px;}
+  .sw-bar .field{flex:1;min-width:160px;}
+  .sw-pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;
+    margin-top:12px;max-height:560px;overflow:auto;padding:3px;}
+  .sw-page{position:relative;display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);
+    background:var(--panel);border-radius:9px;padding:6px;cursor:pointer;font:inherit;color:var(--ink);}
+  .sw-page:hover{border-color:var(--muted);}
+  .sw-thumb{aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    background:var(--panel-2);border-radius:6px;font-size:22px;font-weight:700;color:var(--muted);}
+  .sw-thumb img{flex:none;width:100%;height:100%;object-fit:contain;}
+  /* a page turned a quarter-turn: size the image for the turned box, then turn it */
+  .sw-thumb img.sideways{width:133.33%;height:75%;}
+  .sw-num{font-size:11.5px;font-weight:600;text-align:center;color:var(--muted);}
+  .sw-page.saved .sw-thumb{opacity:.45;}
+  .sw-page[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent);}
+  .sw-page[aria-pressed="true"] .sw-num{color:var(--ink);}
+  .sw-page[aria-pressed="true"]::after{content:'✓';position:absolute;top:3px;right:3px;width:20px;height:20px;
+    border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;}
 
   /* The rubric is far wider than the form, so on a desktop it steps outside the
      reading column and centres on the viewport instead of scrolling sideways. */
@@ -324,11 +344,24 @@
         <span class="sw-file" id="swFile">or drop the student’s work here</span>
         <button class="btn small" id="swClearBtn" type="button" hidden>Remove</button>
       </div>
+      <p class="hint" id="swStatus" hidden></p>
+      <div id="swPicker" hidden>
+        <div class="sw-bar">
+          <div class="field">
+            <label for="swRange">Pages for this student</label>
+            <input type="text" id="swRange" autocomplete="off" placeholder="Click pages below, or type e.g. 3-4">
+          </div>
+          <a class="btn small" id="swView" target="_blank" rel="noopener">View whole PDF ↗</a>
+        </div>
+        <div class="sw-pages" id="swPages" role="group" aria-label="Pages"></div>
+      </div>
       <div class="fn-foot">
         <div class="fn-preview" id="swPreview" aria-live="polite"></div>
-        <button class="btn primary" id="swDownloadBtn" type="button" disabled><span class="ic">⭳</span>Download renamed</button>
+        <button class="btn primary" id="swDownloadBtn" type="button" disabled><span class="ic">⭳</span><span id="swDownloadLabel">Download PDF</span></button>
       </div>
-      <p class="hint">Add the PDF of the work this annotation goes with, and it’s saved again under the same file name as above with STUDENT_WORK on the end — so the two sit side by side in a folder.</p>
+      <p class="hint">Add the PDF of the work this annotation goes with — one student’s pages, or a whole class scanned into one file.
+        Pick this student’s pages and they’re saved as their own PDF, under the same file name as above with STUDENT_WORK on the end.
+        The scan stays loaded when you clear the form, and pages you’ve already saved are faded, so you can work through the class.</p>
     </section>
 
     <p class="hint">Nothing here is uploaded anywhere — the form autosaves to this browser only, and the PDF is built and downloaded locally.</p>
@@ -357,6 +390,8 @@
     fnDrop:$('fnDrop'), fnPal:$('fnPal'), fnSep:$('fnSep'), fnPreview:$('fnPreview'),
     swDrop:$('swDrop'), swInput:$('swInput'), swPickBtn:$('swPickBtn'), swFile:$('swFile'),
     swClearBtn:$('swClearBtn'), swPreview:$('swPreview'), swDownloadBtn:$('swDownloadBtn'),
+    swDownloadLabel:$('swDownloadLabel'), swStatus:$('swStatus'), swPicker:$('swPicker'),
+    swRange:$('swRange'), swView:$('swView'), swPages:$('swPages'),
   };
 
   /* ---------- division ----------
@@ -806,9 +841,12 @@
     const missing = validate();
     els.downloadBtn.disabled = missing.length > 0;
     els.downloadBtn.title = missing.length ? 'Missing: ' + missing.join(', ') : '';
-    els.swDownloadBtn.disabled = !studentWork || missing.length > 0;
-    els.swDownloadBtn.title = !studentWork ? 'Choose the student’s PDF first'
+    const swBlock = !studentWork ? 'Choose the student’s PDF first'
+      : swBusy ? 'Still reading the PDF'
+      : swDoc && !swSel.size ? 'Pick this student’s pages'
       : missing.length ? 'Missing: ' + missing.join(', ') : '';
+    els.swDownloadBtn.disabled = !!swBlock;
+    els.swDownloadBtn.title = swBlock;
   }
 
   /* ---------- file-name builder ----------
@@ -1314,24 +1352,634 @@
     toast('Downloaded ' + filename, 'ok');
   });
 
+  /* ---------- PDF page cutter (hand-built, no library) ----------
+     Reads a PDF well enough to list its pages, find a JPEG to preview each
+     one with (scanners usually store a page as a single JPEG), and write a
+     new PDF holding only the chosen pages. Page content is copied byte for
+     byte, never re-encoded. Anything it can't read throws, and the caller
+     falls back to saving the whole file. */
+  const PdfDoc = (function(){
+    const INHERIT = ['/Resources', '/MediaBox', '/CropBox', '/Rotate'];
+    const isWs = c => c === ' ' || c === '\n' || c === '\r' || c === '\t' || c === '\f' || c === '\0';
+    const isDelim = c => c !== undefined && '()<>[]{}/%'.indexOf(c) >= 0;
+
+    // One char per byte, so string offsets are file offsets.
+    function toBinary(bytes){
+      let s = '';
+      for(let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      return s;
+    }
+    function fromBinary(s){
+      const b = new Uint8Array(s.length);
+      for(let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xFF;
+      return b;
+    }
+
+    /* Values: { dict: Map }, arrays, { ref, gen }, { name: '/X' }, and
+       { raw } for everything else — numbers, strings, booleans, null — kept
+       exactly as written so they can be copied out unchanged. */
+    function Lexer(s, p){ this.s = s; this.p = p || 0; }
+    Lexer.prototype.ws = function(){
+      const s = this.s;
+      for(;;){
+        const c = s[this.p];
+        if(isWs(c)) this.p++;
+        else if(c === '%'){ while(this.p < s.length && s[this.p] !== '\n' && s[this.p] !== '\r') this.p++; }
+        else return;
+      }
+    };
+    Lexer.prototype.word = function(){
+      const s = this.s, st = this.p;
+      while(this.p < s.length && !isWs(s[this.p]) && !isDelim(s[this.p])) this.p++;
+      return s.slice(st, this.p);
+    };
+    Lexer.prototype.value = function(){
+      this.ws();
+      const s = this.s, c = s[this.p];
+      if(c === '<' && s[this.p + 1] === '<'){
+        this.p += 2;
+        const d = new Map();
+        for(;;){
+          this.ws();
+          if(s[this.p] === '>' && s[this.p + 1] === '>'){ this.p += 2; return { dict: d }; }
+          if(s[this.p] !== '/') throw new Error('Bad dictionary');
+          const k = this.value().name;
+          d.set(k, this.value());
+        }
+      }
+      if(c === '['){
+        this.p++;
+        const a = [];
+        for(;;){
+          this.ws();
+          if(s[this.p] === ']'){ this.p++; return a; }
+          a.push(this.value());
+        }
+      }
+      if(c === '<'){
+        const e = s.indexOf('>', this.p);
+        if(e < 0) throw new Error('Bad hex string');
+        const raw = s.slice(this.p, e + 1); this.p = e + 1;
+        return { raw };
+      }
+      if(c === '('){
+        let depth = 0, i = this.p;
+        for(; i < s.length; i++){
+          const ch = s[i];
+          if(ch === '\\'){ i++; continue; }
+          if(ch === '(') depth++;
+          else if(ch === ')' && --depth === 0) break;
+        }
+        if(i >= s.length) throw new Error('Bad string');
+        const raw = s.slice(this.p, i + 1); this.p = i + 1;
+        return { raw };
+      }
+      if(c === '/'){ this.p++; return { name: '/' + this.word() }; }
+      const w = this.word();
+      if(!w) throw new Error('Unexpected ' + (c === undefined ? 'end of file' : c));
+      if(/^\d+$/.test(w)){
+        const save = this.p;
+        this.ws();
+        const g = this.word();
+        if(/^\d+$/.test(g)){
+          this.ws();
+          const after = s[this.p + 1];
+          if(s[this.p] === 'R' && (after === undefined || isWs(after) || isDelim(after))){
+            this.p++;
+            return { ref: +w, gen: +g };
+          }
+        }
+        this.p = save;
+      }
+      return { raw: w };
+    };
+
+    function ser(v, mapRef){
+      if(v == null) return 'null';
+      if(Array.isArray(v)) return '[' + v.map(x => ser(x, mapRef)).join(' ') + ']';
+      if(v.dict){
+        const out = [];
+        v.dict.forEach((x, k) => { out.push(k + ' ' + ser(x, mapRef)); });
+        return '<<' + out.join(' ') + '>>';
+      }
+      if(v.ref != null) return mapRef(v);
+      return v.name || v.raw;
+    }
+
+    async function inflate(bytes, format){
+      const ds = new DecompressionStream(format || 'deflate');
+      const w = ds.writable.getWriter();
+      w.write(bytes).catch(()=>{}); w.close().catch(()=>{});
+      const r = ds.readable.getReader(), chunks = [];
+      let len = 0;
+      try{
+        for(;;){ const x = await r.read(); if(x.done) break; chunks.push(x.value); len += x.value.length; }
+      }catch(e){
+        // Junk after the end of the data is common and harmless; keep what came out.
+        if(!len){ if(!format) return inflate(bytes, 'deflate-raw'); throw e; }
+      }
+      const out = new Uint8Array(len);
+      let o = 0;
+      chunks.forEach(c => { out.set(c, o); o += c.length; });
+      return out;
+    }
+    // PNG predictors, as used by cross-reference and object streams.
+    function unpredict(data, parms){
+      const n = k => { const v = parms.get(k); return v ? +v.raw : 0; };
+      if(n('/Predictor') < 10) return data;
+      const colors = n('/Colors') || 1, bpc = n('/BitsPerComponent') || 8, cols = n('/Columns') || 1;
+      const bpp = Math.max(1, Math.ceil(colors * bpc / 8)), rl = Math.ceil(cols * colors * bpc / 8);
+      const rows = Math.floor(data.length / (rl + 1));
+      const out = new Uint8Array(rows * rl);
+      let prev = new Uint8Array(rl);
+      for(let r = 0; r < rows; r++){
+        const ft = data[r * (rl + 1)], src = r * (rl + 1) + 1;
+        const cur = out.subarray(r * rl, (r + 1) * rl);
+        for(let i = 0; i < rl; i++){
+          const x = data[src + i], a = i >= bpp ? cur[i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
+          let v = x;
+          if(ft === 1) v = x + a;
+          else if(ft === 2) v = x + b;
+          else if(ft === 3) v = x + ((a + b) >> 1);
+          else if(ft === 4){
+            const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+            v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+          }
+          cur[i] = v & 0xFF;
+        }
+        prev = cur;
+      }
+      return out;
+    }
+
+    function Doc(file, bytes){
+      this.file = file; this.bytes = bytes; this.s = toBinary(bytes);
+      this.xref = new Map(); this.cache = new Map(); this.objStms = new Map();
+    }
+    Doc.prototype.resolve = function(v){
+      for(let i = 0; v && v.ref != null && i < 32; i++){ const o = this.get(v.ref); v = o ? o.value : null; }
+      return v && v.ref != null ? null : v;
+    };
+    Doc.prototype.nameOf = function(v){ v = this.resolve(v); return v && v.name; };
+    Doc.prototype.numOf = function(v){ v = this.resolve(v); return v && v.raw != null ? Number(v.raw) : NaN; };
+
+    Doc.prototype.get = function(n){
+      if(this.cache.has(n)) return this.cache.get(n);
+      const e = this.xref.get(n);
+      let o = null;
+      try{
+        if(e && e.type === 1) o = this.readAt(e.off, n);
+        else if(e && e.type === 2){
+          const st = this.objStms.get(e.stm);
+          if(st && st.has(n)) o = { value: st.get(n) };
+        }
+      }catch(err){ o = null; }
+      if(o) this.cache.set(n, o);
+      return o;
+    };
+
+    Doc.prototype.readAt = function(off, expect, scanning){
+      const s = this.s, lx = new Lexer(s, off);
+      lx.ws();
+      const n = lx.word(); lx.ws();
+      const g = lx.word(); lx.ws();
+      if(!/^\d+$/.test(n) || !/^\d+$/.test(g) || !s.startsWith('obj', lx.p)) throw new Error('No object here');
+      if(expect != null && +n !== expect) throw new Error('Wrong object');
+      lx.p += 3;
+      const value = lx.value();
+      lx.ws();
+      let stream = null;
+      if(s.startsWith('stream', lx.p)){
+        let st = lx.p + 6;
+        if(s[st] === '\r') st++;
+        if(s[st] === '\n') st++;
+        const L = value.dict && value.dict.get('/Length');
+        let len = -1;
+        if(L && L.ref == null) len = +L.raw;
+        else if(L && !scanning) len = this.numOf(L);
+        let end = st + len;
+        if(!(len >= 0) || !/^\s*endstream/.test(s.substr(end, 40))){
+          const e = s.indexOf('endstream', st);
+          if(e < 0) throw new Error('No endstream');
+          end = e;
+          if(s[end - 1] === '\n') end--;
+          if(s[end - 1] === '\r') end--;
+        }
+        stream = { start: st, end };
+      }
+      return { value, stream };
+    };
+
+    Doc.prototype.decode = async function(o){
+      const d = o.value.dict;
+      let data = this.bytes.subarray(o.stream.start, o.stream.end);
+      const f = this.resolve(d.get('/Filter')), p = this.resolve(d.get('/DecodeParms'));
+      const filters = !f ? [] : Array.isArray(f) ? f.map(x => this.nameOf(x)) : [f.name];
+      const parms = Array.isArray(p) ? p.map(x => this.resolve(x)) : [p];
+      for(let i = 0; i < filters.length; i++){
+        if(filters[i] !== '/FlateDecode' && filters[i] !== '/Fl') throw new Error('Unsupported filter');
+        data = await inflate(data);
+        if(parms[i] && parms[i].dict) data = unpredict(data, parms[i].dict);
+      }
+      return data;
+    };
+
+    Doc.prototype.readXrefSection = async function(off){
+      const s = this.s, lx = new Lexer(s, off);
+      lx.ws();
+      if(s.startsWith('xref', lx.p)){
+        lx.p += 4;
+        for(;;){
+          lx.ws();
+          if(s.startsWith('trailer', lx.p)){ lx.p += 7; return lx.value(); }
+          const start = +lx.word(); lx.ws();
+          const count = +lx.word();
+          if(!Number.isInteger(start) || !Number.isInteger(count)) throw new Error('Bad xref');
+          for(let i = 0; i < count; i++){
+            lx.ws(); const o = +lx.word();
+            lx.ws(); lx.word();
+            lx.ws(); const t = lx.word();
+            if(!this.xref.has(start + i)) this.xref.set(start + i, t === 'n' ? { type: 1, off: o } : { type: 0 });
+          }
+        }
+      }
+      const obj = this.readAt(off);
+      if(!obj.stream || this.nameOf(obj.value.dict.get('/Type')) !== '/XRef') throw new Error('Bad xref stream');
+      const d = obj.value.dict, data = await this.decode(obj);
+      const W = d.get('/W').map(x => +x.raw), rec = W[0] + W[1] + W[2];
+      const index = d.get('/Index') ? d.get('/Index').map(x => +x.raw) : [0, +d.get('/Size').raw];
+      const field = (p, w, dflt) => { if(!w) return dflt; let v = 0; for(let i = 0; i < w; i++) v = v * 256 + data[p + i]; return v; };
+      let p = 0;
+      for(let k = 0; k < index.length; k += 2){
+        for(let i = 0; i < index[k + 1] && p + rec <= data.length; i++, p += rec){
+          const n = index[k] + i;
+          if(this.xref.has(n)) continue;
+          const t = field(p, W[0], 1), a = field(p + W[0], W[1], 0), b = field(p + W[0] + W[1], W[2], 0);
+          this.xref.set(n, t === 1 ? { type: 1, off: a } : t === 2 ? { type: 2, stm: a, idx: b } : { type: 0 });
+        }
+      }
+      return obj.value;
+    };
+
+    Doc.prototype.readXref = async function(){
+      const s = this.s, sx = s.lastIndexOf('startxref');
+      if(sx < 0) throw new Error('No startxref');
+      const lx = new Lexer(s, sx + 9); lx.ws();
+      let off = +lx.word(), first = null;
+      const seen = new Set();
+      while(Number.isInteger(off) && !seen.has(off)){
+        seen.add(off);
+        const t = await this.readXrefSection(off);
+        if(!first) first = t;
+        const xs = t.dict.get('/XRefStm');
+        if(xs){ try{ await this.readXrefSection(+xs.raw); }catch(e){} }
+        const prev = t.dict.get('/Prev');
+        off = prev ? +prev.raw : NaN;
+      }
+      return first;
+    };
+
+    Doc.prototype.loadObjStm = async function(num){
+      const o = this.get(num);
+      if(!o || !o.stream) return;
+      const ds = toBinary(await this.decode(o));
+      const N = this.numOf(o.value.dict.get('/N')), first = this.numOf(o.value.dict.get('/First'));
+      const lx = new Lexer(ds, 0), m = new Map();
+      const pairs = [];
+      for(let i = 0; i < N; i++){ lx.ws(); const on = +lx.word(); lx.ws(); pairs.push([on, +lx.word()]); }
+      pairs.forEach(([on, off]) => { try{ m.set(on, new Lexer(ds, first + off).value()); }catch(e){} });
+      this.objStms.set(num, m);
+    };
+    Doc.prototype.loadObjStms = async function(){
+      const nums = new Set();
+      this.xref.forEach(e => { if(e.type === 2) nums.add(e.stm); });
+      for(const n of nums) await this.loadObjStm(n);
+    };
+
+    // Last resort for a damaged cross-reference table: find every object by scanning.
+    Doc.prototype.scan = async function(){
+      const s = this.s, re = /(\d+)\s+(\d+)\s+obj\b/g, found = new Map();
+      let m;
+      while((m = re.exec(s))){
+        if(m.index > 0 && !isWs(s[m.index - 1]) && !isDelim(s[m.index - 1])) continue;
+        try{
+          const o = this.readAt(m.index, null, true);
+          found.set(+m[1], m.index);
+          if(o.stream) re.lastIndex = o.stream.end;
+        }catch(e){}
+      }
+      this.xref = new Map(); this.cache = new Map(); this.objStms = new Map();
+      found.forEach((off, n) => this.xref.set(n, { type: 1, off }));
+      let catalog = null;
+      for(const n of found.keys()){
+        const o = this.get(n);
+        if(!o || !o.value.dict) continue;
+        const type = this.nameOf(o.value.dict.get('/Type'));
+        if(type === '/Catalog') catalog = n;
+        if(type === '/ObjStm' && o.stream){
+          await this.loadObjStm(n);
+          const st = this.objStms.get(n);
+          if(st) st.forEach((v, on) => {
+            if(!this.xref.has(on)) this.xref.set(on, { type: 2, stm: n });
+            if(v.dict && this.nameOf(v.dict.get('/Type')) === '/Catalog') catalog = on;
+          });
+        }
+      }
+      return catalog == null ? null : { dict: new Map([['/Root', { ref: catalog, gen: 0 }]]) };
+    };
+
+    Doc.prototype.rootOk = function(tr){
+      const root = tr && tr.dict && this.resolve(tr.dict.get('/Root'));
+      return !!(root && root.dict && root.dict.get('/Pages'));
+    };
+
+    Doc.prototype.walkPages = function(){
+      const root = this.resolve(this.trailer.dict.get('/Root'));
+      const seen = new Set();
+      this.pages = []; this.treeNums = new Set();
+      const walk = (ref, inh, depth) => {
+        if(!ref || ref.ref == null || seen.has(ref.ref) || depth > 64) return;
+        seen.add(ref.ref);
+        const node = this.resolve(ref);
+        if(!node || !node.dict) return;
+        const next = Object.assign({}, inh);
+        INHERIT.forEach(k => { if(node.dict.has(k)) next[k] = node.dict.get(k); });
+        const kids = this.resolve(node.dict.get('/Kids'));
+        if(Array.isArray(kids) && this.nameOf(node.dict.get('/Type')) !== '/Page'){
+          this.treeNums.add(ref.ref);
+          kids.forEach(k => walk(k, next, depth + 1));
+        }else{
+          this.pages.push({ num: ref.ref, node, inh: next });
+        }
+      };
+      walk(root.dict.get('/Pages'), {}, 0);
+    };
+
+    Doc.prototype.init = async function(){
+      if(/\/Encrypt\s*(\d+\s+\d+\s+R|<<)/.test(this.s)){
+        const e = new Error('encrypted'); e.code = 'encrypted'; throw e;
+      }
+      let tr = null;
+      try{
+        tr = await this.readXref();
+        await this.loadObjStms();
+        if(!this.rootOk(tr)) tr = null;
+      }catch(e){ tr = null; }
+      if(!tr){
+        tr = await this.scan();
+        if(!this.rootOk(tr)) throw new Error('Unreadable PDF');
+      }
+      this.trailer = tr;
+      this.walkPages();
+      if(!this.pages.length) throw new Error('No pages');
+    };
+
+    Doc.prototype.rotation = function(i){
+      const r = this.numOf(this.pages[i].inh['/Rotate']);
+      return Number.isFinite(r) ? ((r % 360) + 360) % 360 : 0;
+    };
+
+    // The largest JPEG drawn on the page, as a byte range of the file.
+    Doc.prototype.jpeg = function(i){
+      const find = (res, depth) => {
+        res = this.resolve(res);
+        const xo = res && res.dict && this.resolve(res.dict.get('/XObject'));
+        if(!xo || !xo.dict) return null;
+        let best = null, bestArea = 0;
+        xo.dict.forEach(v => {
+          const o = v.ref != null && this.get(v.ref);
+          if(!o || !o.stream || !o.value.dict) return;
+          const d = o.value.dict, sub = this.nameOf(d.get('/Subtype'));
+          if(sub === '/Image'){
+            let f = this.resolve(d.get('/Filter'));
+            if(Array.isArray(f)) f = f.length === 1 ? this.resolve(f[0]) : null;
+            if(!f || f.name !== '/DCTDecode') return;
+            const area = (this.numOf(d.get('/Width')) || 0) * (this.numOf(d.get('/Height')) || 0);
+            if(area > bestArea){ bestArea = area; best = o.stream; }
+          }else if(sub === '/Form' && depth < 2 && !best){
+            best = find(d.get('/Resources'), depth + 1);
+          }
+        });
+        return best;
+      };
+      try{ return find(this.pages[i].inh['/Resources'], 0); }catch(e){ return null; }
+    };
+
+    /* A shared resource dictionary can list every scanned image in the file,
+       so keep only the images this page's own drawing mentions. */
+    Doc.prototype.pruneResources = async function(d){
+      const res = this.resolve(d.get('/Resources'));
+      const xo = res && res.dict && this.resolve(res.dict.get('/XObject'));
+      if(!xo || !xo.dict || xo.dict.size < 2) return;
+      const contents = d.get('/Contents'), c = this.resolve(contents);
+      if(!c) return;
+      let text = '';
+      try{
+        for(const part of Array.isArray(c) ? c : [contents]){
+          if(!part || part.ref == null) return;
+          const o = this.get(part.ref);
+          if(!o || !o.stream) return;
+          text += toBinary(await this.decode(o)) + '\n';
+        }
+      }catch(e){ return; }
+      const keep = new Map();
+      xo.dict.forEach((v, k) => { if(text.indexOf(k) >= 0) keep.set(k, v); });
+      const nres = new Map(res.dict);
+      nres.set('/XObject', { dict: keep });
+      d.set('/Resources', { dict: nres });
+    };
+
+    // A new PDF holding just the given pages (0-based), in the order given.
+    Doc.prototype.extract = async function(indices){
+      const chosen = indices.map(i => this.pages[i]);
+      const pageNums = new Set(this.pages.map(p => p.num));
+      const map = new Map(), queue = [];
+      let next = 3;
+      chosen.forEach(pg => map.set(pg.num, next++));
+      const mapRef = r => {
+        if(this.treeNums.has(r.ref) || (pageNums.has(r.ref) && !map.has(r.ref))) return 'null';
+        let n = map.get(r.ref);
+        if(n == null){
+          if(!this.get(r.ref)) return 'null';
+          n = next++; map.set(r.ref, n); queue.push(r.ref);
+        }
+        return n + ' 0 R';
+      };
+      const parts = [], offsets = [];
+      let pos = 0;
+      const push = x => { const b = typeof x === 'string' ? fromBinary(x) : x; parts.push(b); pos += b.length; };
+      const write = (n, value, stream) => {
+        offsets[n] = pos;
+        if(stream){
+          value = { dict: new Map(value.dict) };
+          value.dict.set('/Length', { raw: String(stream.end - stream.start) });
+        }
+        push(n + ' 0 obj\n' + ser(value, mapRef) + '\n');
+        if(stream){ push('stream\n'); push(this.bytes.subarray(stream.start, stream.end)); push('\nendstream\n'); }
+        push('endobj\n');
+      };
+      push('%PDF-1.7\n%\xE2\xE3\xCF\xD3\n');
+      write(1, { raw: '<</Type /Catalog /Pages 2 0 R>>' });
+      write(2, { raw: '<</Type /Pages /Kids [' + chosen.map(pg => map.get(pg.num) + ' 0 R').join(' ') + '] /Count ' + chosen.length + '>>' });
+      for(const pg of chosen){
+        const d = new Map(pg.node.dict);
+        ['/Parent', '/Annots', '/B', '/StructParents'].forEach(k => d.delete(k));
+        INHERIT.forEach(k => { if(!d.has(k) && pg.inh[k] !== undefined) d.set(k, pg.inh[k]); });
+        await this.pruneResources(d);
+        d.set('/Parent', { raw: '2 0 R' });
+        write(map.get(pg.num), { dict: d });
+      }
+      while(queue.length){
+        const n = queue.shift(), o = this.get(n);
+        write(map.get(n), o.value, o.stream);
+      }
+      const xrefAt = pos;
+      let x = 'xref\n0 ' + next + '\n0000000000 65535 f \n';
+      for(let n = 1; n < next; n++) x += String(offsets[n]).padStart(10, '0') + ' 00000 n \n';
+      push(x + 'trailer\n<</Size ' + next + ' /Root 1 0 R>>\nstartxref\n' + xrefAt + '\n%%EOF\n');
+      return new Blob(parts, { type: 'application/pdf' });
+    };
+
+    return {
+      async open(file){
+        const doc = new Doc(file, new Uint8Array(await file.arrayBuffer()));
+        await doc.init();
+        return doc;
+      },
+    };
+  })();
+
   /* ---------- student work ----------
-     Held in memory only: a PDF is too big for localStorage, and it belongs to
-     one student, so it isn't part of the draft. */
-  let studentWork = null;
+     Held in memory only: a PDF is too big for localStorage, and it isn't
+     part of the draft. A whole class is often scanned into one file, so it
+     stays loaded across "Clear form", and the pages already saved are
+     remembered until another file is chosen. */
+  let studentWork = null;   // the File
+  let swDoc = null;         // its pages, or null when they couldn't be read
+  let swBusy = false;
+  let swError = '';
+  let swSel = new Set();    // 0-based pages picked for this student
+  let swSaved = new Set();  // pages already downloaded from this file
+  let swLast = null;        // last page clicked, for shift-click ranges
+  let swPreviews = 0;     // pages that have a JPEG to preview
+  let swUrls = [];
+  let swLoad = 0;
 
   function isPdf(file){ return file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)); }
-  function setStudentWork(file){
+  async function setStudentWork(file){
     if(file && !isPdf(file)){ toast('That isn’t a PDF — choose a .pdf file.', 'err'); return; }
+    const load = ++swLoad;
+    swUrls.forEach(u => URL.revokeObjectURL(u)); swUrls = [];
     studentWork = file || null;
+    swDoc = null; swError = ''; swSel = new Set(); swSaved = new Set(); swLast = null;
+    swBusy = !!file;
     els.swInput.value = '';
-    renderStudentWork();
-    refreshValidity();
+    els.swRange.value = '';
+    buildSwPages(); renderStudentWork(); refreshValidity();
+    if(!file) return;
+    try{
+      const doc = await PdfDoc.open(file);
+      if(load !== swLoad) return;
+      swDoc = doc;
+      if(doc.pages.length === 1) swSel.add(0);
+    }catch(e){
+      if(load !== swLoad) return;
+      swError = e.code === 'encrypted' ? 'encrypted' : 'unreadable';
+    }
+    swBusy = false;
+    buildSwPages(); renderStudentWork(); refreshValidity();
   }
+
+  function buildSwPages(){
+    els.swPages.textContent = '';
+    if(!swDoc) return;
+    const view = URL.createObjectURL(studentWork);
+    swUrls.push(view);
+    els.swView.href = view;
+    swPreviews = 0;
+    swDoc.pages.forEach((pg, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sw-page'; b.dataset.i = i;
+      const th = document.createElement('span');
+      th.className = 'sw-thumb';
+      const jpg = swDoc.jpeg(i);
+      if(jpg){
+        const url = URL.createObjectURL(studentWork.slice(jpg.start, jpg.end, 'image/jpeg'));
+        swUrls.push(url);
+        const img = new Image();
+        img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.src = url;
+        const rot = swDoc.rotation(i);
+        if(rot) img.style.transform = 'rotate(' + rot + 'deg)';
+        img.classList.toggle('sideways', rot === 90 || rot === 270);
+        img.onerror = () => { img.remove(); th.textContent = i + 1; };
+        th.appendChild(img);
+        swPreviews++;
+      }else{
+        th.textContent = i + 1;
+      }
+      const num = document.createElement('span');
+      num.className = 'sw-num';
+      b.append(th, num);
+      els.swPages.appendChild(b);
+    });
+  }
+
+  function formatPages(sel){
+    const n = [...sel].sort((a, b) => a - b).map(i => i + 1), out = [];
+    for(let i = 0; i < n.length; i++){
+      let j = i;
+      while(j + 1 < n.length && n[j + 1] === n[j] + 1) j++;
+      out.push(j > i ? n[i] + '-' + n[j] : String(n[i]));
+      i = j;
+    }
+    return out.join(', ');
+  }
+  function parsePages(text, count){
+    const sel = new Set();
+    text.split(',').forEach(part => {
+      const m = /^\s*(\d+)\s*(?:[-–]\s*(\d+))?\s*$/.exec(part);
+      if(!m) return;
+      let a = +m[1], b = m[2] ? +m[2] : a;
+      if(a > b) [a, b] = [b, a];
+      for(let n = Math.max(1, a); n <= Math.min(count, b); n++) sel.add(n - 1);
+    });
+    return sel;
+  }
+
   function renderStudentWork(){
     els.swFile.textContent = studentWork ? studentWork.name : 'or drop the student’s work here';
     els.swFile.classList.toggle('has', !!studentWork);
     els.swClearBtn.hidden = !studentWork;
     els.swPickBtn.textContent = studentWork ? 'Replace…' : 'Choose PDF…';
+    els.swPicker.hidden = !swDoc;
+
+    let status = '';
+    if(swBusy) status = 'Reading the pages…';
+    else if(swError === 'encrypted') status = 'This PDF is password-protected, so its pages can’t be picked out — it will be saved whole.';
+    else if(swError) status = 'Couldn’t read the pages in this PDF, so it will be saved whole.';
+    else if(swDoc){
+      const n = swDoc.pages.length;
+      status = n + ' page' + (n === 1 ? '' : 's') + '. Click the ones that belong to this student — shift-click to pick a run of pages.';
+      if(swPreviews < n) status += ' Some pages have no preview here; use “View whole PDF” to see them.';
+    }
+    els.swStatus.textContent = status;
+    els.swStatus.hidden = !status;
+
+    if(swDoc){
+      els.swPages.querySelectorAll('.sw-page').forEach(b => {
+        const i = +b.dataset.i, on = swSel.has(i), saved = swSaved.has(i);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.classList.toggle('saved', saved);
+        b.querySelector('.sw-num').textContent = 'Page ' + (i + 1) + (saved ? ' · saved' : '');
+        b.title = saved ? 'Already saved for a student' : '';
+      });
+      if(document.activeElement !== els.swRange) els.swRange.value = formatPages(swSel);
+    }
+
+    const k = swSel.size;
+    els.swDownloadLabel.textContent = !swDoc || k === swDoc.pages.length ? 'Download PDF'
+      : k === 1 ? 'Download page ' + ([...swSel][0] + 1)
+      : k ? 'Download ' + k + ' pages' : 'Download pages';
   }
 
   els.swPickBtn.addEventListener('click', ()=> els.swInput.click());
@@ -1345,16 +1993,49 @@
     if(file) setStudentWork(file);
   });
 
-  els.swDownloadBtn.addEventListener('click', ()=>{
-    if(!studentWork){ toast('Choose the student’s PDF first.', 'err'); return; }
+  els.swPages.addEventListener('click', e => {
+    const b = e.target.closest('.sw-page');
+    if(!b) return;
+    const i = +b.dataset.i;
+    if(e.shiftKey && swLast != null){
+      for(let n = Math.min(swLast, i); n <= Math.max(swLast, i); n++) swSel.add(n);
+    }else if(swSel.has(i)) swSel.delete(i);
+    else swSel.add(i);
+    swLast = i;
+    renderStudentWork(); refreshValidity();
+  });
+  els.swRange.addEventListener('input', () => {
+    if(!swDoc) return;
+    swSel = parsePages(els.swRange.value, swDoc.pages.length);
+    renderStudentWork(); refreshValidity();
+  });
+  els.swRange.addEventListener('blur', () => { if(swDoc) els.swRange.value = formatPages(swSel); });
+
+  els.swDownloadBtn.addEventListener('click', async ()=>{
+    if(!studentWork || swBusy) return;
     const missing = validate();
     if(missing.length){ toast('Missing: ' + missing.join(', ') + '.', 'err'); return; }
+    const picked = swDoc ? [...swSel].sort((a, b) => a - b) : null;
+    if(picked && !picked.length){ toast('Pick this student’s pages first.', 'err'); return; }
     const filename = buildStudentWorkFilename();
-    const url = URL.createObjectURL(studentWork);
+    let blob = studentWork;
+    if(picked && picked.length < swDoc.pages.length){
+      els.swDownloadBtn.disabled = true;
+      try{ blob = await swDoc.extract(picked); }
+      catch(e){ toast('Couldn’t cut those pages out of the PDF.', 'err'); refreshValidity(); return; }
+    }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    if(picked){
+      picked.forEach(i => swSaved.add(i));
+      if(swDoc.pages.length > 1) swSel = new Set();
+      els.swRange.value = '';
+      renderStudentWork();
+    }
+    refreshValidity();
     toast('Downloaded ' + filename, 'ok');
   });
 
@@ -1373,7 +2054,7 @@
     els.classSelect.value = ''; renderStudentSelect();
     rubricDates = {}; renderRubricPreview();
     els.dateInput.value = todayISO();
-    studentWork = null;
+    if(swDoc && swDoc.pages.length > 1){ swSel = new Set(); swLast = null; els.swRange.value = ''; }
     onAnyInput();
   });
 
