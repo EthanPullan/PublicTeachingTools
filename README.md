@@ -12,13 +12,14 @@ works offline, and can be downloaded on its own.
 | Tool | What it does |
 | --- | --- |
 | [EAL Benchmark PDF Template](https://ethanpullan.github.io/PublicTeachingTools/tools/eal-benchmark/) | Fill in a Div 2/3 EAL annotation benchmark on screen, then download a PDF whose file name you build yourself by dragging the parts you want into order |
+| [Graph Paper](https://ethanpullan.github.io/PublicTeachingTools/tools/graph-paper/) | Blank graph paper to print — square, dot, cross, isometric, hexagon, polar, log and lined paper, coordinate planes and number lines — on any paper size, then print it or download a true-size PDF, SVG or PNG |
 
 ## About
 
 - **One file per tool.** Inline CSS/JS, no CDNs, no web fonts, no network — open
   the `index.html` by double-click and it just works, online or off.
-- **Nothing leaves your device.** The EAL form autosaves to your browser only,
-  and the PDF is built and downloaded locally — there is no upload, no account
+- **Nothing leaves your device.** The EAL form and the graph-paper settings save
+  to your browser only, and every PDF is built and downloaded locally — there is no upload, no account
   and no server.
 - **Static site.** Served straight from the repo root with GitHub Pages.
 - **Design system.** Shared tokens and components live in the

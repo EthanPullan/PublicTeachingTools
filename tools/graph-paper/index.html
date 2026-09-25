@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Make blank graph paper to print — square, dot, isometric, hexagon, polar, log, coordinate planes, number lines and lined paper — at any size, then print it or download a PDF.">
+<meta name="theme-color" content="#1f3d35">
+<title>Graph Paper</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23e0982e'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --app-bg:#e9edf0; --panel:#fff; --panel-2:#f4f6f8; --room-bg:#f7f8f6;
+    --ink:#16241f; --muted:#67756f; --line:#d8dee2; --grid-line:rgba(31,61,53,.07);
+    --board:#1f3d35; --board-2:#173029; --board-line:#2c5247;
+    --accent:#e0982e; --accent-soft:#fbe6c8; --accent-deep:#b9781f;
+    --danger:#c43d35; --danger-soft:#f7e0de; --together:#2f6f9f; --together-soft:#dde9f3;
+    --ok:#3f9e6b;
+    --shadow:0 1px 2px rgba(20,40,33,.06),0 6px 18px rgba(20,40,33,.06);
+    --shadow-sm:0 1px 2px rgba(20,40,33,.10); --radius:12px;
+    --sans:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;} html,body{height:100%;}
+  [hidden]{display:none !important;}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--app-bg);
+    -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45;}
+  button{font-family:inherit;}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+
+  /* toolbar */
+  .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 16px;
+    background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;font-size:13px;color:var(--ink);white-space:nowrap;text-decoration:none;}
+  .brand .mark{width:16px;height:16px;border-radius:4px;background:var(--accent);
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.06);flex:none;}
+  .brand small{font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--muted);font-size:11px;}
+  .spacer{flex:1;}
+  .progress-pill{font-family:var(--mono);font-size:11px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--muted);white-space:nowrap;
+    max-width:46vw;overflow:hidden;text-overflow:ellipsis;}
+
+  .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 13px;
+    border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;
+    gap:7px;transition:background .12s,border-color .12s,transform .05s;white-space:nowrap;}
+  .btn:hover{background:var(--panel-2);} .btn:active{transform:translateY(1px);}
+  .btn.primary{background:var(--board);border-color:var(--board);color:#fff;}
+  .btn.primary:hover{background:var(--board-2);}
+  .btn.danger{color:var(--danger);border-color:var(--danger-soft);background:#fff;}
+  .btn.danger:hover{background:var(--danger-soft);}
+  .btn.small{padding:5px 9px;font-size:12px;border-radius:7px;}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;}
+
+  /* layout — settings on the left, the page preview on the right */
+  .layout{display:grid;grid-template-columns:minmax(330px,430px) minmax(0,1fr);gap:18px;
+    max-width:1440px;margin:0 auto;padding:18px 16px 60px;align-items:start;}
+  .preview-col{position:sticky;top:64px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px;margin-bottom:14px;}
+  .section-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 12px;}
+  .sub-title{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);margin:14px 0 8px;padding-top:12px;border-top:1px solid var(--line);}
+  .hint{font-size:12px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
+
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .field label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  select,input[type=text],input[type=number]{
+    border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--panel-2);width:100%;}
+  select:focus,input:focus{outline:none;border-color:var(--accent);}
+  input[type=color]{width:100%;height:34px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel-2);padding:3px;cursor:pointer;}
+
+  .row{display:grid;gap:10px;}
+  .row.cols2{grid-template-columns:1fr 1fr;}
+  .row.cols3{grid-template-columns:1fr 1fr 1fr;}
+  .row.cols4{grid-template-columns:repeat(4,1fr);}
+  .row + .row{margin-top:10px;}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin:10px 0;}
+  .checks .check{margin:0;}
+  .check input{width:16px;height:16px;accent-color:var(--board);margin:0;}
+  .checks{display:flex;flex-wrap:wrap;gap:8px 16px;}
+
+  /* grid-type tiles and presets */
+  .types{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;}
+  .type-tile{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid var(--line);
+    background:var(--panel);border-radius:9px;padding:7px 3px 6px;cursor:pointer;font-size:11px;
+    font-weight:600;color:var(--muted);transition:border-color .12s,background .12s;}
+  .type-tile:hover{border-color:var(--accent);}
+  .type-tile svg{width:38px;height:38px;display:block;border-radius:3px;}
+  .type-tile.active{border-color:var(--board);background:var(--board);color:#fff;}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;}
+  .preset{border:1px solid var(--line);background:var(--panel-2);border-radius:999px;padding:5px 11px;
+    font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
+  .preset:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .swatches{display:flex;flex-wrap:wrap;gap:6px;}
+  .swatch{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);
+    border-radius:999px;padding:4px 10px 4px 5px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .swatch:hover{border-color:var(--accent);}
+  .swatch i{width:16px;height:16px;border-radius:50%;display:block;}
+
+  .export-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+
+  /* preview */
+  .preview-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;}
+  .preview-stage{display:flex;justify-content:center;align-items:flex-start;background:var(--room-bg);
+    border-radius:9px;padding:18px;min-height:240px;
+    background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+    background-size:22px 22px;}
+  .preview-stage svg{display:block;height:auto;background:#fff;
+    box-shadow:0 1px 3px rgba(20,40,33,.18),0 10px 26px rgba(20,40,33,.14);}
+  .preview-error{max-width:46ch;margin:40px auto;padding:14px 16px;border-radius:9px;background:var(--danger-soft);
+    color:var(--danger);font-size:13px;line-height:1.5;}
+  .readout{font-size:12.5px;color:var(--muted);margin:10px 2px 0;line-height:1.5;}
+  .readout b{color:var(--ink);font-weight:600;}
+
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;}
+    .preview-col{position:static;order:-1;}
+  }
+  @media (max-width:560px){ .progress-pill{display:none;} }
+  @media (max-width:420px){ .types{grid-template-columns:repeat(4,1fr);} .row.cols3,.row.cols4{grid-template-columns:1fr 1fr;} }
+
+  /* toast */
+  .toast-wrap{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;
+    display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .toast{background:var(--ink);color:#fff;padding:10px 15px;border-radius:10px;font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:min(92vw,560px);
+    border-left:3px solid var(--accent);animation:tin .2s ease both;}
+  .toast.err{border-left-color:var(--danger);}
+  .toast.ok{border-left-color:var(--ok);}
+  @keyframes tin{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  @media (prefers-reduced-motion:reduce){ .btn:active{transform:none;} *{scroll-behavior:auto;} .toast{animation:none;} }
+
+  /* printing — only the generated pages, each exactly one sheet */
+  #printArea{display:none;}
+  @media print{
+    body > *:not(#printArea){display:none !important;}
+    html,body{background:#fff;height:auto;}
+    #printArea{display:block;}
+    .print-page{overflow:hidden;break-after:page;page-break-after:always;}
+    .print-page:last-child{break-after:auto;page-break-after:auto;}
+    .print-page svg{display:block;}
+  }
+</style>
+<style id="pageStyle"></style>
+</head>
+<body>
+  <header class="toolbar">
+    <a class="brand" href="../../index.html" title="All tools"><span class="mark"></span>Graph Paper <small>print blank grids</small></a>
+    <div class="spacer"></div>
+    <span class="progress-pill" id="pill"></span>
+    <button class="btn" id="printBtn"><span class="ic">⎙</span>Print</button>
+    <button class="btn primary" id="pdfBtn"><span class="ic">⭳</span>Download PDF</button>
+  </header>
+
+  <div class="layout">
+    <div class="controls" id="controls">
+
+      <section class="card">
+        <h3 class="section-title">Grid type</h3>
+        <div class="types" id="typeTiles" role="group" aria-label="Grid type"></div>
+        <h4 class="sub-title">Quick start</h4>
+        <div class="presets" id="presets"></div>
+        <p class="hint">A quick start sets up the grid; your paper, header and colours stay as they are.</p>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Paper</h3>
+        <div class="row cols2">
+          <div class="field">
+            <label for="paper">Size</label>
+            <select id="paper" data-k="paper"></select>
+          </div>
+          <div class="field">
+            <label for="orient">Orientation</label>
+            <select id="orient" data-k="orient">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+        </div>
+        <div class="row cols2" data-when="paper=custom">
+          <div class="field"><label for="customW">Width <span class="u"></span></label>
+            <input type="number" id="customW" data-k="customW" data-t="len" step="any" min="0"></div>
+          <div class="field"><label for="customH">Height <span class="u"></span></label>
+            <input type="number" id="customH" data-k="customH" data-t="len" step="any" min="0"></div>
+        </div>
+        <div class="row cols2">
+          <div class="field">
+            <label for="unit">Units</label>
+            <select id="unit" data-k="unit">
+              <option value="in">Inches</option>
+              <option value="mm">Millimetres</option>
+              <option value="cm">Centimetres</option>
+            </select>
+          </div>
+          <div class="field" data-when="linkMargins">
+            <label for="mAll">Margins <span class="u"></span></label>
+            <input type="number" id="mAll" data-k="mAll" data-t="len" step="any" min="0">
+          </div>
+        </div>
+        <div class="row cols4" data-when="!linkMargins">
+          <div class="field"><label for="mTop">Top</label><input type="number" id="mTop" data-k="mTop" data-t="len" step="any" min="0"></div>
+          <div class="field"><label for="mRight">Right</label><input type="number" id="mRight" data-k="mRight" data-t="len" step="any" min="0"></div>
+          <div class="field"><label for="mBottom">Bottom</label><input type="number" id="mBottom" data-k="mBottom" data-t="len" step="any" min="0"></div>
+          <div class="field"><label for="mLeft">Left</label><input type="number" id="mLeft" data-k="mLeft" data-t="len" step="any" min="0"></div>
+        </div>
+        <label class="check"><input type="checkbox" data-k="linkMargins"> Same margin on every side</label>
+        <p class="hint">Most printers can't reach the very edge of the sheet — keep at least ¼ in (6 mm) of margin.</p>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Grid size</h3>
+        <div class="row cols2" data-when="sizingAllowed">
+          <div class="field">
+            <label for="sizing">Size by</label>
+            <select id="sizing" data-k="sizing">
+              <option value="size">Square size</option>
+              <option value="count">Number of squares</option>
+            </select>
+          </div>
+        </div>
+        <div class="row cols2" data-when="useCell">
+          <div class="field">
+            <label for="cell"><span id="cellLabel">Square size</span> <span class="u"></span></label>
+            <input type="number" id="cell" data-k="cell" data-t="len" step="any" min="0">
+          </div>
+          <div class="field">
+            <label for="cellPreset">Common sizes</label>
+            <select id="cellPreset" data-k="cellPreset"></select>
+          </div>
+        </div>
+        <div class="row cols2" data-when="useCount">
+          <div class="field"><label for="cols">Squares across</label><input type="number" id="cols" data-k="cols" data-t="int" min="1" max="500"></div>
+          <div class="field"><label for="rows">Squares down</label><input type="number" id="rows" data-k="rows" data-t="int" min="1" max="500"></div>
+        </div>
+        <div class="row cols2" data-when="alignAllowed">
+          <div class="field" data-when="fitAllowed">
+            <label for="fit">Edges</label>
+            <select id="fit" data-k="fit">
+              <option value="whole">Whole cells only</option>
+              <option value="fill">Fill to the margins</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="align">Position</label>
+            <select id="align" data-k="align">
+              <option value="center">Centred</option>
+              <option value="topleft">Top-left</option>
+            </select>
+          </div>
+        </div>
+        <h4 class="sub-title">Grids per page</h4>
+        <div class="row cols3">
+          <div class="field"><label for="panelsX">Across</label><input type="number" id="panelsX" data-k="panelsX" data-t="int" min="1" max="8"></div>
+          <div class="field"><label for="panelsY">Down</label><input type="number" id="panelsY" data-k="panelsY" data-t="int" min="1" max="8"></div>
+          <div class="field"><label for="gap">Gap <span class="u"></span></label><input type="number" id="gap" data-k="gap" data-t="len" step="any" min="0"></div>
+        </div>
+        <p class="hint">Split the page into several separate grids — handy for a set of small coordinate planes.</p>
+      </section>
+
+      <section class="card" data-when="typeOpts">
+        <h3 class="section-title" id="typeOptsTitle">Options</h3>
+
+        <div data-types="dots isodots">
+          <div class="row cols2">
+            <div class="field"><label for="dotD">Dot size (pt)</label><input type="number" id="dotD" data-k="dotD" data-t="num" step="0.1" min="0.1"></div>
+            <div class="field" data-when="hasMajor"><label for="dotMajorD">Major dot size (pt)</label><input type="number" id="dotMajorD" data-k="dotMajorD" data-t="num" step="0.1" min="0.1"></div>
+          </div>
+        </div>
+
+        <div data-types="crosses">
+          <div class="row cols2">
+            <div class="field"><label for="crossLen">Cross size <span class="u"></span></label><input type="number" id="crossLen" data-k="crossLen" data-t="len" step="any" min="0"></div>
+          </div>
+        </div>
+
+        <div data-types="iso isodots">
+          <div class="row cols2">
+            <div class="field">
+              <label for="isoOrient">Orientation</label>
+              <select id="isoOrient" data-k="isoOrient">
+                <option value="vertical">Vertical lines (isometric drawing)</option>
+                <option value="horizontal">Horizontal lines (triangles)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div data-types="hex">
+          <div class="row cols2">
+            <div class="field">
+              <label for="hexOrient">Orientation</label>
+              <select id="hexOrient" data-k="hexOrient">
+                <option value="pointy">Pointy top</option>
+                <option value="flat">Flat top</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div data-types="polar">
+          <div class="row cols2">
+            <div class="field">
+              <label for="polarShape">Shape</label>
+              <select id="polarShape" data-k="polarShape">
+                <option value="full">Full circle</option>
+                <option value="half">Half circle</option>
+                <option value="quarter">Quarter circle</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="polarStep">Spoke every</label>
+              <select id="polarStep" data-k="polarStep" data-t="num">
+                <option value="5">5°</option><option value="10">10°</option><option value="15">15°</option>
+                <option value="20">20°</option><option value="30">30°</option><option value="45">45°</option>
+                <option value="60">60°</option><option value="90">90°</option>
+              </select>
+            </div>
+          </div>
+          <div class="row cols2">
+            <div class="field">
+              <label for="polarMajor">Bold spoke every</label>
+              <select id="polarMajor" data-k="polarMajor" data-t="num">
+                <option value="0">None</option><option value="30">30°</option><option value="45">45°</option><option value="90">90°</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="polarLabels">Angle labels</label>
+              <select id="polarLabels" data-k="polarLabels">
+                <option value="none">None</option>
+                <option value="deg">Degrees</option>
+                <option value="rad">Radians (π)</option>
+              </select>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" data-k="polarRingLabels"> Number the rings</label>
+        </div>
+
+        <div data-types="log">
+          <div class="row cols2">
+            <div class="field">
+              <label for="logX">Across (x)</label>
+              <select id="logX" data-k="logX" data-t="int">
+                <option value="0">Linear</option><option value="1">Log, 1 cycle</option><option value="2">Log, 2 cycles</option>
+                <option value="3">Log, 3 cycles</option><option value="4">Log, 4 cycles</option><option value="5">Log, 5 cycles</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="logY">Up (y)</label>
+              <select id="logY" data-k="logY" data-t="int">
+                <option value="0">Linear</option><option value="1">Log, 1 cycle</option><option value="2">Log, 2 cycles</option>
+                <option value="3">Log, 3 cycles</option><option value="4">Log, 4 cycles</option><option value="5">Log, 5 cycles</option>
+              </select>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" data-k="logFine"> Fine subdivisions between 1 and 10</label>
+          <label class="check"><input type="checkbox" data-k="logLabels"> Label 1–9 on each cycle</label>
+        </div>
+
+        <div data-types="numline">
+          <div class="row cols3">
+            <div class="field"><label for="nlCount">Lines</label><input type="number" id="nlCount" data-k="nlCount" data-t="int" min="1" max="40"></div>
+            <div class="field"><label for="nlMin">From</label><input type="number" id="nlMin" data-k="nlMin" data-t="num" step="any"></div>
+            <div class="field"><label for="nlMax">To</label><input type="number" id="nlMax" data-k="nlMax" data-t="num" step="any"></div>
+          </div>
+          <div class="row cols3">
+            <div class="field"><label for="nlStep">Tick every</label><input type="number" id="nlStep" data-k="nlStep" data-t="num" step="any" min="0"></div>
+            <div class="field"><label for="nlLabelEvery">Label every</label><input type="number" id="nlLabelEvery" data-k="nlLabelEvery" data-t="int" min="1"></div>
+          </div>
+          <p class="hint">“Label every 2” numbers every second tick, and makes those ticks longer.</p>
+          <label class="check"><input type="checkbox" data-k="nlLabels"> Print the numbers (off for blank lines)</label>
+        </div>
+
+        <div data-types="lined">
+          <label class="check"><input type="checkbox" data-k="linedMargin"> Margin line</label>
+          <div class="row cols2" data-when="linedMargin">
+            <div class="field"><label for="linedMarginPos">Margin from left <span class="u"></span></label><input type="number" id="linedMarginPos" data-k="linedMarginPos" data-t="len" step="any" min="0"></div>
+            <div class="field"><label for="linedMarginC">Margin colour</label><input type="color" id="linedMarginC" data-k="linedMarginC"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Lines &amp; colour</h3>
+        <div class="swatches" id="swatches"></div>
+
+        <h4 class="sub-title" id="minorTitle">Lines</h4>
+        <div class="row cols3">
+          <div class="field" data-when="lineWeights"><label for="minorW">Weight (pt)</label><input type="number" id="minorW" data-k="minorW" data-t="num" step="0.05" min="0.05"></div>
+          <div class="field"><label for="minorC">Colour</label><input type="color" id="minorC" data-k="minorC"></div>
+          <div class="field" data-when="lineStyles">
+            <label for="minorDash">Style</label>
+            <select id="minorDash" data-k="minorDash"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select>
+          </div>
+        </div>
+
+        <div data-when="hasMajor">
+          <h4 class="sub-title">Bold lines</h4>
+          <div class="row cols2">
+            <div class="field">
+              <label for="majorEvery" id="majorEveryLabel">Bold every</label>
+              <input type="number" id="majorEvery" data-k="majorEvery" data-t="int" min="0" max="100">
+            </div>
+          </div>
+          <p class="hint">0 turns bold lines off. Every 4 squares of ¼ in makes a bold line each inch.</p>
+          <div class="row cols3" data-when="majorOn">
+            <div class="field" data-when="lineWeights"><label for="majorW">Weight (pt)</label><input type="number" id="majorW" data-k="majorW" data-t="num" step="0.05" min="0.05"></div>
+            <div class="field"><label for="majorC">Colour</label><input type="color" id="majorC" data-k="majorC"></div>
+            <div class="field" data-when="lineStyles">
+              <label for="majorDash">Style</label>
+              <select id="majorDash" data-k="majorDash"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select>
+            </div>
+          </div>
+        </div>
+
+        <div data-when="hasBorder">
+          <h4 class="sub-title">Border</h4>
+          <label class="check"><input type="checkbox" data-k="border"> Draw a border round the grid</label>
+          <div class="row cols3" data-when="border">
+            <div class="field"><label for="borderW">Weight (pt)</label><input type="number" id="borderW" data-k="borderW" data-t="num" step="0.05" min="0.05"></div>
+            <div class="field"><label for="borderC">Colour</label><input type="color" id="borderC" data-k="borderC"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" data-when="axesCard">
+        <h3 class="section-title" id="axesTitle">Axes &amp; numbers</h3>
+        <div data-when="axesAllowed">
+          <label class="check"><input type="checkbox" data-k="axes"> Draw x and y axes (coordinate plane)</label>
+          <div data-when="axes">
+            <div class="row cols2">
+              <div class="field">
+                <label for="origin">Origin</label>
+                <select id="origin" data-k="origin">
+                  <option value="center">Centre (four quadrants)</option>
+                  <option value="bl">Bottom-left (first quadrant)</option>
+                  <option value="bc">Bottom-centre (quadrants I &amp; II)</option>
+                  <option value="ml">Middle-left (quadrants I &amp; IV)</option>
+                  <option value="tl">Top-left (fourth quadrant)</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </div>
+            </div>
+            <div class="row cols2" data-when="origin=custom">
+              <div class="field"><label for="originX">Squares from left</label><input type="number" id="originX" data-k="originX" data-t="int" min="0"></div>
+              <div class="field"><label for="originY">Squares from bottom</label><input type="number" id="originY" data-k="originY" data-t="int" min="0"></div>
+            </div>
+            <div class="row cols2">
+              <div class="field"><label for="axisLabelX">x-axis label</label><input type="text" id="axisLabelX" data-k="axisLabelX" autocomplete="off"></div>
+              <div class="field"><label for="axisLabelY">y-axis label</label><input type="text" id="axisLabelY" data-k="axisLabelY" autocomplete="off"></div>
+            </div>
+          </div>
+        </div>
+
+        <div data-when="axisStyle">
+          <div class="row cols3">
+            <div class="field"><label for="axisW">Axis weight (pt)</label><input type="number" id="axisW" data-k="axisW" data-t="num" step="0.1" min="0.1"></div>
+            <div class="field"><label for="axisC">Axis colour</label><input type="color" id="axisC" data-k="axisC"></div>
+            <div class="field">
+              <label for="arrows">Arrows</label>
+              <select id="arrows" data-k="arrows">
+                <option value="both">Both ends</option>
+                <option value="positive">Positive end</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div data-when="axes axesAllowed">
+          <label class="check"><input type="checkbox" data-k="numbers"> Number the axes</label>
+          <div data-when="numbers">
+            <div class="row cols3">
+              <div class="field"><label for="xStep">x per square</label><input type="number" id="xStep" data-k="xStep" data-t="num" step="any"></div>
+              <div class="field"><label for="yStep">y per square</label><input type="number" id="yStep" data-k="yStep" data-t="num" step="any"></div>
+              <div class="field"><label for="numEvery">Label every</label><input type="number" id="numEvery" data-k="numEvery" data-t="int" min="1"></div>
+            </div>
+            <label class="check"><input type="checkbox" data-k="showZero"> Show 0 at the origin</label>
+          </div>
+        </div>
+
+        <div data-when="ringLabels">
+          <div class="row cols2">
+            <div class="field"><label for="xStepR">Value per ring</label><input type="number" id="xStepR" data-k="xStep" data-t="num" step="any"></div>
+            <div class="field"><label for="numEveryR">Label every</label><input type="number" id="numEveryR" data-k="numEvery" data-t="int" min="1"></div>
+          </div>
+        </div>
+
+        <div data-when="hasLabels">
+          <div class="row cols2">
+            <div class="field"><label for="numSize">Number size (pt)</label><input type="number" id="numSize" data-k="numSize" data-t="num" step="0.5" min="4"></div>
+          </div>
+          <label class="check"><input type="checkbox" data-k="numHalo"> White box behind numbers</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Header &amp; footer</h3>
+        <div class="row">
+          <div class="field"><label for="title">Title</label><input type="text" id="title" data-k="title" autocomplete="off" placeholder="e.g. Unit 3 — Linear relations"></div>
+        </div>
+        <div class="row cols2" data-when="hasTitle">
+          <div class="field"><label for="titleSize">Title size (pt)</label><input type="number" id="titleSize" data-k="titleSize" data-t="num" step="1" min="6"></div>
+          <div class="field">
+            <label for="titleAlign">Title position</label>
+            <select id="titleAlign" data-k="titleAlign"><option value="left">Left</option><option value="center">Centre</option></select>
+          </div>
+        </div>
+        <h4 class="sub-title">Fill-in lines</h4>
+        <div class="checks">
+          <label class="check"><input type="checkbox" data-k="fName"> Name</label>
+          <label class="check"><input type="checkbox" data-k="fDate"> Date</label>
+          <label class="check"><input type="checkbox" data-k="fClass"> Class</label>
+          <label class="check"><input type="checkbox" data-k="fPeriod"> Period</label>
+        </div>
+        <div class="row cols2">
+          <div class="field"><label for="fCustom">Extra line</label><input type="text" id="fCustom" data-k="fCustom" autocomplete="off" placeholder="e.g. Score"></div>
+          <div class="field" data-when="hasFields"><label for="fieldSize">Text size (pt)</label><input type="number" id="fieldSize" data-k="fieldSize" data-t="num" step="0.5" min="6"></div>
+        </div>
+        <h4 class="sub-title">Footer</h4>
+        <div class="row">
+          <div class="field"><label for="footer">Footer text</label><input type="text" id="footer" data-k="footer" autocomplete="off" placeholder="e.g. Room 104 · Mr. Smith"></div>
+        </div>
+        <div class="checks" style="margin-top:10px">
+          <label class="check"><input type="checkbox" data-k="pageNums"> Page numbers</label>
+          <label class="check"><input type="checkbox" data-k="gridInfo"> Grid size note</label>
+          <label class="check"><input type="checkbox" data-k="scaleBar"> Print-scale check bar</label>
+        </div>
+        <p class="hint" data-when="scaleBar">The check bar should measure exactly 1 in (or 2 cm) on paper. If it doesn't, the printer scaled the page — print at 100% / “Actual size”.</p>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Pages &amp; export</h3>
+        <div class="row cols2">
+          <div class="field"><label for="pages">Pages</label><input type="number" id="pages" data-k="pages" data-t="int" min="1" max="100"></div>
+          <div class="field"><label for="fileName">File name</label><input type="text" id="fileName" data-k="fileName" autocomplete="off"></div>
+        </div>
+        <div class="row cols2">
+          <div class="field">
+            <label for="pngDpi">Image resolution</label>
+            <select id="pngDpi" data-k="pngDpi" data-t="int">
+              <option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option>
+            </select>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" data-k="previewMargins"> Show margins in the preview</label>
+        <div class="export-row">
+          <button class="btn small" id="svgBtn">⭳ SVG</button>
+          <button class="btn small" id="pngBtn">⭳ PNG image</button>
+          <button class="btn small" id="linkBtn">🔗 Copy link to these settings</button>
+          <button class="btn small danger" id="resetBtn">↺ Reset everything</button>
+        </div>
+        <p class="hint">The PDF is the most reliable way to get true-size squares. When printing from the browser, choose 100% / “Actual size” and turn off headers and footers.</p>
+      </section>
+
+      <p class="hint">Nothing here is uploaded anywhere — your settings are saved in this browser only, and every file is made on this device.</p>
+    </div>
+
+    <div class="preview-col">
+      <div class="preview-card">
+        <div class="preview-stage" id="stage"></div>
+        <p class="readout" id="readout"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="printArea"></div>
+  <div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const LS = 'teachingtools:graphPaper:settings';
+  const K = 72 / 25.4;                       // PDF points per millimetre
+  const UNIT_MM = { in:25.4, mm:1, cm:10 };
+  const UNIT_DEC = { in:3, mm:2, cm:3 };
+  const UNIT_ABBR = { in:'in', mm:'mm', cm:'cm' };
+  const MAX_ITEMS = 400000;                  // guard against a 0.5 mm dot grid on a poster
+
+  /* ---------- reference data ---------- */
+  const PAPERS = [
+    ['letter',  'Letter — 8.5 × 11 in',        215.9, 279.4],
+    ['legal',   'Legal — 8.5 × 14 in',         215.9, 355.6],
+    ['tabloid', 'Tabloid — 11 × 17 in',        279.4, 431.8],
+    ['half',    'Half letter — 5.5 × 8.5 in',  139.7, 215.9],
+    ['a3',      'A3 — 297 × 420 mm',           297,   420],
+    ['a4',      'A4 — 210 × 297 mm',           210,   297],
+    ['a5',      'A5 — 148 × 210 mm',           148,   210],
+    ['b5',      'B5 — 176 × 250 mm',           176,   250],
+    ['card46',  'Index card — 4 × 6 in',       101.6, 152.4],
+    ['card58',  'Index card — 5 × 8 in',       127,   203.2],
+    ['p1824',   'Poster — 18 × 24 in',         457.2, 609.6],
+    ['p2436',   'Poster — 24 × 36 in',         609.6, 914.4],
+    ['custom',  'Custom size…',                0,     0],
+  ];
+  const TYPES = [
+    ['square', 'Squares'], ['dots', 'Dots'], ['crosses', 'Crosses'], ['iso', 'Isometric'], ['isodots', 'Iso dots'],
+    ['hex', 'Hexagons'], ['polar', 'Polar'], ['log', 'Log'], ['numline', 'Number lines'], ['lined', 'Lined'],
+  ];
+  const TYPE_LONG = {
+    square:'Square grid', dots:'Dot grid', crosses:'Cross grid', iso:'Isometric grid', isodots:'Isometric dot grid',
+    hex:'Hexagon grid', polar:'Polar grid', log:'Logarithmic grid', numline:'Number lines', lined:'Lined paper',
+  };
+  const CELL_LABEL = {
+    square:'Square size', dots:'Dot spacing', crosses:'Cross spacing', iso:'Triangle side', isodots:'Dot spacing',
+    hex:'Hexagon side', polar:'Ring spacing', log:'Square size (linear axis)', lined:'Line spacing',
+  };
+  const MAJOR_LABEL = {
+    square:'Bold every … squares', dots:'Bigger dot every … dots', crosses:'Bold cross every …',
+    iso:'Bold every … lines', polar:'Bold every … rings', log:'Bold every … squares (linear axis)', lined:'Bold every … lines',
+  };
+  const CELL_PRESETS = [
+    ['', 'Pick a size…'],
+    ['2.54', '1/10 in'], ['3.175', '1/8 in'], ['5.08', '1/5 in'], ['6.35', '¼ in'], ['8.4667', '1/3 in'],
+    ['12.7', '½ in'], ['25.4', '1 in'],
+    ['1', '1 mm'], ['2', '2 mm'], ['5', '5 mm'], ['10', '1 cm'], ['20', '2 cm'],
+    ['7.1438', 'College ruled — 9/32 in'], ['8.7313', 'Wide ruled — 11/32 in'],
+  ];
+  const PALETTES = [
+    ['Blue',   '#9cc3e4', '#4a86bd'],
+    ['Grey',   '#c4c4c4', '#7c7c7c'],
+    ['Black',  '#6f6f6f', '#000000'],
+    ['Green',  '#a9d6b3', '#4f9a5e'],
+    ['Orange', '#f2b884', '#d9772b'],
+    ['Red',    '#efa6a6', '#c94848'],
+    ['Purple', '#c9b6e4', '#7d5bb0'],
+  ];
+
+  // Every length is stored in millimetres whatever unit is on screen, so
+  // switching units never rounds a value.
+  const DEFAULTS = {
+    v:1,
+    unit:'in', paper:'letter', customW:215.9, customH:279.4, orient:'portrait',
+    mTop:12.7, mRight:12.7, mBottom:12.7, mLeft:12.7, linkMargins:true,
+    type:'square', sizing:'size', cell:6.35, cols:20, rows:20, fit:'whole', align:'center',
+    panelsX:1, panelsY:1, gap:12.7,
+    minorW:0.4, minorC:'#9cc3e4', minorDash:'solid',
+    majorEvery:4, majorW:0.9, majorC:'#4a86bd', majorDash:'solid',
+    border:true, borderW:1, borderC:'#4a86bd',
+    dotD:1.8, dotMajorD:3, crossLen:2,
+    isoOrient:'vertical', hexOrient:'pointy',
+    polarShape:'full', polarStep:15, polarMajor:45, polarLabels:'deg', polarRingLabels:false,
+    logX:0, logY:3, logFine:true, logLabels:true,
+    nlCount:8, nlMin:-10, nlMax:10, nlStep:1, nlLabelEvery:1, nlLabels:true,
+    linedMargin:true, linedMarginPos:31.75, linedMarginC:'#e58f8f',
+    axes:false, origin:'center', originX:0, originY:0, axisW:1.3, axisC:'#1a1a1a', arrows:'both',
+    axisLabelX:'x', axisLabelY:'y', numbers:true, numEvery:1, xStep:1, yStep:1, numSize:7, numHalo:true, showZero:true,
+    title:'', titleSize:16, titleAlign:'left',
+    fName:false, fDate:false, fClass:false, fPeriod:false, fCustom:'', fieldSize:10,
+    footer:'', pageNums:false, gridInfo:false, scaleBar:false,
+    pages:1, fileName:'graph-paper', pngDpi:300, previewMargins:true,
+  };
+  // What a quick start leaves alone: the sheet, the header, the colours, the export.
+  const KEEP_ON_PRESET = ['v','unit','paper','customW','customH','orient','mTop','mRight','mBottom','mLeft','linkMargins',
+    'minorC','majorC','borderC','axisC','linedMarginC',
+    'title','titleSize','titleAlign','fName','fDate','fClass','fPeriod','fCustom','fieldSize',
+    'footer','pageNums','gridInfo','scaleBar','pages','fileName','pngDpi','previewMargins'];
+  const PRESETS = [
+    ['¼-inch graph',       { type:'square', cell:6.35, majorEvery:4 }],
+    ['5 mm grid',          { type:'square', cell:5, majorEvery:2 }],
+    ['1 mm graph',         { type:'square', cell:1, majorEvery:10, minorW:0.2, majorW:0.7 }],
+    ['Coordinate plane',   { type:'square', sizing:'count', cols:20, rows:20, axes:true, majorEvery:0 }],
+    ['4 planes',           { type:'square', sizing:'count', cols:20, rows:20, panelsX:2, panelsY:2, axes:true, majorEvery:0, numEvery:2, numSize:6 }],
+    ['6 small planes',     { type:'square', sizing:'count', cols:16, rows:16, panelsX:2, panelsY:3, axes:true, majorEvery:0, numEvery:2, numSize:5.5 }],
+    ['First quadrant',     { type:'square', sizing:'count', cols:20, rows:20, axes:true, origin:'bl', arrows:'positive', majorEvery:5 }],
+    ['Dot grid',           { type:'dots', cell:5, majorEvery:0 }],
+    ['Isometric',          { type:'iso', cell:10, majorEvery:0 }],
+    ['Isometric dots',     { type:'isodots', cell:10 }],
+    ['Hexagons',           { type:'hex', cell:6 }],
+    ['Polar',              { type:'polar', cell:6.35, majorEvery:4 }],
+    ['Semi-log',           { type:'log', logX:0, logY:3 }],
+    ['Log–log',            { type:'log', logX:2, logY:3 }],
+    ['Number lines',       { type:'numline' }],
+    ['Blank number lines', { type:'numline', nlMin:0, nlMax:10, nlLabels:false }],
+    ['Wide-ruled lined',   { type:'lined', cell:8.7313, majorEvery:0, border:false }],
+  ];
+  const COUNTABLE = ['square','dots','crosses'];
+
+  let S = Object.assign({}, DEFAULTS);
+
+  /* ---------- small helpers ---------- */
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const num = (v, lo, hi, def) => (typeof v === 'number' && isFinite(v)) ? clamp(v, lo, hi) : def;
+  const int = (v, lo, hi, def) => Math.round(num(v, lo, hi, def));
+  const trimNum = (v, dec) => String(parseFloat(v.toFixed(dec)));
+  function fmtVal(v){
+    const s = trimNum(v, 6);
+    return s[0] === '-' ? '−' + s.slice(1) : s;
+  }
+  function fmtLen(mm, unit){
+    unit = unit || S.unit;
+    if(unit === 'in'){
+      const v = mm / 25.4;
+      const named = [[1/4,'¼'],[1/2,'½'],[3/4,'¾'],[1/8,'1/8'],[1/5,'1/5'],[1/10,'1/10'],[1/16,'1/16'],[1/3,'1/3'],
+        [9/32,'9/32'],[11/32,'11/32']];
+      for(const [f, s] of named) if(Math.abs(v - f) < 2e-4) return s + ' in';
+      return trimNum(v, 3) + ' in';
+    }
+    return unit === 'cm' ? trimNum(mm / 10, 2) + ' cm' : trimNum(mm, 2) + ' mm';
+  }
+  const escXml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const mctx = document.createElement('canvas').getContext('2d');
+  function fontCss(size, font){
+    if(font === 'serif') return 'italic ' + size + 'px "Times New Roman", Times, serif';
+    return (font === 'bold' ? 'bold ' : '') + size + 'px Helvetica, Arial, sans-serif';
+  }
+  function measure(s, size, font){ mctx.font = fontCss(size, font); return mctx.measureText(s).width; }
+
+  function toast(msg, kind){
+    const t = document.createElement('div');
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.textContent = msg;
+    $('toastWrap').appendChild(t);
+    setTimeout(() => t.remove(), kind === 'err' ? 5200 : 2800);
+  }
+
+  /* ---------- derived flags (drive which controls are visible) ---------- */
+  function derived(){
+    const t = S.type, countable = COUNTABLE.includes(t);
+    const useCount = countable && S.sizing === 'count';
+    const axesOn = countable && S.axes;
+    const numbersOn = axesOn && S.numbers;
+    const ringLabels = t === 'polar' && S.polarRingLabels;
+    return {
+      sizingAllowed: countable, useCount, useCell: t !== 'numline' && !useCount,
+      alignAllowed: countable || t === 'lined' || t === 'hex',
+      fitAllowed: (countable || t === 'lined' || t === 'hex') && !useCount,
+      hasMajor: !['hex','numline','isodots'].includes(t),
+      majorOn: S.majorEvery > 0,
+      lineWeights: !['dots','isodots'].includes(t),
+      lineStyles: !['dots','isodots','crosses'].includes(t),
+      hasBorder: !['numline','polar'].includes(t),
+      axesAllowed: countable, axesOn, numbersOn, ringLabels,
+      axisStyle: axesOn || t === 'numline',
+      hasLabels: numbersOn || ringLabels || (t === 'numline' && S.nlLabels) ||
+        (t === 'polar' && S.polarLabels !== 'none') || (t === 'log' && S.logLabels),
+      axesCard: countable || ['numline','polar','log'].includes(t),
+      typeOpts: t !== 'square',
+      hasTitle: !!S.title.trim(),
+      hasFields: S.fName || S.fDate || S.fClass || S.fPeriod || !!S.fCustom.trim(),
+    };
+  }
+
+  /* =====================================================================
+     Geometry. build() turns the settings into a flat list of drawing items
+     in points, origin top-left, y down. The same list feeds the SVG preview,
+     the print pages, the PNG and the PDF, so all four always match.
+       L line · B box outline · D dot · C circle · A arc · P filled polygon
+       R filled rect (label halo) · T text
+     ===================================================================== */
+  function paperMM(){
+    let w, h;
+    if(S.paper === 'custom'){ w = num(S.customW, 25, 2000, 215.9); h = num(S.customH, 25, 2000, 279.4); }
+    else { const p = PAPERS.find(p => p[0] === S.paper) || PAPERS[0]; w = p[2]; h = p[3]; }
+    const lo = Math.min(w, h), hi = Math.max(w, h);
+    return S.orient === 'landscape' ? [hi, lo] : [lo, hi];
+  }
+
+  function build(){
+    const [wmm, hmm] = paperMM();
+    const W = wmm * K, H = hmm * K;
+    const items = [];
+    const add = it => { if(items.length >= MAX_ITEMS) throw new Error('That grid is too fine for this page — make the cells bigger or the paper smaller.'); items.push(it); };
+    const st = (w, c, dash) => ({ w, c, dash: dash || 'solid', key: w + c + (dash || 'solid') });
+    const minorS = st(num(S.minorW, 0.05, 10, 0.4), S.minorC, S.minorDash);
+    const majorS = st(num(S.majorW, 0.05, 10, 0.9), S.majorC, S.majorDash);
+    const fineS  = st(minorS.w * 0.55, S.minorC, S.minorDash);
+    const axisS  = st(num(S.axisW, 0.1, 10, 1.3), S.axisC);
+    const borderS = st(num(S.borderW, 0.05, 10, 1), S.borderC);
+    const majorN = int(S.majorEvery, 0, 1000, 0);
+    const isMaj = (i, ref) => majorN > 0 && (i - ref) % majorN === 0;
+    const fs = num(S.numSize, 4, 40, 7);
+    const D = derived();
+
+    function seg(x1, y1, x2, y2, s, r){
+      if(r){ const c = clipSeg(x1, y1, x2, y2, r); if(!c) return; [x1, y1, x2, y2] = c; }
+      if(Math.abs(x2 - x1) + Math.abs(y2 - y1) < 0.01) return;
+      add({ k:'L', x1, y1, x2, y2, s });
+    }
+    function box(x, y, w, h){ if(S.border) add({ k:'B', x, y, w, h, s:borderS }); }
+    function label(x, y, text, anchor, size, font, color){
+      size = size || fs; font = font || 'sans';
+      if(S.numHalo){
+        const tw = measure(text, size, font) + 3, th = size * 1.1;
+        const lx = anchor === 'end' ? x - tw + 1.5 : anchor === 'middle' ? x - tw / 2 : x - 1.5;
+        add({ k:'R', x:lx, y:y - th / 2, w:tw, h:th, fill:'#ffffff' });
+      }
+      add({ k:'T', x, y, s:text, size, c:color || '#1a1a1a', anchor, font, mid:true });
+    }
+    function arrow(x, y, dx, dy, L){
+      const w = L * 0.42, bx = x - dx * L, by = y - dy * L;
+      add({ k:'P', pts:[[x, y], [bx - dy * w, by + dx * w], [bx + dy * w, by - dx * w]], fill:axisS.c });
+    }
+    const arrowLen = () => Math.max(5, axisS.w * 3.6);
+
+    /* --- page frame: margins, header, footer --- */
+    const m = { t:num(S.mTop,0,500,0)*K, r:num(S.mRight,0,500,0)*K, b:num(S.mBottom,0,500,0)*K, l:num(S.mLeft,0,500,0)*K };
+    const area = { x:m.l, y:m.t, w:W - m.l - m.r, h:H - m.t - m.b };
+    if(area.w < 36 || area.h < 36) throw new Error('The margins leave no room on the page for a grid.');
+    const inner = { x:area.x, y:area.y, w:area.w, h:area.h };
+
+    let y = area.y;
+    const title = S.title.trim();
+    if(title){
+      const ts = num(S.titleSize, 6, 72, 16);
+      add({ k:'T', x:S.titleAlign === 'center' ? area.x + area.w / 2 : area.x, y:y + ts * 0.8, s:title, size:ts,
+        c:'#1a1a1a', anchor:S.titleAlign === 'center' ? 'middle' : 'start', font:'bold' });
+      y += ts * 1.15 + 6;
+    }
+    const fields = [['Name', S.fName, 2.2], ['Class', S.fClass, 1], ['Period', S.fPeriod, 0.8], ['Date', S.fDate, 1.2],
+      [S.fCustom.trim(), !!S.fCustom.trim(), 1]].filter(f => f[1]);
+    if(fields.length){
+      const ffs = num(S.fieldSize, 6, 30, 10), total = fields.reduce((a, f) => a + f[2], 0);
+      const lineS = st(0.6, '#555555');
+      let x = area.x;
+      const base = y + ffs;
+      fields.forEach(([name, , share], i) => {
+        const segW = area.w * share / total, text = name + ':';
+        add({ k:'T', x, y:base, s:text, size:ffs, c:'#333333', anchor:'start', font:'sans' });
+        const lx = x + measure(text, ffs, 'sans') + 4, rx = x + segW - (i === fields.length - 1 ? 0 : 12);
+        if(rx - lx > 8) seg(lx, base + 1.5, rx, base + 1.5, lineS);
+        x += segW;
+      });
+      y += ffs + 10;
+    }
+    if(y > area.y){ y += 4; inner.y = y; inner.h -= y - area.y; }
+
+    const footer = S.footer.trim();
+    const hasFooter = footer || S.pageNums || S.gridInfo || S.scaleBar;
+    const footFs = 8, footBase = area.y + area.h - 1;
+    if(hasFooter) inner.h -= footFs + 10;
+    if(inner.h < 36) throw new Error('The header and footer leave no room for a grid — shrink them or the margins.');
+
+    /* --- panels: the grid area split into across × down separate grids --- */
+    const PX = int(S.panelsX, 1, 8, 1), PY = int(S.panelsY, 1, 8, 1), gap = num(S.gap, 0, 500, 0) * K;
+    const pw = (inner.w - gap * (PX - 1)) / PX, ph = (inner.h - gap * (PY - 1)) / PY;
+    if(pw < 24 || ph < 24) throw new Error('Too many grids for this page — use fewer, or a smaller gap.');
+    const cell = Math.max(0.5, num(S.cell, 0, 1000, 6.35)) * K;
+    let summary = '', usedCell = cell;
+
+    /* --- square / dots / crosses / lined share one lattice --- */
+    function lattice(r){
+      let c = cell, nx, ny;
+      if(D.useCount){
+        nx = int(S.cols, 1, 500, 20); ny = int(S.rows, 1, 500, 20);
+        c = Math.min(r.w / nx, r.h / ny);
+      }
+      const center = S.align === 'center';
+      if(D.useCount || S.fit === 'whole' || !D.fitAllowed){
+        if(!D.useCount){ nx = Math.floor(r.w / c + 1e-6); ny = Math.floor(r.h / c + 1e-6); }
+        if(nx < 1 || ny < 1) throw new Error('The cells are bigger than the space for the grid.');
+        const gw = nx * c, gh = ny * c;
+        const gx = r.x + (center ? (r.w - gw) / 2 : 0), gy = r.y + (center ? (r.h - gh) / 2 : 0);
+        const xs = [], ys = [];
+        for(let i = 0; i <= nx; i++) xs.push(gx + i * c);
+        for(let j = 0; j <= ny; j++) ys.push(gy + j * c);
+        return { xs, ys, gx, gy, gw, gh, c, nx, ny };
+      }
+      const px = center ? (r.w - Math.floor(r.w / c + 1e-6) * c) / 2 : 0;
+      const py = center ? (r.h - Math.floor(r.h / c + 1e-6) * c) / 2 : 0;
+      const xs = [], ys = [];
+      for(let i = 0; r.x + px + i * c <= r.x + r.w + 1e-6; i++) xs.push(r.x + px + i * c);
+      for(let j = 0; r.y + py + j * c <= r.y + r.h + 1e-6; j++) ys.push(r.y + py + j * c);
+      if(xs.length < 2 || ys.length < 2) throw new Error('The cells are bigger than the space for the grid.');
+      return { xs, ys, gx:r.x, gy:r.y, gw:r.w, gh:r.h, c, nx:xs.length - 1, ny:ys.length - 1 };
+    }
+    function originOf(g){
+      const lx = g.xs.length - 1, ly = g.ys.length - 1;
+      let ox, oyb;
+      switch(S.origin){
+        case 'bl': ox = 0; oyb = 0; break;
+        case 'bc': ox = Math.round(lx / 2); oyb = 0; break;
+        case 'ml': ox = 0; oyb = Math.round(ly / 2); break;
+        case 'tl': ox = 0; oyb = ly; break;
+        case 'custom': ox = int(S.originX, 0, lx, 0); oyb = int(S.originY, 0, ly, 0); break;
+        default: ox = Math.round(lx / 2); oyb = Math.round(ly / 2);
+      }
+      return { ox, oy: ly - oyb };
+    }
+
+    function drawLattice(r){
+      const g = lattice(r);
+      usedCell = g.c;
+      const t = S.type;
+      const o = D.axesOn ? originOf(g) : { ox:0, oy:0 };
+      const top = g.gy, bottom = g.gy + g.gh, left = g.gx, right = g.gx + g.gw;
+      if(t === 'square'){
+        [false, true].forEach(pass => {
+          const s = pass ? majorS : minorS;
+          g.xs.forEach((x, i) => { if(isMaj(i, o.ox) === pass && !(D.axesOn && i === o.ox)) seg(x, top, x, bottom, s); });
+          g.ys.forEach((y, j) => { if(isMaj(j, o.oy) === pass && !(D.axesOn && j === o.oy)) seg(left, y, right, y, s); });
+        });
+        summary = g.nx + ' × ' + g.ny + ' squares';
+      } else if(t === 'dots'){
+        const d = num(S.dotD, 0.1, 20, 1.4), dm = num(S.dotMajorD, 0.1, 20, 2.4);
+        g.ys.forEach((y, j) => g.xs.forEach((x, i) => {
+          const maj = isMaj(i, o.ox) && isMaj(j, o.oy);
+          add({ k:'D', x, y, d:maj ? dm : d, c:maj ? majorS.c : minorS.c });
+        }));
+        summary = g.xs.length + ' × ' + g.ys.length + ' dots';
+      } else if(t === 'crosses'){
+        const a = num(S.crossLen, 0.1, 100, 2) * K / 2;
+        [false, true].forEach(pass => {
+          const s = st(pass ? majorS.w : minorS.w, pass ? majorS.c : minorS.c);
+          g.ys.forEach((y, j) => g.xs.forEach((x, i) => {
+            if((isMaj(i, o.ox) && isMaj(j, o.oy)) !== pass) return;
+            seg(x - a, y, x + a, y, s, r); seg(x, y - a, x, y + a, s, r);
+          }));
+        });
+        summary = g.xs.length + ' × ' + g.ys.length + ' crosses';
+      } else if(t === 'lined'){
+        const lx = r.x, rx = r.x + r.w;
+        [false, true].forEach(pass => g.ys.forEach((y, j) => { if(isMaj(j, 0) === pass) seg(lx, y, rx, y, pass ? majorS : minorS); }));
+        if(S.linedMargin){
+          const mx = r.x + num(S.linedMarginPos, 0, 2000, 31.75) * K;
+          if(mx > r.x && mx < rx) seg(mx, top, mx, bottom, st(Math.max(minorS.w, 0.8), S.linedMarginC));
+        }
+        box(lx, top, r.w, g.gh);
+        summary = g.ny + ' lines';
+        return;
+      }
+      box(left, top, g.gw, g.gh);
+      if(D.axesOn) drawAxes(g, o);
+    }
+
+    function drawAxes(g, o){
+      const ax = g.xs[o.ox], ay = g.ys[o.oy];
+      const left = g.gx, right = g.gx + g.gw, top = g.gy, bottom = g.gy + g.gh;
+      const L = arrowLen(), lastX = g.xs.length - 1, lastY = g.ys.length - 1;
+      const posArrows = S.arrows !== 'none', negArrows = S.arrows === 'both';
+      const aL = negArrows && o.ox > 0, aR = posArrows && o.ox < lastX;
+      const aT = posArrows && o.oy > 0, aB = negArrows && o.oy < lastY;
+      seg(aL ? left + L * 0.7 : left, ay, aR ? right - L * 0.7 : right, ay, axisS);
+      seg(ax, aT ? top + L * 0.7 : top, ax, aB ? bottom - L * 0.7 : bottom, axisS);
+      if(aL) arrow(left, ay, -1, 0, L);
+      if(aR) arrow(right, ay, 1, 0, L);
+      if(aT) arrow(ax, top, 0, -1, L);
+      if(aB) arrow(ax, bottom, 0, 1, L);
+
+      if(S.numbers){
+        const every = int(S.numEvery, 1, 1000, 1);
+        const below = o.oy < lastY, leftSide = o.ox > 0;
+        const ly = below ? ay + 3 + fs * 0.55 : ay - 3 - fs * 0.55;
+        g.xs.forEach((x, i) => {
+          const k = i - o.ox;
+          if(k === 0 || k % every) return;
+          label(x, ly, fmtVal(k * num(S.xStep, -1e9, 1e9, 1)), 'middle');
+        });
+        g.ys.forEach((y, j) => {
+          const k = o.oy - j;
+          if(k === 0 || k % every) return;
+          label(leftSide ? ax - 3 : ax + 3, y, fmtVal(k * num(S.yStep, -1e9, 1e9, 1)), leftSide ? 'end' : 'start');
+        });
+        if(S.showZero) label(leftSide ? ax - 3 : ax + 3, ly, '0', leftSide ? 'end' : 'start');
+      }
+      const afs = fs + 3.5;
+      if(S.axisLabelX.trim()){
+        const xy = o.oy > 0 ? ay - 5 - afs * 0.4 : ay + 5 + afs * 0.4 + (S.numbers ? fs : 0);
+        label(right - 1, xy, S.axisLabelX.trim(), 'end', afs, 'serif');
+      }
+      if(S.axisLabelY.trim()){
+        const onRight = o.ox < lastX;
+        label(onRight ? ax + 6 : ax - 6, top + afs * 0.6 + 1, S.axisLabelY.trim(), onRight ? 'start' : 'end', afs, 'serif');
+      }
+    }
+
+    /* --- isometric / triangle lines and dots --- */
+    function drawIso(r, dotsOnly){
+      const c = cell, h = c * Math.sqrt(3) / 2;
+      const O = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+      const phi = S.isoOrient === 'vertical' ? 0 : 90;
+      if(!dotsOnly){
+        // Three families of parallel lines whose normals sit 120° apart, all
+        // passing through O, spaced one triangle-height apart: a triangular lattice.
+        const corners = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]];
+        const BIG = r.w + r.h;
+        [false, true].forEach(pass => {
+          for(let f = 0; f < 3; f++){
+            const a = (phi + 120 * f) * Math.PI / 180, nx = Math.cos(a), ny = Math.sin(a), dx = -ny, dy = nx;
+            const proj = corners.map(p => (p[0] - O.x) * nx + (p[1] - O.y) * ny);
+            const k0 = Math.ceil(Math.min(...proj) / h), k1 = Math.floor(Math.max(...proj) / h);
+            for(let k = k0; k <= k1; k++){
+              if(isMaj(k, 0) !== pass) continue;
+              const bx = O.x + nx * k * h, by = O.y + ny * k * h;
+              seg(bx - dx * BIG, by - dy * BIG, bx + dx * BIG, by + dy * BIG, pass ? majorS : minorS, r);
+            }
+          }
+        });
+      } else {
+        const d = num(S.dotD, 0.1, 20, 1.4), vert = S.isoOrient === 'vertical';
+        // columns (vertical) or rows (horizontal) one triangle-height apart, alternate ones shifted half a side
+        const span = vert ? [r.x, r.x + r.w, O.x] : [r.y, r.y + r.h, O.y];
+        const along = vert ? [r.y, r.y + r.h, O.y] : [r.x, r.x + r.w, O.x];
+        for(let i = Math.ceil((span[0] - span[2]) / h); i <= Math.floor((span[1] - span[2]) / h); i++){
+          const p = span[2] + i * h, off = Math.abs(i) % 2 ? c / 2 : 0;
+          for(let j = Math.ceil((along[0] - along[2] - off) / c); j <= Math.floor((along[1] - along[2] - off) / c); j++){
+            const q = along[2] + off + j * c;
+            add(vert ? { k:'D', x:p, y:q, d, c:minorS.c } : { k:'D', x:q, y:p, d, c:minorS.c });
+          }
+        }
+      }
+      box(r.x, r.y, r.w, r.h);
+      summary = 'triangle side ' + fmtLen(c / K);
+    }
+
+    /* --- hexagons --- */
+    function drawHex(r){
+      const s = cell, R3 = Math.sqrt(3), pointy = S.hexOrient === 'pointy';
+      const dx = pointy ? R3 * s : 1.5 * s, dy = pointy ? 1.5 * s : R3 * s;
+      const hw = pointy ? R3 * s / 2 : s, hh = pointy ? s : R3 * s / 2;
+      const whole = S.fit === 'whole', eps = 1e-6;
+      let centers = [];
+      for(let j = -1; j * dy <= r.h + dy; j++){
+        for(let i = -1; i * dx <= r.w + dx; i++){
+          const x = hw + i * dx + (pointy && (j & 1) ? dx / 2 : 0);
+          const y = hh + j * dy + (!pointy && (i & 1) ? dy / 2 : 0);
+          const inside = x - hw >= -eps && x + hw <= r.w + eps && y - hh >= -eps && y + hh <= r.h + eps;
+          const touches = x + hw > 0 && x - hw < r.w && y + hh > 0 && y - hh < r.h;
+          if(whole ? inside : touches) centers.push([x, y]);
+        }
+      }
+      if(!centers.length) throw new Error('The hexagons are bigger than the space for the grid.');
+      let ox = r.x, oy = r.y, bb = null;
+      if(whole){
+        const xs = centers.map(p => p[0]), ys = centers.map(p => p[1]);
+        bb = { x0:Math.min(...xs) - hw, x1:Math.max(...xs) + hw, y0:Math.min(...ys) - hh, y1:Math.max(...ys) + hh };
+        if(S.align === 'center'){ ox += (r.w - (bb.x1 - bb.x0)) / 2 - bb.x0; oy += (r.h - (bb.y1 - bb.y0)) / 2 - bb.y0; }
+        else { ox -= bb.x0; oy -= bb.y0; }
+      }
+      const seen = new Set();
+      const a0 = pointy ? 30 : 0;
+      const key = (x, y) => Math.round(x * 20) + ',' + Math.round(y * 20);
+      centers.forEach(([cx, cy]) => {
+        const v = [];
+        for(let k = 0; k < 6; k++){ const a = (a0 + 60 * k) * Math.PI / 180; v.push([ox + cx + s * Math.cos(a), oy + cy + s * Math.sin(a)]); }
+        for(let k = 0; k < 6; k++){
+          const p = v[k], q = v[(k + 1) % 6];
+          const id = [key(p[0], p[1]), key(q[0], q[1])].sort().join('|');
+          if(seen.has(id)) continue;
+          seen.add(id);
+          seg(p[0], p[1], q[0], q[1], minorS, whole ? null : r);
+        }
+      });
+      if(!whole) box(r.x, r.y, r.w, r.h);
+      summary = centers.length + ' hexagons';
+    }
+
+    /* --- polar --- */
+    function drawPolar(r){
+      const c = cell, shape = S.polarShape;
+      const angLabels = S.polarLabels !== 'none';
+      const p = angLabels ? 6 + fs * 2.7 : 3;
+      const q = Math.max(angLabels ? fs * 1.1 : 3, S.polarRingLabels ? fs * 1.3 + 4 : 0);
+      let R;
+      if(shape === 'half') R = Math.min(r.w / 2 - p, r.h - p - q);
+      else if(shape === 'quarter') R = Math.min(r.w - p - q, r.h - p - q);
+      else R = Math.min(r.w, r.h) / 2 - p;
+      const n = Math.floor(R / c + 1e-6);
+      if(n < 1) throw new Error('The ring spacing is bigger than the space for the grid.');
+      const Re = n * c;
+      let cx, cy;
+      if(shape === 'half'){ cx = r.x + r.w / 2; cy = r.y + (r.h - (Re + p + q)) / 2 + p + Re; }
+      else if(shape === 'quarter'){ cx = r.x + (r.w - (Re + p + q)) / 2 + q; cy = r.y + (r.h - (Re + p + q)) / 2 + p + Re; }
+      else { cx = r.x + r.w / 2; cy = r.y + r.h / 2; }
+      const [aMin, aMax] = shape === 'half' ? [0, 180] : shape === 'quarter' ? [0, 90] : [0, 360];
+      const step = num(S.polarStep, 1, 180, 15), majA = int(S.polarMajor, 0, 360, 0);
+
+      // spokes first so the rings sit on top of them
+      const spokes = [];
+      for(let a = aMin; a <= aMax + 1e-9; a += step){ if(shape === 'full' && a >= 360 - 1e-9) break; spokes.push(a); }
+      const majSpoke = a => majA > 0 && Math.abs(a % majA) < 1e-9;
+      [false, true].forEach(pass => spokes.forEach(a => {
+        if(majSpoke(a) !== pass) return;
+        const rad = a * Math.PI / 180, r0 = (pass || majA === 0 || n < 2) ? 0 : c;
+        seg(cx + r0 * Math.cos(rad), cy - r0 * Math.sin(rad), cx + Re * Math.cos(rad), cy - Re * Math.sin(rad), pass ? majorS : minorS);
+      }));
+      [false, true].forEach(pass => {
+        for(let k = 1; k <= n; k++){
+          const maj = k === n || isMaj(k, 0);
+          if(maj !== pass) continue;
+          const s = maj ? majorS : minorS;
+          add(shape === 'full' ? { k:'C', cx, cy, r:k * c, s } : { k:'A', cx, cy, r:k * c, a0:aMin, a1:aMax, s });
+        }
+      });
+      if(angLabels){
+        const every = majA || step;
+        spokes.forEach(a => {
+          if(Math.abs(a % every) > 1e-9) return;
+          const text = S.polarLabels === 'rad' ? radLabel(a) : trimNum(a, 2) + '°';
+          const rad = a * Math.PI / 180, tw = measure(text, fs, 'sans');
+          const dist = Re + 4 + tw / 2 * Math.abs(Math.cos(rad)) + fs * 0.6 * Math.abs(Math.sin(rad));
+          add({ k:'T', x:cx + dist * Math.cos(rad), y:cy - dist * Math.sin(rad), s:text, size:fs, c:'#1a1a1a', anchor:'middle', font:'sans', mid:true });
+        });
+      }
+      if(S.polarRingLabels){
+        const every = int(S.numEvery, 1, 1000, 1);
+        for(let k = every; k <= n; k += every) label(cx + k * c, cy + 3 + fs * 0.55, fmtVal(k * num(S.xStep, -1e9, 1e9, 1)), 'middle');
+      }
+      summary = n + ' rings, spokes every ' + trimNum(step, 2) + '°';
+    }
+    function radLabel(a){
+      const gcd = (x, y) => y ? gcd(y, x % y) : x;
+      const deg = Math.round(a);
+      if(deg === 0) return '0';
+      const g = gcd(deg, 180), nu = deg / g, de = 180 / g;
+      return (nu === 1 ? '' : nu) + 'π' + (de === 1 ? '' : '/' + de);
+    }
+
+    /* --- logarithmic --- */
+    function logAxis(len, cycles){
+      const lines = [], labels = [];
+      if(!cycles){
+        const n = Math.floor(len / cell + 1e-6);
+        if(n < 1) throw new Error('The squares are bigger than the space for the grid.');
+        for(let i = 0; i <= n; i++) lines.push({ p:i * cell, kind:isMaj(i, 0) ? 'maj' : 'min' });
+        return { len:n * cell, lines, labels, desc:'linear' };
+      }
+      const cl = len / cycles;
+      for(let d = 0; d < cycles; d++){
+        const base = d * cl;
+        for(let m = 1; m < 10; m++){
+          const p = base + Math.log10(m) * cl;
+          lines.push({ p, kind:m === 1 ? 'maj' : 'min' });
+          labels.push({ p, t:String(m) });
+          if(S.logFine){
+            const sub = m < 2 ? 0.1 : m < 5 ? 0.2 : 0.5;
+            let prev = p;
+            for(let v = m + sub; v < m + 1 - 1e-9; v += sub){
+              const pv = base + Math.log10(v) * cl;
+              if(pv - prev < 1.6) break;             // too tight to print — stop subdividing this step
+              lines.push({ p:pv, kind:'fine' });
+              prev = pv;
+            }
+          }
+        }
+      }
+      lines.push({ p:len, kind:'maj' });
+      labels.push({ p:len, t:'1' });
+      // thin the labels out on small cycles so they never overlap
+      const kept = []; let last = -1e9;
+      labels.forEach(l => { if(l.p - last >= fs * 1.25){ kept.push(l); last = l.p; } });
+      return { len, lines, labels:kept, desc:cycles + '-cycle log' };
+    }
+    function drawLog(r){
+      const lx = int(S.logX, 0, 5, 0), ly = int(S.logY, 0, 5, 0);
+      const padL = S.logLabels && ly ? fs * 1.6 + 4 : 0, padB = S.logLabels && lx ? fs * 1.3 + 4 : 0;
+      const ir = { x:r.x + padL, y:r.y, w:r.w - padL, h:r.h - padB };
+      const X = logAxis(ir.w, lx), Y = logAxis(ir.h, ly);
+      const center = S.align === 'center';
+      const gx = ir.x + (center ? (ir.w - X.len) / 2 : 0), gy = ir.y + (center ? (ir.h - Y.len) / 2 : 0);
+      const bottom = gy + Y.len;
+      ['fine', 'min', 'maj'].forEach(kind => {
+        const s = kind === 'maj' ? majorS : kind === 'min' ? minorS : fineS;
+        X.lines.forEach(l => { if(l.kind === kind) seg(gx + l.p, gy, gx + l.p, bottom, s); });
+        Y.lines.forEach(l => { if(l.kind === kind) seg(gx, bottom - l.p, gx + X.len, bottom - l.p, s); });
+      });
+      box(gx, gy, X.len, Y.len);
+      if(S.logLabels){
+        X.labels.forEach(l => add({ k:'T', x:gx + l.p, y:bottom + 3 + fs * 0.55, s:l.t, size:fs, c:'#1a1a1a', anchor:'middle', font:'sans', mid:true }));
+        Y.labels.forEach(l => add({ k:'T', x:gx - 3, y:bottom - l.p, s:l.t, size:fs, c:'#1a1a1a', anchor:'end', font:'sans', mid:true }));
+      }
+      summary = X.desc + ' across × ' + Y.desc + ' up';
+    }
+
+    /* --- number lines --- */
+    function drawNumLines(r){
+      const n = int(S.nlCount, 1, 40, 8);
+      const min = num(S.nlMin, -1e9, 1e9, 0), max = num(S.nlMax, -1e9, 1e9, 10), step = num(S.nlStep, 0, 1e9, 1);
+      if(!(max > min)) throw new Error('Number lines: “To” has to be bigger than “From”.');
+      if(!(step > 0)) throw new Error('Number lines: “Tick every” has to be more than 0.');
+      const ticks = Math.floor((max - min) / step + 1e-9);
+      if(ticks > 400) throw new Error('Number lines: that is over 400 ticks per line — use a bigger “Tick every”.');
+      const every = int(S.nlLabelEvery, 1, 1000, 1), labels = S.nlLabels;
+      const L = arrowLen(), arrows = S.arrows;
+      const edgeLabel = labels ? Math.max(measure(fmtVal(min), fs, 'sans'), measure(fmtVal(max), fs, 'sans')) / 2 + 2 : 2;
+      const inset = Math.max(arrows !== 'none' ? L + 6 : 0, edgeLabel);
+      const xL = r.x + inset, xR = r.x + r.w - inset;
+      if(xR - xL < 30) throw new Error('Number lines: not enough room across — use fewer grids across.');
+      const rowH = r.h / n;
+      if(rowH < 14 + (labels ? fs * 1.5 : 0)) throw new Error('Number lines: too many lines for the space — use fewer.');
+      for(let i = 0; i < n; i++){
+        const y = r.y + rowH * (i + 0.5) - (labels ? fs * 0.6 : 0);
+        const aL = arrows === 'both', aR = arrows !== 'none';
+        seg(aL ? r.x + L * 0.7 : xL, y, aR ? r.x + r.w - L * 0.7 : xR, y, axisS);
+        if(aL) arrow(r.x, y, -1, 0, L);
+        if(aR) arrow(r.x + r.w, y, 1, 0, L);
+        for(let t = 0; t <= ticks; t++){
+          const v = min + t * step, x = xL + (v - min) / (max - min) * (xR - xL);
+          const major = t % every === 0, th = major ? 5 : 3;
+          seg(x, y - th, x, y + th, axisS);
+          if(labels && major) add({ k:'T', x, y:y + th + 2 + fs * 0.55, s:fmtVal(v), size:fs, c:'#1a1a1a', anchor:'middle', font:'sans', mid:true });
+        }
+      }
+      summary = n + ' line' + (n === 1 ? '' : 's') + ', ' + fmtVal(min) + ' to ' + fmtVal(max);
+    }
+
+    for(let py = 0; py < PY; py++){
+      for(let px = 0; px < PX; px++){
+        const r = { x:inner.x + px * (pw + gap), y:inner.y + py * (ph + gap), w:pw, h:ph };
+        const t = S.type;
+        if(COUNTABLE.includes(t) || t === 'lined') drawLattice(r);
+        else if(t === 'iso') drawIso(r, false);
+        else if(t === 'isodots') drawIso(r, true);
+        else if(t === 'hex') drawHex(r);
+        else if(t === 'polar') drawPolar(r);
+        else if(t === 'log') drawLog(r);
+        else drawNumLines(r);
+      }
+    }
+
+    /* --- footer (page numbers are added per page, below) --- */
+    const infoText = TYPE_LONG[S.type] + (S.type === 'numline' ? '' : ' · ' + fmtLen(usedCell / K) +
+      (S.type === 'polar' ? ' rings' : S.type === 'lined' ? ' lines' : S.type === 'hex' ? ' sides' : ''));
+    if(hasFooter){
+      let fx = area.x;
+      const grey = '#555555';
+      if(S.scaleBar){
+        const barMM = S.unit === 'in' ? 25.4 : 20, bl = barMM * K, by = footBase - 3;
+        const s = st(0.8, '#1a1a1a');
+        seg(fx, by, fx + bl, by, s); seg(fx, by - 3, fx, by + 3, s); seg(fx + bl, by - 3, fx + bl, by + 3, s);
+        const t = S.unit === 'in' ? '1 in' : '2 cm';
+        add({ k:'T', x:fx + bl + 4, y:footBase, s:t, size:footFs, c:grey, anchor:'start', font:'sans' });
+        fx += bl + 10 + measure(t, footFs, 'sans');
+      }
+      if(footer) add({ k:'T', x:fx, y:footBase, s:footer, size:footFs, c:grey, anchor:'start', font:'sans' });
+      if(S.gridInfo) add({ k:'T', x:area.x + area.w / 2, y:footBase, s:infoText, size:footFs, c:grey, anchor:'middle', font:'sans' });
+    }
+    const pageItems = (i, n) => S.pageNums ? [{ k:'T', x:area.x + area.w, y:footBase, s:'Page ' + (i + 1) + ' of ' + n,
+      size:footFs, c:'#555555', anchor:'end', font:'sans' }] : [];
+
+    return { W, H, wmm, hmm, items, pageItems, margins:m, summary, panels:PX * PY, infoText };
+  }
+
+  // Liang–Barsky: clip a segment to a rectangle, or null if it misses.
+  function clipSeg(x1, y1, x2, y2, r){
+    let t0 = 0, t1 = 1;
+    const dx = x2 - x1, dy = y2 - y1;
+    const p = [-dx, dx, -dy, dy], q = [x1 - r.x, r.x + r.w - x1, y1 - r.y, r.y + r.h - y1];
+    for(let i = 0; i < 4; i++){
+      if(p[i] === 0){ if(q[i] < -1e-9) return null; continue; }
+      const t = q[i] / p[i];
+      if(p[i] < 0){ if(t > t1) return null; if(t > t0) t0 = t; }
+      else { if(t < t0) return null; if(t < t1) t1 = t; }
+    }
+    return [x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy];
+  }
+
+  function dashArray(s){
+    if(s.dash === 'dashed') return [Math.max(2, s.w * 5), Math.max(1.5, s.w * 3.5)];
+    if(s.dash === 'dotted') return [0, Math.max(1.5, s.w * 3)];
+    return [];
+  }
+
+  /* ---------- SVG ---------- */
+  const f2 = v => String(Math.round(v * 100) / 100);
+  function svgItems(items){
+    const out = [];
+    let i = 0;
+    while(i < items.length){
+      const it = items[i];
+      if(it.k === 'L'){
+        let d = '';
+        const s = it.s;
+        while(i < items.length && items[i].k === 'L' && items[i].s.key === s.key){
+          const l = items[i++];
+          d += 'M' + f2(l.x1) + ' ' + f2(l.y1) + 'L' + f2(l.x2) + ' ' + f2(l.y2);
+        }
+        out.push('<path d="' + d + '" fill="none"' + strokeAttrs(s) + '/>');
+        continue;
+      }
+      if(it.k === 'D'){
+        const c = it.c;
+        let g = '';
+        while(i < items.length && items[i].k === 'D' && items[i].c === c){
+          const p = items[i++];
+          g += '<circle cx="' + f2(p.x) + '" cy="' + f2(p.y) + '" r="' + f2(p.d / 2) + '"/>';
+        }
+        out.push('<g fill="' + c + '">' + g + '</g>');
+        continue;
+      }
+      i++;
+      if(it.k === 'B') out.push('<rect x="' + f2(it.x) + '" y="' + f2(it.y) + '" width="' + f2(it.w) + '" height="' + f2(it.h) + '" fill="none"' + strokeAttrs(it.s) + '/>');
+      else if(it.k === 'C') out.push('<circle cx="' + f2(it.cx) + '" cy="' + f2(it.cy) + '" r="' + f2(it.r) + '" fill="none"' + strokeAttrs(it.s) + '/>');
+      else if(it.k === 'A'){
+        const a0 = it.a0 * Math.PI / 180, a1 = it.a1 * Math.PI / 180;
+        const x0 = it.cx + it.r * Math.cos(a0), y0 = it.cy - it.r * Math.sin(a0);
+        const x1 = it.cx + it.r * Math.cos(a1), y1 = it.cy - it.r * Math.sin(a1);
+        out.push('<path d="M' + f2(x0) + ' ' + f2(y0) + 'A' + f2(it.r) + ' ' + f2(it.r) + ' 0 ' + (it.a1 - it.a0 > 180 ? 1 : 0) +
+          ' 0 ' + f2(x1) + ' ' + f2(y1) + '" fill="none"' + strokeAttrs(it.s) + '/>');
+      }
+      else if(it.k === 'P') out.push('<polygon points="' + it.pts.map(p => f2(p[0]) + ',' + f2(p[1])).join(' ') + '" fill="' + it.fill + '"/>');
+      else if(it.k === 'R') out.push('<rect x="' + f2(it.x) + '" y="' + f2(it.y) + '" width="' + f2(it.w) + '" height="' + f2(it.h) + '" fill="' + it.fill + '"/>');
+      else if(it.k === 'T'){
+        const y = it.mid ? it.y + it.size * 0.35 : it.y;
+        const fam = it.font === 'serif' ? '\'Times New Roman\',Times,serif' : 'Helvetica,Arial,sans-serif';
+        out.push('<text x="' + f2(it.x) + '" y="' + f2(y) + '" font-family="' + fam + '" font-size="' + f2(it.size) + '"' +
+          (it.font === 'bold' ? ' font-weight="700"' : '') + (it.font === 'serif' ? ' font-style="italic"' : '') +
+          ' fill="' + it.c + '" text-anchor="' + (it.anchor || 'start') + '">' + escXml(it.s) + '</text>');
+      }
+    }
+    return out.join('');
+  }
+  function strokeAttrs(s){
+    const da = dashArray(s);
+    return ' stroke="' + s.c + '" stroke-width="' + f2(s.w) + '"' +
+      (da.length ? ' stroke-dasharray="' + da.map(f2).join(' ') + '"' : '') +
+      (s.dash === 'dotted' ? ' stroke-linecap="round"' : '');
+  }
+  function svgOpen(pg, w, h, extra){
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + f2(pg.W) + ' ' + f2(pg.H) + '" width="' + w + '" height="' + h + '"' +
+      (extra || '') + '><rect width="100%" height="100%" fill="#ffffff"/>';
+  }
+  function pageSVG(pg, i, n, w, h){
+    return svgOpen(pg, w, h) + svgItems(pg.items) + svgItems(pg.pageItems(i, n)) + '</svg>';
+  }
+
+  /* ---------- PDF (hand-built, no library; Helvetica, Times and Symbol are standard PDF fonts) ---------- */
+  const WIN_ANSI = { '–':'\x96', '—':'\x97', '−':'\x96', '‘':'\x91', '’':'\x92', '“':'\x93', '”':'\x94', '•':'\x95' };
+  const toLatin1 = s => String(s).split('').map(ch => WIN_ANSI[ch] || (ch.charCodeAt(0) <= 255 ? ch : '?')).join('');
+  const pdfEsc = s => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  const pn = v => { const r = Math.round(v * 100) / 100; return String(Object.is(r, -0) ? 0 : r); };
+  function rgb(hex){
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    const n = m ? parseInt(m[1], 16) : 0;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => pn(v / 255 * 1000) / 1000).join(' ');
+  }
+  function arcOps(cx, cy, r, a0, a1){
+    // cx, cy already in PDF space (y up); angles in degrees, counter-clockwise
+    const segs = Math.max(1, Math.ceil(Math.abs(a1 - a0) / 90 - 1e-9));
+    const da = (a1 - a0) / segs * Math.PI / 180, k = 4 / 3 * Math.tan(da / 4);
+    let a = a0 * Math.PI / 180;
+    let o = pn(cx + r * Math.cos(a)) + ' ' + pn(cy + r * Math.sin(a)) + ' m';
+    for(let i = 0; i < segs; i++){
+      const b = a + da, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+      o += ' ' + pn(cx + r * (ca - k * sa)) + ' ' + pn(cy + r * (sa + k * ca)) +
+           ' ' + pn(cx + r * (cb + k * sb)) + ' ' + pn(cy + r * (sb - k * cb)) +
+           ' ' + pn(cx + r * cb) + ' ' + pn(cy + r * sb) + ' c';
+      a = b;
+    }
+    return o;
+  }
+  function pdfOps(items, H){
+    const o = [];
+    const cur = {};
+    const stroke = (w, c, da, cap) => {
+      if(cur.w !== w){ o.push(pn(w) + ' w'); cur.w = w; }
+      if(cur.c !== c){ o.push(rgb(c) + ' RG'); cur.c = c; }
+      const dk = da.map(pn).join(' ');
+      if(cur.d !== dk){ o.push('[' + dk + '] 0 d'); cur.d = dk; }
+      if(cur.cap !== cap){ o.push(cap + ' J'); cur.cap = cap; }
+    };
+    const fill = c => { if(cur.f !== c){ o.push(rgb(c) + ' rg'); cur.f = c; } };
+    const sty = s => stroke(s.w, s.c, dashArray(s), s.dash === 'dotted' ? 1 : 0);
+    let i = 0;
+    while(i < items.length){
+      const it = items[i];
+      if(it.k === 'L'){
+        sty(it.s);
+        const key = it.s.key, parts = [];
+        while(i < items.length && items[i].k === 'L' && items[i].s.key === key){
+          const l = items[i++];
+          parts.push(pn(l.x1) + ' ' + pn(H - l.y1) + ' m ' + pn(l.x2) + ' ' + pn(H - l.y2) + ' l');
+        }
+        o.push(parts.join('\n'), 'S');
+        continue;
+      }
+      if(it.k === 'D'){
+        // a zero-length stroke with round caps is a dot, and far smaller than four Béziers
+        const c = it.c, parts = [];
+        while(i < items.length && items[i].k === 'D' && items[i].c === c && items[i].d === it.d){
+          const p = items[i++];
+          parts.push(pn(p.x) + ' ' + pn(H - p.y) + ' m ' + pn(p.x) + ' ' + pn(H - p.y) + ' l');
+        }
+        stroke(it.d, c, [], 1);
+        o.push(parts.join('\n'), 'S');
+        continue;
+      }
+      i++;
+      if(it.k === 'B'){ sty(it.s); o.push(pn(it.x) + ' ' + pn(H - it.y - it.h) + ' ' + pn(it.w) + ' ' + pn(it.h) + ' re S'); }
+      else if(it.k === 'C'){ sty(it.s); o.push(arcOps(it.cx, H - it.cy, it.r, 0, 360) + ' h S'); }
+      else if(it.k === 'A'){ sty(it.s); o.push(arcOps(it.cx, H - it.cy, it.r, it.a0, it.a1) + ' S'); }
+      else if(it.k === 'P'){ fill(it.fill); o.push(it.pts.map((p, j) => pn(p[0]) + ' ' + pn(H - p[1]) + (j ? ' l' : ' m')).join(' ') + ' h f'); }
+      else if(it.k === 'R'){ fill(it.fill); o.push(pn(it.x) + ' ' + pn(H - it.y - it.h) + ' ' + pn(it.w) + ' ' + pn(it.h) + ' re f'); }
+      else if(it.k === 'T'){
+        fill(it.c);
+        const font = it.font === 'bold' ? 'F2' : it.font === 'serif' ? 'F3' : 'F1';
+        const w = measure(it.s, it.size, it.font);
+        const x = it.anchor === 'end' ? it.x - w : it.anchor === 'middle' ? it.x - w / 2 : it.x;
+        const y = H - (it.mid ? it.y + it.size * 0.35 : it.y);
+        // π isn't in WinAnsi, so it comes from the Symbol font (where it lives at "p")
+        const runs = it.s.split(/(π)/).filter(Boolean).map(r => r === 'π'
+          ? '/F4 ' + pn(it.size) + ' Tf (p) Tj'
+          : '/' + font + ' ' + pn(it.size) + ' Tf (' + pdfEsc(toLatin1(r)) + ') Tj');
+        o.push('BT ' + pn(x) + ' ' + pn(y) + ' Td ' + runs.join(' ') + ' ET');
+      }
+    }
+    return o.join('\n');
+  }
+
+  const latin1Bytes = s => { const a = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 255; return a; };
+  async function deflate(bytes){
+    if(typeof CompressionStream === 'undefined') return null;
+    try{
+      const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }catch(e){ return null; }
+  }
+  async function buildPdf(pg, pages){
+    // The grid is drawn once as a Form XObject and every page reuses it, so a
+    // 30-page dot grid costs little more than one page.
+    const chunks = [], offsets = [];
+    let len = 0;
+    const put = b => { if(typeof b === 'string') b = latin1Bytes(b); chunks.push(b); len += b.length; };
+    const objs = [];                      // functions that write each object, in number order
+    const streamObj = async (dict, text) => {
+      const raw = latin1Bytes(text), z = await deflate(raw);
+      const data = z || raw;
+      const head = dict.slice(0, -2) + ' /Length ' + data.length + (z ? ' /Filter /FlateDecode' : '') + ' >>';
+      return () => { put(head + '\nstream\n'); put(data); put('\nendstream'); };
+    };
+    const fonts = '/Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >>';
+    const box = '[0 0 ' + pn(pg.W) + ' ' + pn(pg.H) + ']';
+    const firstPage = 8;
+    const kids = [];
+    for(let i = 0; i < pages; i++) kids.push((firstPage + i * 2) + ' 0 R');
+    objs.push(() => put('<< /Type /Catalog /Pages 2 0 R >>'));
+    objs.push(() => put('<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + pages + ' >>'));
+    objs.push(() => put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'));
+    objs.push(() => put('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'));
+    objs.push(() => put('<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic /Encoding /WinAnsiEncoding >>'));
+    objs.push(() => put('<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>'));
+    objs.push(await streamObj('<< /Type /XObject /Subtype /Form /BBox ' + box + ' /Resources << ' + fonts + ' >> >>', pdfOps(pg.items, pg.H)));
+    for(let i = 0; i < pages; i++){
+      objs.push(() => put('<< /Type /Page /Parent 2 0 R /MediaBox ' + box + ' /Resources << ' + fonts +
+        ' /XObject << /G 7 0 R >> >> /Contents ' + (firstPage + i * 2 + 1) + ' 0 R >>'));
+      objs.push(await streamObj('<< >>', 'q /G Do Q\n' + pdfOps(pg.pageItems(i, pages), pg.H)));
+    }
+    put('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    objs.forEach((write, idx) => { offsets.push(len); put((idx + 1) + ' 0 obj\n'); write(); put('\nendobj\n'); });
+    const xref = len;
+    let x = 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n';
+    offsets.forEach(o => { x += String(o).padStart(10, '0') + ' 00000 n \n'; });
+    put(x + 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+    return new Blob(chunks, { type:'application/pdf' });
+  }
+
+  /* ---------- rendering the preview ---------- */
+  let current = null;           // last successful build
+  function render(){
+    const stage = $('stage');
+    try{
+      current = build();
+    }catch(e){
+      current = null;
+      stage.innerHTML = '<div class="preview-error">' + escXml(e.message) + '</div>';
+      $('readout').textContent = '';
+      $('pill').textContent = 'needs a fix';
+      setExportEnabled(false);
+      return;
+    }
+    const pg = current, mm = pg.margins;
+    const overlay = S.previewMargins
+      ? '<rect x="' + f2(mm.l) + '" y="' + f2(mm.t) + '" width="' + f2(pg.W - mm.l - mm.r) + '" height="' + f2(pg.H - mm.t - mm.b) +
+        '" fill="none" stroke="#e0982e" stroke-opacity=".55" stroke-width="' + f2(Math.max(pg.W, pg.H) / 700) + '" stroke-dasharray="4 3"/>'
+      : '';
+    const ratio = pg.W / pg.H;
+    stage.innerHTML = svgOpen(pg, '100%', '100%',
+      ' role="img" aria-label="Preview of the page" style="aspect-ratio:' + f2(pg.W) + ' / ' + f2(pg.H) +
+      ';width:min(100%, calc((100vh - 190px) * ' + ratio.toFixed(4) + '));min-width:200px;height:auto"') +
+      svgItems(pg.items) + svgItems(pg.pageItems(0, int(S.pages, 1, 100, 1))) + overlay + '</svg>';
+    const paperName = S.paper === 'custom' ? 'Custom' : (PAPERS.find(p => p[0] === S.paper) || PAPERS[0])[1].split(' — ')[0];
+    const size = fmtLen(pg.wmm).replace(/ \w+$/, '') + ' × ' + fmtLen(pg.hmm);
+    const pages = int(S.pages, 1, 100, 1);
+    $('readout').innerHTML = '<b>' + escXml(paperName) + '</b> · ' + escXml(size) + ' · ' + S.orient + ' — ' +
+      (pg.panels > 1 ? pg.panels + ' grids · ' : '') + escXml(pg.summary) + ' · ' + pages + ' page' + (pages === 1 ? '' : 's');
+    $('pill').textContent = pg.infoText;
+    setExportEnabled(true);
+  }
+  function setExportEnabled(on){ ['pdfBtn','printBtn','svgBtn','pngBtn'].forEach(id => { $(id).disabled = !on; }); }
+
+  let renderTimer = 0;
+  function scheduleRender(){ clearTimeout(renderTimer); renderTimer = setTimeout(render, 40); }
+
+  /* ---------- settings <-> controls ---------- */
+  function getKey(k){ return k === 'mAll' ? S.mTop : k === 'cellPreset' ? '' : S[k]; }
+  function setKey(k, v){
+    if(k === 'mAll'){ S.mTop = S.mRight = S.mBottom = S.mLeft = v; return; }
+    if(k === 'cellPreset'){ if(v) S.cell = parseFloat(v); return; }
+    if(k === 'linkMargins' && v){ S.mRight = S.mBottom = S.mLeft = S.mTop; }
+    S[k] = v;
+  }
+  function readEl(el){
+    const k = el.dataset.k, t = el.dataset.t;
+    let v;
+    if(el.type === 'checkbox') v = el.checked;
+    else if(t === 'len' || t === 'num' || t === 'int'){
+      const n = t === 'int' ? parseInt(el.value, 10) : parseFloat(el.value);
+      if(!isFinite(n)) return false;
+      v = t === 'len' ? n * UNIT_MM[S.unit] : n;
+    }
+    else v = el.value;
+    setKey(k, v);
+    return true;
+  }
+  function writeEl(el){
+    const v = getKey(el.dataset.k);
+    if(el.type === 'checkbox') el.checked = !!v;
+    else if(el.dataset.t === 'len') el.value = trimNum(v / UNIT_MM[S.unit], UNIT_DEC[S.unit]);
+    else el.value = v == null ? '' : v;
+  }
+  function writeAll(except){
+    document.querySelectorAll('[data-k]').forEach(el => { if(el !== except) writeEl(el); });
+    document.querySelectorAll('.u').forEach(el => { el.textContent = '(' + UNIT_ABBR[S.unit] + ')'; });
+    $('cellLabel').textContent = CELL_LABEL[S.type] || 'Size';
+    $('majorEveryLabel').textContent = MAJOR_LABEL[S.type] || 'Bold every';
+    $('minorTitle').textContent = ['dots','isodots'].includes(S.type) ? 'Dots' : S.type === 'crosses' ? 'Crosses' : 'Lines';
+    $('typeOptsTitle').textContent = TYPE_LONG[S.type] + ' options';
+    $('axesTitle').textContent = COUNTABLE.includes(S.type) ? 'Axes & numbers' : S.type === 'numline' ? 'Line style' : 'Labels';
+    document.querySelectorAll('.type-tile').forEach(b => {
+      const on = b.dataset.type === S.type;
+      b.classList.toggle('active', on); b.setAttribute('aria-pressed', on);
+    });
+    applyVisibility();
+  }
+  function applyVisibility(){
+    const D = derived();
+    const test = c => {
+      const neg = c[0] === '!'; if(neg) c = c.slice(1);
+      let r;
+      if(c.includes('=')){ const [k, v] = c.split('='); r = String(S[k]) === v; }
+      else r = c in D ? !!D[c] : !!S[c];
+      return neg ? !r : r;
+    };
+    document.querySelectorAll('[data-types],[data-when]').forEach(el => {
+      let ok = true;
+      if(el.dataset.types) ok = el.dataset.types.split(' ').includes(S.type);
+      if(ok && el.dataset.when) ok = el.dataset.when.split(' ').every(test);
+      el.hidden = !ok;
+    });
+  }
+
+  /* ---------- persistence and share links ---------- */
+  function sanitize(obj){
+    const out = Object.assign({}, DEFAULTS);
+    if(obj && typeof obj === 'object'){
+      Object.keys(DEFAULTS).forEach(k => {
+        if(typeof obj[k] === typeof DEFAULTS[k] && (typeof obj[k] !== 'number' || isFinite(obj[k]))) out[k] = obj[k];
+      });
+    }
+    return out;
+  }
+  let saveTimer = 0;
+  function save(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }, 250);
+  }
+  function load(){
+    const h = location.hash.match(/^#s=([A-Za-z0-9_-]+)/);
+    if(h){
+      try{
+        const json = decodeURIComponent(escape(atob(h[1].replace(/-/g, '+').replace(/_/g, '/'))));
+        S = sanitize(Object.assign({}, DEFAULTS, JSON.parse(json)));
+        history.replaceState(null, '', location.pathname + location.search);
+        toast('Loaded the shared settings.', 'ok');
+        save();
+        return;
+      }catch(e){ toast('That settings link could not be read — using your saved settings.', 'err'); }
+    }
+    try{ S = sanitize(JSON.parse(localStorage.getItem(LS) || 'null')); }catch(e){ S = Object.assign({}, DEFAULTS); }
+  }
+  function shareLink(){
+    const diff = {};
+    Object.keys(DEFAULTS).forEach(k => { if(S[k] !== DEFAULTS[k]) diff[k] = S[k]; });
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(diff)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return location.href.split('#')[0] + '#s=' + b64;
+  }
+
+  /* ---------- export ---------- */
+  function fileBase(){
+    const n = S.fileName.trim().replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '').replace(/\s+/g, ' ').trim();
+    return n || 'graph-paper';
+  }
+  function download(blob, name){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  async function exportPdf(){
+    if(!current) return;
+    const btn = $('pdfBtn');
+    btn.disabled = true;
+    try{
+      const blob = await buildPdf(current, int(S.pages, 1, 100, 1));
+      download(blob, fileBase() + '.pdf');
+      toast('PDF downloaded — print it at 100% / “Actual size”.', 'ok');
+    }catch(e){ toast('Could not make the PDF: ' + e.message, 'err'); }
+    btn.disabled = false;
+  }
+  function exportSvg(){
+    if(!current) return;
+    const pg = current;
+    const svg = '<?xml version="1.0" encoding="UTF-8"?>\n' + pageSVG(pg, 0, 1, f2(pg.wmm) + 'mm', f2(pg.hmm) + 'mm');
+    download(new Blob([svg], { type:'image/svg+xml' }), fileBase() + '.svg');
+  }
+  async function exportPng(){
+    if(!current) return;
+    const pg = current;
+    let dpi = int(S.pngDpi, 72, 1200, 300);
+    const px = d => [Math.round(pg.W / 72 * d), Math.round(pg.H / 72 * d)];
+    while(dpi > 50 && (px(dpi)[0] * px(dpi)[1] > 60e6 || Math.max(...px(dpi)) > 16000)) dpi = Math.floor(dpi * 0.75);
+    const [w, h] = px(dpi);
+    const url = URL.createObjectURL(new Blob([pageSVG(pg, 0, 1, w, h)], { type:'image/svg+xml' }));
+    try{
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+      cx.drawImage(img, 0, 0, w, h);
+      const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+      if(!blob) throw new Error('the image is too large for this browser');
+      download(blob, fileBase() + '.png');
+      if(dpi !== int(S.pngDpi, 72, 1200, 300)) toast('That page is too big for ' + S.pngDpi + ' dpi — saved at ' + dpi + ' dpi instead.');
+    }catch(e){ toast('Could not make the image: ' + e.message, 'err'); }
+    URL.revokeObjectURL(url);
+  }
+
+  // Print pages are real-size SVGs, one per sheet. The grid is drawn once and
+  // the other pages <use> it, so 100 pages of dots don't mean 100 copies in the DOM.
+  function fillPrintArea(){
+    const area = $('printArea');
+    if(!current){ area.innerHTML = ''; return; }
+    const pg = current, n = int(S.pages, 1, 100, 1);
+    const w = f2(pg.wmm) + 'mm', h = f2(pg.hmm) + 'mm';
+    $('pageStyle').textContent = '@page{size:' + w + ' ' + h + ';margin:0;}';
+    let html = '';
+    for(let i = 0; i < n; i++){
+      const base = i === 0 ? '<g id="gpBase">' + svgItems(pg.items) + '</g>' : '<use href="#gpBase"/>';
+      html += '<div class="print-page" style="width:' + w + ';height:' + h + '">' + svgOpen(pg, w, h) + base + svgItems(pg.pageItems(i, n)) + '</svg></div>';
+    }
+    area.innerHTML = html;
+  }
+
+  /* ---------- building the controls ---------- */
+  function iconFor(type){
+    const saved = S;
+    S = Object.assign({}, DEFAULTS, {
+      type, paper:'custom', customW:30, customH:30, orient:'portrait', mTop:1.5, mRight:1.5, mBottom:1.5, mLeft:1.5,
+      cell: type === 'hex' ? 3 : type === 'polar' ? 2.6 : type === 'iso' || type === 'isodots' ? 6 : type === 'lined' ? 4 : 4.5,
+      majorEvery:0, minorW:0.9, minorC:'#6f8f86', majorC:'#1f3d35', borderC:'#6f8f86', borderW:1, majorW:1.2,
+      axisC:'#1f3d35', axisW:1.3, dotD:2.2, crossLen:2.4, fit:'fill',
+      polarLabels:'none', polarStep:30, polarMajor:90, logX:1, logY:1, logFine:false, logLabels:false,
+      nlCount:3, nlMin:0, nlMax:4, nlLabels:false, arrows:'none', linedMarginPos:7, linedMarginC:'#e0982e',
+    });
+    let svg = '';
+    try{ const pg = build(); svg = svgOpen(pg, 38, 38) + svgItems(pg.items) + '</svg>'; }catch(e){}
+    S = saved;
+    return svg;
+  }
+  function setupControls(){
+    $('paper').innerHTML = PAPERS.map(p => '<option value="' + p[0] + '">' + escXml(p[1]) + '</option>').join('');
+    $('cellPreset').innerHTML = CELL_PRESETS.map(p => '<option value="' + p[0] + '">' + escXml(p[1]) + '</option>').join('');
+    $('typeTiles').innerHTML = TYPES.map(([t, name]) =>
+      '<button type="button" class="type-tile" data-type="' + t + '" aria-pressed="false">' + iconFor(t) + '<span>' + name + '</span></button>').join('');
+    $('presets').innerHTML = PRESETS.map((p, i) => '<button type="button" class="preset" data-i="' + i + '">' + escXml(p[0]) + '</button>').join('');
+    $('swatches').innerHTML = PALETTES.map((p, i) =>
+      '<button type="button" class="swatch" data-i="' + i + '" title="' + p[0] + ' lines"><i style="background:linear-gradient(135deg,' +
+      p[1] + ' 50%,' + p[2] + ' 50%)"></i>' + p[0] + '</button>').join('');
+
+    const controls = $('controls');
+    const onEdit = e => {
+      const el = e.target;
+      if(!el.dataset || !el.dataset.k) return;
+      if(!readEl(el)) return;
+      const k = el.dataset.k;
+      writeAll(k === 'unit' || k === 'cellPreset' || k === 'linkMargins' ? null : el);
+      scheduleRender(); save();
+    };
+    controls.addEventListener('input', onEdit);
+    controls.addEventListener('change', onEdit);
+    // on leaving a number box, show the value the tool is actually using
+    controls.addEventListener('focusout', e => { if(e.target.dataset && e.target.dataset.k) writeEl(e.target); });
+
+    $('typeTiles').addEventListener('click', e => {
+      const b = e.target.closest('.type-tile'); if(!b) return;
+      S.type = b.dataset.type;
+      writeAll(null); scheduleRender(); save();
+    });
+    $('presets').addEventListener('click', e => {
+      const b = e.target.closest('.preset'); if(!b) return;
+      const keep = {};
+      KEEP_ON_PRESET.forEach(k => { keep[k] = S[k]; });
+      S = Object.assign({}, DEFAULTS, keep, PRESETS[+b.dataset.i][1]);
+      writeAll(null); scheduleRender(); save();
+      toast(PRESETS[+b.dataset.i][0] + ' — set up.');
+    });
+    $('swatches').addEventListener('click', e => {
+      const b = e.target.closest('.swatch'); if(!b) return;
+      const p = PALETTES[+b.dataset.i];
+      S.minorC = p[1]; S.majorC = p[2]; S.borderC = p[2];
+      writeAll(null); scheduleRender(); save();
+    });
+
+    $('pdfBtn').addEventListener('click', exportPdf);
+    $('svgBtn').addEventListener('click', exportSvg);
+    $('pngBtn').addEventListener('click', exportPng);
+    $('printBtn').addEventListener('click', () => { if(current){ fillPrintArea(); window.print(); } });
+    window.addEventListener('beforeprint', fillPrintArea);
+    window.addEventListener('afterprint', () => { $('printArea').innerHTML = ''; });
+    $('linkBtn').addEventListener('click', async () => {
+      const url = shareLink();
+      try{ await navigator.clipboard.writeText(url); toast('Link copied — anyone who opens it gets these exact settings.', 'ok'); }
+      catch(e){ window.prompt('Copy this link:', url); }
+    });
+    $('resetBtn').addEventListener('click', () => {
+      if(!confirm('Reset every setting back to the default?')) return;
+      S = Object.assign({}, DEFAULTS);
+      writeAll(null); scheduleRender(); save();
+      toast('Back to the defaults.');
+    });
+  }
+
+  load();
+  setupControls();
+  writeAll(null);
+  render();
+})();
+</script>
+</body>
+</html>

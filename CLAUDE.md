@@ -18,8 +18,8 @@ Those files change upstream; this one only records what is different **here**.
 
 ## What's different here
 
-- **Scope is the EAL Benchmark tool only.** Upstream carries ~20 tools; this
-  site deliberately does not.
+- **Scope is a curated subset.** Upstream carries ~20 tools; this site carries
+  only the EAL Benchmark tool and Graph Paper.
 - **No Class Lists.** The shared roster panel (localStorage
   `teachingtools:rosters`) is not on this homepage. The EAL tool handles its
   absence on its own — it hides the class pickers and falls back to a typed
@@ -33,6 +33,8 @@ Those files change upstream; this one only records what is different **here**.
   verbatim from upstream's homepage so the two sites stay visually identical.
 - `tools/eal-benchmark/index.html` — **forked from upstream.** This repo is the
   source of truth for the tool; it has diverged and is no longer a copy.
+- `tools/graph-paper/index.html` — **native to this repo** (not from upstream).
+  Printable blank grids of every common kind.
 - `.nojekyll` — serve files as-is on GitHub Pages.
 
 ## The EAL tool has forked from upstream
@@ -57,6 +59,20 @@ and port it upstream by hand.
 - `safeToken()` and `formatDateFile()` are gone, replaced by `safeFilePart()`.
   The old helper stripped every digit (`[^A-Z-]`), which would have erased the
   ASN and the date parts outright.
+
+## Graph Paper — how it's built
+
+- **One geometry, four outputs.** `build()` turns the settings into a flat list
+  of drawing items in points (top-left origin). The SVG preview, the print
+  pages, the PNG and the hand-built PDF all render that same list, so they can't
+  disagree. Add a new grid type by adding a `draw…()` that emits items — never
+  by drawing straight into one output.
+- **Lengths are stored in millimetres**, whatever unit is on screen, so switching
+  units never rounds anything. Line weights and text sizes are in points.
+- **The PDF draws the grid once** as a Form XObject that every page reuses, and
+  is Flate-compressed via `CompressionStream` where the browser has it.
+- Settings persist under `teachingtools:graphPaper:settings`; a "Copy link"
+  button encodes the non-default settings in the URL hash (`#s=…`).
 
 ## Commit / PR rules — IMPORTANT
 
