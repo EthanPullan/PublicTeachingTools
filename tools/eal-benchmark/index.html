@@ -138,6 +138,9 @@
   .sw-file{flex:1;min-width:160px;font-size:12.5px;color:var(--muted);word-break:break-all;}
   .sw-file.has{color:var(--ink);font-weight:600;}
   a.btn{text-decoration:none;}
+  .sw-combine{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:600;cursor:pointer;}
+  .sw-combine input{width:16px;height:16px;margin:0;accent-color:var(--board);}
+  .sw-combine.off{opacity:.45;cursor:not-allowed;}
   .sw-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:12px;}
   .sw-bar .field{flex:1;min-width:160px;}
   .sw-pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;
@@ -359,9 +362,12 @@
         <div class="fn-preview" id="swPreview" aria-live="polite"></div>
         <button class="btn primary" id="swDownloadBtn" type="button" disabled><span class="ic">⭳</span><span id="swDownloadLabel">Download PDF</span></button>
       </div>
+      <label class="sw-combine" id="swCombineRow"><input type="checkbox" id="swCombine">
+        Combine with the benchmark — one PDF, with the benchmark first and these pages after it</label>
       <p class="hint">Add the PDF of the work this annotation goes with — one student’s pages, or a whole class scanned into one file.
         Pick this student’s pages and they’re saved as their own PDF, under the same file name as above with STUDENT_WORK on the end.
-        The scan stays loaded when you clear the form, and pages you’ve already saved are faded, so you can work through the class.</p>
+        The scan stays loaded when you clear the form, and pages you’ve already saved are faded, so you can work through the class.
+        Tick “Combine” to get a single PDF instead, named like the benchmark, with the annotation at the front.</p>
     </section>
 
     <p class="hint">Nothing here is uploaded anywhere — the form autosaves to this browser only, and the PDF is built and downloaded locally.</p>
@@ -392,6 +398,7 @@
     swClearBtn:$('swClearBtn'), swPreview:$('swPreview'), swDownloadBtn:$('swDownloadBtn'),
     swDownloadLabel:$('swDownloadLabel'), swStatus:$('swStatus'), swPicker:$('swPicker'),
     swRange:$('swRange'), swView:$('swView'), swPages:$('swPages'),
+    swCombine:$('swCombine'), swCombineRow:$('swCombineRow'),
   };
 
   /* ---------- division ----------
@@ -1055,7 +1062,7 @@
     const name = buildFilename();
     els.fnPreview.textContent = name || 'Add a part to name the file';
     els.fnPreview.classList.toggle('bad', !name);
-    const swName = buildStudentWorkFilename();
+    const swName = swCombining() ? buildFilename() : buildStudentWorkFilename();
     els.swPreview.textContent = swName || 'Add a part to name the file';
     els.swPreview.classList.toggle('bad', !swName);
   }
@@ -1332,23 +1339,26 @@
     };
   }
 
+  function buildBenchmarkBlob(){ return bytesToBlob(buildPdf(buildContentStream(collectValues()))); }
+  function markStudentDone(){
+    const cls = currentClass();
+    markCompleted(cls ? cls.name : '', els.nameInput.value.trim());
+    renderStudentSelect();
+  }
+
   els.downloadBtn.addEventListener('click', ()=>{
     const missing = validate();
     if(missing.length){ toast('Missing: ' + missing.join(', ') + '.', 'err'); return; }
     const filename = buildFilename();
     if(!filename){ toast('Enter the student’s first and last name, and a date.', 'err'); return; }
-    const v = collectValues();
-    const pdfStr = buildPdf(buildContentStream(v));
-    const blob = bytesToBlob(pdfStr);
+    const blob = buildBenchmarkBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 1000);
 
-    const cls = currentClass();
-    markCompleted(cls ? cls.name : '', els.nameInput.value.trim());
-    renderStudentSelect();
+    markStudentDone();
     toast('Downloaded ' + filename, 'ok');
   });
 
@@ -1789,56 +1799,64 @@
       d.set('/Resources', { dict: nres });
     };
 
-    // A new PDF holding just the given pages (0-based), in the order given.
-    Doc.prototype.extract = async function(indices){
-      const chosen = indices.map(i => this.pages[i]);
-      const pageNums = new Set(this.pages.map(p => p.num));
+    /* A new PDF holding the given pages, in the order given. Pages can come
+       from more than one document — { doc, i } each — so the benchmark and
+       the student's work can go into one file. */
+    async function writePages(list){
+      const docs = [...new Set(list.map(x => x.doc))];
+      const chosen = new Set(list.map(x => x.doc.pages[x.i].num + '@' + docs.indexOf(x.doc)));
       const map = new Map(), queue = [];
       let next = 3;
-      chosen.forEach(pg => map.set(pg.num, next++));
-      const mapRef = r => {
-        if(this.treeNums.has(r.ref) || (pageNums.has(r.ref) && !map.has(r.ref))) return 'null';
-        let n = map.get(r.ref);
-        if(n == null){
-          if(!this.get(r.ref)) return 'null';
-          n = next++; map.set(r.ref, n); queue.push(r.ref);
-        }
-        return n + ' 0 R';
+      const key = (doc, n) => n + '@' + docs.indexOf(doc);
+      list.forEach(x => map.set(key(x.doc, x.doc.pages[x.i].num), next++));
+      const mapRefIn = doc => {
+        const pageNums = new Set(doc.pages.map(p => p.num));
+        return r => {
+          const k = key(doc, r.ref);
+          if(doc.treeNums.has(r.ref) || (pageNums.has(r.ref) && !chosen.has(k))) return 'null';
+          let n = map.get(k);
+          if(n == null){
+            if(!doc.get(r.ref)) return 'null';
+            n = next++; map.set(k, n); queue.push([doc, r.ref]);
+          }
+          return n + ' 0 R';
+        };
       };
+      const mapRefs = new Map(docs.map(d => [d, mapRefIn(d)]));
       const parts = [], offsets = [];
       let pos = 0;
       const push = x => { const b = typeof x === 'string' ? fromBinary(x) : x; parts.push(b); pos += b.length; };
-      const write = (n, value, stream) => {
+      const write = (doc, n, value, stream) => {
         offsets[n] = pos;
         if(stream){
           value = { dict: new Map(value.dict) };
           value.dict.set('/Length', { raw: String(stream.end - stream.start) });
         }
-        push(n + ' 0 obj\n' + ser(value, mapRef) + '\n');
-        if(stream){ push('stream\n'); push(this.bytes.subarray(stream.start, stream.end)); push('\nendstream\n'); }
+        push(n + ' 0 obj\n' + ser(value, doc ? mapRefs.get(doc) : null) + '\n');
+        if(stream){ push('stream\n'); push(doc.bytes.subarray(stream.start, stream.end)); push('\nendstream\n'); }
         push('endobj\n');
       };
       push('%PDF-1.7\n%\xE2\xE3\xCF\xD3\n');
-      write(1, { raw: '<</Type /Catalog /Pages 2 0 R>>' });
-      write(2, { raw: '<</Type /Pages /Kids [' + chosen.map(pg => map.get(pg.num) + ' 0 R').join(' ') + '] /Count ' + chosen.length + '>>' });
-      for(const pg of chosen){
-        const d = new Map(pg.node.dict);
+      write(null, 1, { raw: '<</Type /Catalog /Pages 2 0 R>>' });
+      write(null, 2, { raw: '<</Type /Pages /Kids [' + list.map(x => map.get(key(x.doc, x.doc.pages[x.i].num)) + ' 0 R').join(' ') + '] /Count ' + list.length + '>>' });
+      for(const x of list){
+        const pg = x.doc.pages[x.i], d = new Map(pg.node.dict);
         ['/Parent', '/Annots', '/B', '/StructParents'].forEach(k => d.delete(k));
         INHERIT.forEach(k => { if(!d.has(k) && pg.inh[k] !== undefined) d.set(k, pg.inh[k]); });
-        await this.pruneResources(d);
+        await x.doc.pruneResources(d);
         d.set('/Parent', { raw: '2 0 R' });
-        write(map.get(pg.num), { dict: d });
+        write(x.doc, map.get(key(x.doc, pg.num)), { dict: d });
       }
       while(queue.length){
-        const n = queue.shift(), o = this.get(n);
-        write(map.get(n), o.value, o.stream);
+        const [doc, n] = queue.shift(), o = doc.get(n);
+        write(doc, map.get(key(doc, n)), o.value, o.stream);
       }
       const xrefAt = pos;
       let x = 'xref\n0 ' + next + '\n0000000000 65535 f \n';
       for(let n = 1; n < next; n++) x += String(offsets[n]).padStart(10, '0') + ' 00000 n \n';
       push(x + 'trailer\n<</Size ' + next + ' /Root 1 0 R>>\nstartxref\n' + xrefAt + '\n%%EOF\n');
       return new Blob(parts, { type: 'application/pdf' });
-    };
+    }
 
     return {
       async open(file){
@@ -1846,6 +1864,7 @@
         await doc.init();
         return doc;
       },
+      writePages,
     };
   })();
 
@@ -1864,6 +1883,16 @@
   let swPreviews = 0;     // pages that have a JPEG to preview
   let swUrls = [];
   let swLoad = 0;
+
+  /* Whether to put the benchmark and the picked pages into one PDF. A
+     preference, like the file-name order, so it survives "Clear form". */
+  const COMBINE_LS = 'teachingtools:ealBenchmark:combine';
+  try{ els.swCombine.checked = localStorage.getItem(COMBINE_LS) === '1'; }catch(e){}
+  function swCombining(){ return !!swDoc && els.swCombine.checked; }
+  els.swCombine.addEventListener('change', () => {
+    try{ localStorage.setItem(COMBINE_LS, els.swCombine.checked ? '1' : '0'); }catch(e){}
+    renderStudentWork();
+  });
 
   function isPdf(file){ return file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)); }
   async function setStudentWork(file){
@@ -1977,7 +2006,12 @@
     }
 
     const k = swSel.size;
-    els.swDownloadLabel.textContent = !swDoc || k === swDoc.pages.length ? 'Download PDF'
+    els.swCombine.disabled = !swDoc;
+    els.swCombineRow.classList.toggle('off', !swDoc);
+    els.swCombineRow.title = studentWork && !swDoc && !swBusy ? 'This PDF’s pages can’t be read, so it can’t be combined' : '';
+    updateFnPreview();
+    els.swDownloadLabel.textContent = swCombining() ? 'Download combined PDF'
+      : !swDoc || k === swDoc.pages.length ? 'Download PDF'
       : k === 1 ? 'Download page ' + ([...swSel][0] + 1)
       : k ? 'Download ' + k + ' pages' : 'Download pages';
   }
@@ -2017,12 +2051,19 @@
     if(missing.length){ toast('Missing: ' + missing.join(', ') + '.', 'err'); return; }
     const picked = swDoc ? [...swSel].sort((a, b) => a - b) : null;
     if(picked && !picked.length){ toast('Pick this student’s pages first.', 'err'); return; }
-    const filename = buildStudentWorkFilename();
+    const combine = swCombining();
+    const filename = combine ? buildFilename() : buildStudentWorkFilename();
     let blob = studentWork;
-    if(picked && picked.length < swDoc.pages.length){
+    if(combine || (picked && picked.length < swDoc.pages.length)){
       els.swDownloadBtn.disabled = true;
-      try{ blob = await swDoc.extract(picked); }
-      catch(e){ toast('Couldn’t cut those pages out of the PDF.', 'err'); refreshValidity(); return; }
+      try{
+        const list = picked.map(i => ({ doc: swDoc, i }));
+        if(combine){
+          const bench = await PdfDoc.open(buildBenchmarkBlob());
+          list.unshift(...bench.pages.map((pg, i) => ({ doc: bench, i })));
+        }
+        blob = await PdfDoc.writePages(list);
+      }catch(e){ toast('Couldn’t put those pages into a PDF.', 'err'); refreshValidity(); return; }
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2035,6 +2076,7 @@
       els.swRange.value = '';
       renderStudentWork();
     }
+    if(combine) markStudentDone();
     refreshValidity();
     toast('Downloaded ' + filename, 'ok');
   });

@@ -66,12 +66,18 @@ and port it upstream by hand.
   (an underscore when that is "none"). The file is held in memory only, not
   in the draft. "Clear form" keeps the scan loaded and only clears the page
   selection, and pages already saved are faded.
+- A **Combine** checkbox under that card puts the benchmark and the picked
+  pages into one PDF, benchmark first, named with the plain benchmark file
+  name. It is a preference saved under `teachingtools:ealBenchmark:combine`.
+  It works by reading the freshly built benchmark back through `PdfDoc` and
+  handing both documents to `writePages()`, which takes `{ doc, i }` pages
+  from any number of documents.
 - **`PdfDoc`** is a hand-built PDF reader behind that card, with no library
   (upstream rules out CDNs). It follows the cross-reference table, including
   xref streams, object streams and incremental updates, and falls back to
   scanning for objects when the table is damaged. It previews each page from
   its largest JPEG, which is how scanners store pages. It writes the chosen
-  pages into a new PDF by copying their objects byte for byte, and trims a
+  pages into a new PDF (`PdfDoc.writePages`) by copying their objects byte for byte, and trims a
   shared `/XObject` dictionary to what each page's content actually uses.
   Encrypted or unreadable files fall back to saving the whole PDF renamed.
 
