@@ -703,12 +703,11 @@
     const name = els.studentSelect.value;
     if(!name) return;
     els.nameInput.value = name;
-    // A new student record — never carry over another student's per-student fields.
-    els.gradeSelect.value = '';
+    /* A new student record — clear what belongs to one student. Grade,
+       context and next steps are usually shared across a class's benchmarks,
+       so they carry over. */
     els.asnInput.value = '';
-    els.contextArea.value = '';
     els.vocabLP.value = ''; els.syntaxLP.value = ''; els.discourseLP.value = ''; els.overallLP.value = '';
-    els.nextStepsArea.value = '';
     rubricDates = {}; renderRubricPreview();
     onAnyInput();
   });

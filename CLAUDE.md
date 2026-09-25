@@ -59,6 +59,9 @@ and port it upstream by hand.
 - `safeToken()` and `formatDateFile()` are gone, replaced by `safeFilePart()`.
   The old helper stripped every digit (`[^A-Z-]`), which would have erased the
   ASN and the date parts outright.
+- Picking a student from the class list keeps **grade, context and next
+  steps**, which are usually shared across a class. It still clears ASN, the
+  LP scores and the rubric dates. Upstream clears all of them.
 - A **Student work** card near the bottom. Pick or drop a PDF, often a
   whole class scanned into one file, click the pages for this student (or
   type `3-4`), and those pages are saved as their own PDF. It is named after
