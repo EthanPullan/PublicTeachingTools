@@ -83,6 +83,7 @@
   input[type=checkbox],input[type=radio]{padding:0;width:auto;}
   input.w-num{width:5.5em;} input.w-name{width:9em;}
   .bells input[type=time]{width:7.6em;padding:5px 4px;}
+  .schedbar input.w-name{width:14em;}
   label{font-size:13px;}
   .form-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;margin:10px 0;}
   .form-row label{display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:12px;}
@@ -362,24 +363,32 @@ const periods = rows => rows.map(r => ({id:r[0], kind:'period', name:'', start:T
 const FRIDAY_LUNCH = () => ({id:'lunch', kind:'block', name:'Lunch', start:T('12:10'), end:T('13:00'), type:'lunch'});
 
 // A version is a complete copy of the generic week from its start date until
-// the next version starts. `days` is school setup (the bells); `timetable` is
-// personal (what each period is), so a colleague can import one without the other.
+// the next version starts. It holds named bell schedules (school setup) and, for
+// each day type, which schedule it follows. Monday to Thursday share one schedule
+// and Friday A to D share another, so a bell time is changed once. `timetable` is
+// personal (what each period is, per day type), so a colleague can import the bells
+// without it.
 function templateVersion(start){
+  const schedules = {
+    mt:    {id:'mt',    name:'Monday\u2013Thursday', bells: periods(MON_THU_BELLS)},
+    fri:   {id:'fri',   name:'Friday',              bells: periods(FRIDAY_BELLS).concat([FRIDAY_LUNCH()])},
+    // Placeholder: the real Early dismissal bell times are not known yet, so it
+    // starts as a copy of the Friday periods. Edit it like any other schedule.
+    early: {id:'early', name:'Early dismissal',     bells: periods(FRIDAY_BELLS),
+            placeholder:'Copy of the Friday periods until the real Early dismissal times are entered.'}
+  };
   const days = {};
-  DAY_TYPES.forEach(d => { days[d.id] = {bells: [], arrival: null, departure: null}; });
-  ['mon','tue','wed','thu'].forEach(id => { days[id].bells = periods(MON_THU_BELLS); });
-  ['friA','friB','friC','friD'].forEach(id => { days[id].bells = periods(FRIDAY_BELLS).concat([FRIDAY_LUNCH()]); });
-  // Placeholder: the real Early dismissal bell times are not known yet, so it
-  // starts as a copy of the Friday periods. Edit it like any other schedule.
-  days.early.bells = periods(FRIDAY_BELLS);
-  days.early.placeholder = 'Copy of the Friday periods until the real Early dismissal times are entered.';
-  return {start, arrival: 0, departure: 0, days, timetable: {}};
+  DAY_TYPES.forEach(d => { days[d.id] = {schedule: null, arrival: null, departure: null}; });
+  ['mon','tue','wed','thu'].forEach(id => { days[id].schedule = 'mt'; });
+  ['friA','friB','friC','friD'].forEach(id => { days[id].schedule = 'fri'; });
+  days.early.schedule = 'early';
+  return {start, arrival: 0, departure: 0, schedules, days, timetable: {}};
 }
 
 function newModel(){
   const cal = clone(CAL_2026_27);
   return {
-    format: 'time-counter', version: 1, seq: 0,
+    format: 'time-counter', version: 2, seq: 0,
     calendar: cal, calendarEdits: {},
     settings: {
       fte: 1, typicalAssignedHours: null,
@@ -397,6 +406,41 @@ function newModel(){
               rule:{kind:'weekly', dayTypes:['friA','friB','friC','friD']}}],
     edits: {}, confirmed: {}, log: []
   };
+}
+
+/* ---------- opening a saved model ---------- */
+// Version 1 kept a separate copy of the bells in every day type. Day types whose bells
+// are identical now share one schedule (a placeholder keeps its own).
+function migrate(m){
+  if(!m || m.format !== 'time-counter' || !m.versions || !m.versions.length) return null;
+  if(m.version === 2) return m;
+  if(m.version !== 1) return null;
+  m.versions.forEach(v => {
+    const groups = {};
+    v.schedules = {};
+    Object.keys(v.days).forEach(id => {
+      const d = v.days[id], bells = d.bells || [];
+      const ph = d.placeholder;
+      delete d.bells; delete d.placeholder;
+      if(!bells.length){ d.schedule = null; return; }
+      const key = ph ? 'ph:' + id : JSON.stringify(bells);
+      let g = groups[key];
+      if(!g){
+        const sid = nextScheduleId(v);
+        g = groups[key] = {id: sid, members: []};
+        v.schedules[sid] = {id: sid, name: '', bells};
+        if(ph) v.schedules[sid].placeholder = ph;
+      }
+      g.members.push(id);
+      d.schedule = g.id;
+    });
+    Object.keys(groups).forEach(k => {
+      const g = groups[k], names = g.members.map(id => (m.dayTypes.find(x => x.id === id) || {name: id}).name);
+      v.schedules[g.id].name = names.length > 1 ? names[0] + ' \u2013 ' + names[names.length - 1] : names[0];
+    });
+  });
+  m.version = 2;
+  return m;
 }
 
 /* ---------- internal caches (not saved) ---------- */
@@ -431,7 +475,7 @@ function setDayType(m, date, dayTypeId){
 function addDayType(m, dt){
   if(m.dayTypes.some(d => d.id === dt.id)) throw new Error('Day type exists: ' + dt.id);
   m.dayTypes.push({id: dt.id, name: dt.name});
-  m.versions.forEach(v => { v.days[dt.id] = {bells: [], arrival: null, departure: null}; });
+  m.versions.forEach(v => { v.days[dt.id] = {schedule: null, arrival: null, departure: null}; });
 }
 function versionFor(m, date){
   let v = m.versions[0];
@@ -453,50 +497,118 @@ function nextBellId(bells, kind){
   bells.forEach(b => { const x = re.exec(b.id); if(x) n = Math.max(n, +x[1]); });
   return pre + (n + 1);
 }
+const scheduleOf = (version, dayTypeId) => { const d = version.days[dayTypeId]; return (d && d.schedule && version.schedules[d.schedule]) || null; };
+const bellsOf = (version, dayTypeId) => { const s = scheduleOf(version, dayTypeId); return s ? s.bells : []; };
+const dayTypesUsing = (version, scheduleId) => Object.keys(version.days).filter(id => version.days[id].schedule === scheduleId);
+function nextScheduleId(version){
+  let n = 0;
+  Object.keys(version.schedules).forEach(id => { const x = /^s(\d+)$/.exec(id); if(x) n = Math.max(n, +x[1]); });
+  return 's' + (n + 1);
+}
+function gcSchedules(version){   // a schedule no day type follows is dropped
+  const used = {};
+  Object.keys(version.days).forEach(id => { if(version.days[id].schedule) used[version.days[id].schedule] = 1; });
+  Object.keys(version.schedules).forEach(id => { if(!used[id]) delete version.schedules[id]; });
+}
+// A day type with no bell times of its own yet gets an empty schedule to fill in.
+function ensureSchedule(version, dayTypeId){
+  const s = scheduleOf(version, dayTypeId);
+  if(s) return s;
+  const id = nextScheduleId(version);
+  version.schedules[id] = {id, name: 'Bell times', bells: []};
+  version.days[dayTypeId].schedule = id;
+  return version.schedules[id];
+}
+// Give one day type its own copy of the bell times, so it can differ from the others.
+function unlinkSchedule(version, dayTypeId, name){
+  const src = scheduleOf(version, dayTypeId), id = nextScheduleId(version);
+  version.schedules[id] = {id, name: name || (src ? src.name : 'Bell times'), bells: src ? clone(src.bells) : []};
+  version.days[dayTypeId].schedule = id;
+  gcSchedules(version);
+  return id;
+}
+// Point a day type at an existing schedule (or at none). Timetable entries for periods
+// the new schedule does not have mean nothing there, so they are dropped.
+function linkSchedule(version, dayTypeId, scheduleId){
+  if(scheduleId && !version.schedules[scheduleId]) throw new Error('There are no such bell times.');
+  version.days[dayTypeId].schedule = scheduleId || null;
+  const t = version.timetable[dayTypeId];
+  if(t){
+    const ids = {};
+    bellsOf(version, dayTypeId).forEach(b => { ids[b.id] = 1; });
+    Object.keys(t).forEach(k => { if(!ids[k]) delete t[k]; });
+  }
+  gcSchedules(version);
+}
+function renameSchedule(version, scheduleId, name){ if(version.schedules[scheduleId]) version.schedules[scheduleId].name = name; }
+
+// The bell edits below change the schedule a day type follows, so they change every
+// day type that shares it. The timetable (what each period is) stays per day type.
 function addPeriod(version, dayTypeId, p){
-  const d = version.days[dayTypeId];
-  const bell = {id: p.id || nextBellId(d.bells, p.kind), kind: p.kind || 'period', name: p.name || '', start: p.start, end: p.end};
+  const s = ensureSchedule(version, dayTypeId);
+  const bell = {id: p.id || nextBellId(s.bells, p.kind), kind: p.kind || 'period', name: p.name || '', start: p.start, end: p.end};
   if(p.type) bell.type = p.type;
-  d.bells.push(bell);
-  d.bells.sort((a, b) => a.start - b.start || a.end - b.end);
-  delete d.placeholder;
+  s.bells.push(bell);
+  s.bells.sort((a, b) => a.start - b.start || a.end - b.end);
+  delete s.placeholder;
   return bell.id;
 }
 function removePeriod(version, dayTypeId, bellId){
-  const d = version.days[dayTypeId];
-  d.bells = d.bells.filter(b => b.id !== bellId);
-  if(version.timetable[dayTypeId]) delete version.timetable[dayTypeId][bellId];
-  delete d.placeholder;
+  const s = scheduleOf(version, dayTypeId);
+  if(!s) return;
+  s.bells = s.bells.filter(b => b.id !== bellId);
+  dayTypesUsing(version, s.id).forEach(id => { if(version.timetable[id]) delete version.timetable[id][bellId]; });
+  delete s.placeholder;
+}
+// Change a bell's name, times or (for a block) time type.
+function updateBell(version, dayTypeId, bellId, props){
+  const s = scheduleOf(version, dayTypeId), b = s && s.bells.find(x => x.id === bellId);
+  if(!b) throw new Error('That period is no longer there.');
+  const start = props.start != null ? props.start : b.start, end = props.end != null ? props.end : b.end;
+  if(!(end > start)) throw new Error('A period has to end after it starts.');
+  if(props.name !== undefined) b.name = props.name;
+  if(props.type !== undefined){ if(props.type) b.type = props.type; else delete b.type; }
+  if(start !== b.start || end !== b.end){
+    b.start = start; b.end = end;
+    s.bells.sort((x, y) => x.start - y.start || x.end - y.end);
+    delete s.placeholder;
+  }
 }
 // Split a period or block in two at a time inside it. The second half keeps the
 // same time type and class name, and period numbers renumber on their own.
 function splitPeriod(version, dayTypeId, bellId, at){
-  const d = version.days[dayTypeId], b = d.bells.find(x => x.id === bellId);
+  const s = scheduleOf(version, dayTypeId), b = s && s.bells.find(x => x.id === bellId);
   if(!b || !(at > b.start && at < b.end)) throw new Error('The split time must fall inside the period.');
-  const nb = {id: nextBellId(d.bells, b.kind), kind: b.kind, name: b.kind === 'block' ? b.name : '', start: at, end: b.end};
+  const nb = {id: nextBellId(s.bells, b.kind), kind: b.kind, name: b.kind === 'block' ? b.name : '', start: at, end: b.end};
   if(b.type) nb.type = b.type;
   b.end = at;
-  d.bells.push(nb);
-  d.bells.sort((x, y) => x.start - y.start || x.end - y.end);
-  const tt = version.timetable[dayTypeId] && version.timetable[dayTypeId][bellId];
-  if(tt) setTimetable(version, dayTypeId, nb.id, tt);
-  delete d.placeholder;
+  s.bells.push(nb);
+  s.bells.sort((x, y) => x.start - y.start || x.end - y.end);
+  dayTypesUsing(version, s.id).forEach(id => {
+    const tt = version.timetable[id] && version.timetable[id][bellId];
+    if(tt) setTimetable(version, id, nb.id, tt);
+  });
+  delete s.placeholder;
   return nb.id;
 }
 // Merge a period with the one right after it: it keeps the first one's time type and class name.
 function mergePeriods(version, dayTypeId, idA, idB){
-  const d = version.days[dayTypeId];
-  const i = d.bells.findIndex(x => x.id === idA), j = d.bells.findIndex(x => x.id === idB);
+  const s = scheduleOf(version, dayTypeId);
+  const i = s ? s.bells.findIndex(x => x.id === idA) : -1, j = s ? s.bells.findIndex(x => x.id === idB) : -1;
   if(i < 0 || j !== i + 1) throw new Error('Only neighbouring periods can be merged.');
-  if(d.bells[i].kind !== d.bells[j].kind) throw new Error('A period cannot be merged with a block.');
-  d.bells[i].end = Math.max(d.bells[i].end, d.bells[j].end);
+  if(s.bells[i].kind !== s.bells[j].kind) throw new Error('A period cannot be merged with a block.');
+  s.bells[i].end = Math.max(s.bells[i].end, s.bells[j].end);
   removePeriod(version, dayTypeId, idB);
 }
+// Move one day type's timetable entry to another period. Returns false (and moves
+// nothing) when the target period already has an entry there.
 function moveTimetableEntry(version, dayTypeId, fromId, toId){
   const t = version.timetable[dayTypeId];
-  if(!t || !t[fromId]) return;
+  if(!t || !t[fromId]) return false;
+  if(t[toId] && (t[toId].type || t[toId].name)) return false;
   t[toId] = t[fromId];
   delete t[fromId];
+  return true;
 }
 function deleteVersion(m, start){
   if(m.versions[0].start === start) throw new Error('The first version cannot be deleted.');
@@ -525,8 +637,7 @@ function copyDayType(m, fromId, name){
   const id = 'd' + (++m.seq);
   m.dayTypes.push({id, name});
   m.versions.forEach(v => {
-    v.days[id] = clone(v.days[fromId] || {bells: [], arrival: null, departure: null});
-    delete v.days[id].placeholder;
+    v.days[id] = clone(v.days[fromId] || {schedule: null, arrival: null, departure: null});   // follows the same bell times
     if(v.timetable[fromId]) v.timetable[id] = clone(v.timetable[fromId]);
   });
   return id;
@@ -544,7 +655,7 @@ function dayTypeUsage(m, id){
 }
 function deleteDayType(m, id){
   m.dayTypes = m.dayTypes.filter(d => d.id !== id);
-  m.versions.forEach(v => { delete v.days[id]; delete v.timetable[id]; });
+  m.versions.forEach(v => { delete v.days[id]; delete v.timetable[id]; gcSchedules(v); });
   const dd = m.dayTypeDefaults;
   Object.keys(dd.weekday).forEach(k => { if(dd.weekday[k] === id) delete dd.weekday[k]; });
   Object.keys(dd.status).forEach(k => { if(dd.status[k] === id) delete dd.status[k]; });
@@ -763,9 +874,10 @@ function resolveDay(m, date, opts){
   if(working && dayTypeId && !vd && m.dayTypes.some(d => d.id === dayTypeId)){
     flags.push({code:'day-type-not-in-version', dayTypeId, msg:'This day type has no schedule in the timetable version in force.'});
   }
-  if(vd){
+  const bells = vd ? bellsOf(ver, dayTypeId) : [];
+  if(bells.length){
     let n = 0;
-    for(const b of vd.bells){
+    for(const b of bells){
       const isPeriod = b.kind !== 'block';
       if(isPeriod) n++;
       const tt = ver.timetable[dayTypeId] && ver.timetable[dayTypeId][b.id];
@@ -774,7 +886,7 @@ function resolveDay(m, date, opts){
              name:(tt && tt.name) || label, source:'bell', ref:b.id});
     }
     // 2. required arrival and departure, on instructional days only
-    const ps = vd.bells.filter(b => b.kind !== 'block');
+    const ps = bells.filter(b => b.kind !== 'block');
     if(st.status === 'instructional' && ps.length){
       const first = Math.min.apply(null, ps.map(b => b.start)), last = Math.max.apply(null, ps.map(b => b.end));
       const arr = vd.arrival != null ? vd.arrival : ver.arrival, dep = vd.departure != null ? vd.departure : ver.departure;
@@ -992,6 +1104,7 @@ window.TimeCounter = {
   newModel, touch, statusOf, setCalendarDate, datesWhere, countDays,
   dayTypeFor, setDayType, addDayType, versionFor, ensureVersion, addPeriod, removePeriod, setTimetable, setArrivalDeparture,
   splitPeriod, mergePeriods, moveTimetableEntry, deleteVersion, setDayTypeArrivalDeparture,
+  scheduleOf, bellsOf, dayTypesUsing, unlinkSchedule, linkSchedule, renameSchedule, updateBell, migrate,
   renameDayType, copyDayType, dayTypeUsage, deleteDayType, rotationPlan, applyRotation, planDay, dayTypeTotals, planSummary,
   dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
   resolveDay, sumRange, yearTotals, limits, weekFlags, flagsByDate, missingDayTypeDates
@@ -1041,8 +1154,9 @@ const KEY = 'teachingtools:timeCounter:model', UIKEY = 'teachingtools:timeCounte
 const readJSON = k => { try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; }catch(e){ return null; } };
 const writeJSON = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } };
 function loadModel(){
-  const m = readJSON(KEY);
-  return (m && m.format === 'time-counter' && m.version === 1 && m.versions && m.versions.length) ? m : TC.newModel();
+  let m = readJSON(KEY);
+  try{ m = m && TC.migrate(m); }catch(e){ m = null; }
+  return m || TC.newModel();
 }
 const ui = readJSON(UIKEY) || {};
 const S = {
@@ -1206,9 +1320,9 @@ function planChecks(P){
       r.flags.filter(f => f.code === 'long-gap' || f.code === 'bad-block' || f.code === 'unknown-type')
         .forEach(f => items.push({text: r.name + tag + ': ' + f.msg, tab: 'bells', dt: r.id, ver: v.start}));
     });
-    m.dayTypes.forEach(d => {
-      const vd = v.days[d.id];
-      if(vd && vd.placeholder) items.push({text: d.name + tag + ' uses placeholder bell times. ' + vd.placeholder, tab: 'bells', dt: d.id, ver: v.start, dismiss: {dt: d.id, ver: v.start}});
+    Object.keys(v.schedules).forEach(id => {
+      const sc = v.schedules[id];
+      if(sc.placeholder) items.push({text: sc.name + ' bell times' + tag + ' are a placeholder. ' + sc.placeholder, tab: 'bells', dt: TC.dayTypesUsing(v, id)[0], ver: v.start, dismiss: {sch: id, ver: v.start}});
     });
   });
   Object.keys(P.sum.conflicts).forEach(id => {
@@ -1227,7 +1341,7 @@ function checksCard(P){
   h += '<ul class="checks">' + items.map(i =>
     '<li><span class="ico" aria-hidden="true">⚠</span><span class="txt">' + esc(i.text) + '</span>' +
     '<button class="link" data-act="goto" data-tab="' + i.tab + '"' + (i.dt ? ' data-dt="' + esc(i.dt) + '"' : '') + (i.ver ? ' data-ver="' + esc(i.ver) + '"' : '') + (i.rotWd ? ' data-rotwd="' + i.rotWd + '"' : '') + '>Go there</button>' +
-    (i.dismiss ? '<button class="link" data-act="ph-dismiss" data-dt="' + esc(i.dismiss.dt) + '" data-ver="' + esc(i.dismiss.ver) + '">Mark as correct</button>' : '') + '</li>').join('') + '</ul></section>';
+    (i.dismiss ? '<button class="link" data-act="ph-dismiss" data-sch="' + esc(i.dismiss.sch) + '" data-ver="' + esc(i.dismiss.ver) + '">Mark as correct</button>' : '') + '</li>').join('') + '</ul></section>';
   return h;
 }
 function totalsTable(P){
@@ -1336,7 +1450,7 @@ function versionBar(){
     '. Earlier weeks and confirmed weeks keep their periods. A new version starts as a copy of the one before it.</p></div>';
 }
 function bellRows(v, dt){
-  const m = S.model, max = m.settings.gapMaxMinutes, bells = v.days[dt].bells, tt = v.timetable[dt] || {};
+  const m = S.model, max = m.settings.gapMaxMinutes, bells = TC.bellsOf(v, dt), tt = v.timetable[dt] || {};
   let n = 0, h = '';
   bells.forEach((b, i) => {
     const isP = b.kind !== 'block';
@@ -1375,11 +1489,21 @@ function pBells(P){
   let h = '<section class="card"><h2>Bells &amp; timetable</h2>' + versionBar() + '<div class="chips" role="group" aria-label="Day type">' +
     m.dayTypes.map(d => '<button class="chipbtn" data-act="dt-select" data-dt="' + esc(d.id) + '" aria-pressed="' + (d.id === dt) + '">' + esc(d.name) + '</button>').join('') + '</div></section>';
   if(!dt || !v.days[dt]) return h + '<section class="card"><p class="hint">This day type has no schedule in this version.</p></section>';
-  const d = v.days[dt];
+  const sch = TC.scheduleOf(v, dt), bells = TC.bellsOf(v, dt);
+  const sharedWith = sch ? TC.dayTypesUsing(v, sch.id).filter(x => x !== dt) : [];
   h += '<section class="card"><h2>' + esc(dtName(dt)) + '</h2>';
-  if(d.placeholder) h += '<div class="banner warn">' + esc(d.placeholder) + ' <button class="link" data-act="ph-dismiss" data-dt="' + esc(dt) + '" data-ver="' + esc(v.start) + '">Mark as correct</button></div>';
+  h += '<div class="verbar schedbar"><div class="form-row"><label>Bell times <select data-f="sched" data-key="sched">' +
+    '<option value=""' + (sch ? '' : ' selected') + '>\u2014 none yet \u2014</option>' +
+    Object.keys(v.schedules).map(id => '<option value="' + esc(id) + '"' + (sch && sch.id === id ? ' selected' : '') + '>' + esc(v.schedules[id].name || 'Bell times') + '</option>').join('') +
+    '<option value="__new">A new set (a copy of these)</option></select></label>' +
+    (sch ? ' <label>Name <input type="text" class="w-name" value="' + esc(sch.name) + '" data-f="schedName" data-key="schedName" aria-label="Name of this set of bell times"></label>' : '') +
+    (sch && sharedWith.length ? ' <button class="btn" data-act="sched-split">Make ' + esc(dtName(dt)) + ' different</button>' : '') + '</div>' +
+    '<p class="hint">' + (!sch ? 'This day type has no bell times yet. Pick a set above, or add a period to start its own. ' :
+      sharedWith.length ? 'These bell times are shared with <strong>' + sharedWith.map(x => esc(dtName(x))).join(', ') + '</strong>. Change a time here and it changes for all of them. The time type and class on each period stay separate for each day, so every day can have its own classes and prep.' :
+      'Only ' + esc(dtName(dt)) + ' uses these bell times.') + '</p></div>';
+  if(sch && sch.placeholder) h += '<div class="banner warn">' + esc(sch.placeholder) + ' <button class="link" data-act="ph-dismiss" data-sch="' + esc(sch.id) + '" data-ver="' + esc(v.start) + '">Mark as correct</button></div>';
   h += '<p class="hint">Bell times are school setup; the time type and class name on each period are your own timetable. Period numbers update on their own. A block (such as Lunch) sits among the periods but is not numbered.</p>';
-  if(d.bells.length){
+  if(bells.length){
     h += '<div class="scroll"><table class="tbl bells"><thead><tr><th>Period</th><th>Start</th><th>End</th><th class="num">Min</th><th>Time type</th><th>Class or activity</th><th></th></tr></thead><tbody>' + bellRows(v, dt) + '</tbody></table></div>';
   }else{
     h += '<p class="hint">No periods yet.</p>';
@@ -1394,8 +1518,8 @@ function pArrival(P){
   const m = S.model, v = curVer();
   if(!S.ad){ const base = TC.versionFor(m, m.calendar.start); S.ad = {from: m.calendar.start, arr: base.arrival, dep: base.departure}; }
   const rows = m.dayTypes.map(d => {
-    const vd = v.days[d.id] || {bells: []};
-    const ps = vd.bells.filter(b => b.kind !== 'block');
+    const vd = v.days[d.id] || {};
+    const ps = TC.bellsOf(v, d.id).filter(b => b.kind !== 'block');
     if(!ps.length) return '<tr><th scope="row">' + esc(d.name) + '</th><td colspan="6" class="muted">no periods</td></tr>';
     const first = Math.min.apply(null, ps.map(b => b.start)), last = Math.max.apply(null, ps.map(b => b.end));
     const arr = vd.arrival != null ? vd.arrival : v.arrival, dep = vd.departure != null ? vd.departure : v.departure;
@@ -1594,7 +1718,7 @@ async function act(a, b){
     if(u.status.length) parts.push('it is the default for ' + u.status.map(s => s === 'nid' ? 'non-instruction days' : 'Convention days').join(' and '));
     if(u.duties.length) parts.push('duties use it: ' + u.duties.join(', '));
     if(u.calendar) parts.push('the calendar assigns it to a date');
-    const r = await ask('Delete ' + dtName(d.id) + '?', '<p>' + (parts.length ? 'Currently ' + esc(parts.join('; ')) + '. Deleting it removes it from those places, and its bells and timetable in every version.' : 'Its bells and timetable are removed from every version.') + '</p><p>You can undo this.</p>', [CANCEL, {label: 'Delete day type', value: 'ok', kind: 'danger'}]);
+    const r = await ask('Delete ' + dtName(d.id) + '?', '<p>' + (parts.length ? 'Currently ' + esc(parts.join('; ')) + '. Deleting it removes it from those places, and its timetable in every version.' : 'Its timetable is removed from every version.') + ' Its bell times are removed too if no other day type uses them.' + '</p><p>You can undo this.</p>', [CANCEL, {label: 'Delete day type', value: 'ok', kind: 'danger'}]);
     if(r.value === 'ok') commit(mm => { TC.deleteDayType(mm, d.id); });
     break; }
   case 'ver-new': {
@@ -1611,41 +1735,50 @@ async function act(a, b){
   case 'bell-add': case 'bell-add-block': {
     const dt = curDt(), block = a === 'bell-add-block';
     commit(mm => {
-      const v = verIn(mm), bells = v.days[dt].bells;
+      const v = verIn(mm), bells = TC.bellsOf(v, dt);
       const start = bells.length ? Math.max.apply(null, bells.map(x => x.end)) + 2 : T('8:00');
       TC.addPeriod(v, dt, block ? {kind: 'block', name: 'New block', start, end: start + 30} : {start, end: start + 45});
     });
     break; }
   case 'bell-merge': { const dt = curDt(); commit(mm => { TC.mergePeriods(verIn(mm), dt, d.id, d.next); }); break; }
   case 'bell-split': {
-    const dt = curDt(), bell = curVer().days[dt].bells.find(x => x.id === d.id);
+    const dt = curDt(), bell = TC.bellsOf(curVer(), dt).find(x => x.id === d.id);
     if(!bell) break;
     const mid = Math.round((bell.start + bell.end) / 2);
     const r = await ask('Split this period', '<p>' + rng(bell.start, bell.end) + '. The second part keeps the same time type and class name.</p><label>Split at <input type="time" name="at" value="' + tval(mid) + '" required></label>', [CANCEL, {label: 'Split', value: 'ok', kind: 'primary'}]);
     if(r.value === 'ok' && r.data.at) commit(mm => { TC.splitPeriod(verIn(mm), dt, d.id, T(r.data.at)); });
     break; }
   case 'bell-remove': {
-    const dt = curDt(), v = curVer(), bells = v.days[dt].bells, bell = bells.find(x => x.id === d.id);
+    const dt = curDt(), v = curVer(), sch = TC.scheduleOf(v, dt), bells = TC.bellsOf(v, dt), bell = bells.find(x => x.id === d.id);
     if(!bell) break;
     let n = 0, label = '';
     bells.forEach(x => { if(x.kind !== 'block') n++; if(x === bell) label = bell.name || (bell.kind === 'block' ? 'this block' : 'Period ' + n); });
-    const e = (v.timetable[dt] || {})[d.id];
+    const users = TC.dayTypesUsing(v, sch.id);
+    const entries = users.map(u => ({u, e: (v.timetable[u] || {})[d.id]})).filter(x => x.e && (x.e.type || x.e.name));
     const others = bells.filter(x => x.id !== d.id && x.kind !== 'block');
-    let body = '<p>Remove <strong>' + esc(label) + '</strong> from ' + esc(dtName(dt)) + ' from <strong>' + fmtDate(v.start) + '</strong> forward. Earlier weeks and confirmed weeks keep it. Edits that point at it are flagged for review, not dropped.</p>';
-    if(e && (e.type || e.name) && bell.kind !== 'block'){
-      const tn = (S.model.timeTypes.find(t => t.id === e.type) || {}).name;
-      body += '<p>It has a timetable entry (' + esc([tn, e.name].filter(Boolean).join(': ')) + '). What should happen to it?</p>' +
-        '<label class="chk"><input type="radio" name="what" value="drop" checked> Remove it with the period</label>' +
-        (others.length ? '<label class="chk"><input type="radio" name="what" value="move"> Move it to another period: <select name="to">' + others.map(x => '<option value="' + esc(x.id) + '">' + esc(x.name || x.id) + ' (' + rng(x.start, x.end) + ')</option>').join('') + '</select></label>' : '');
+    let body = '<p>Remove <strong>' + esc(label) + '</strong> from the bell times <strong>' + esc(sch.name) + '</strong>' +
+      (users.length > 1 ? ', which are shared by ' + users.map(x => esc(dtName(x))).join(', ') + ', so it goes from all of them' : '') +
+      ', from <strong>' + fmtDate(v.start) + '</strong> forward. Earlier weeks and confirmed weeks keep it. Edits that point at it are flagged for review, not dropped.</p>';
+    if(entries.length && bell.kind !== 'block'){
+      const tname = id => (S.model.timeTypes.find(t => t.id === id) || {}).name;
+      body += '<p>It has ' + (entries.length === 1 ? 'a timetable entry' : 'timetable entries') + ': ' +
+        entries.map(x => esc(dtName(x.u)) + ' \u2014 ' + esc([tname(x.e.type), x.e.name].filter(Boolean).join(': '))).join('; ') + '. What should happen to ' + (entries.length === 1 ? 'it' : 'them') + '?</p>' +
+        '<label class="chk"><input type="radio" name="what" value="drop" checked> Remove ' + (entries.length === 1 ? 'it' : 'them') + ' with the period</label>' +
+        (others.length ? '<label class="chk"><input type="radio" name="what" value="move"> Move ' + (entries.length === 1 ? 'it' : 'each') + ' to another period: <select name="to">' + others.map(x => '<option value="' + esc(x.id) + '">' + esc(x.name || x.id) + ' (' + rng(x.start, x.end) + ')</option>').join('') + '</select></label>' : '');
     }
     const r = await ask('Remove ' + label + '?', body, [CANCEL, {label: 'Remove', value: 'ok', kind: 'danger'}]);
-    if(r.value === 'ok') commit(mm => {
-      const vv = verIn(mm);
-      if(r.data.what === 'move' && r.data.to) TC.moveTimetableEntry(vv, dt, d.id, r.data.to);
-      TC.removePeriod(vv, dt, d.id);
-    });
+    if(r.value === 'ok'){
+      let left = 0;
+      commit(mm => {
+        const vv = verIn(mm);
+        if(r.data.what === 'move' && r.data.to) entries.forEach(x => { if(!TC.moveTimetableEntry(vv, x.u, d.id, r.data.to)) left++; });
+        TC.removePeriod(vv, dt, d.id);
+      });
+      if(left){ S.flash = {level: 'warn', text: left + ' timetable ' + (left === 1 ? 'entry was' : 'entries were') + ' dropped because that period already had a class on that day.'}; }
+    }
     break; }
-  case 'ph-dismiss': commit(mm => { const v = mm.versions.find(x => x.start === d.ver); if(v && v.days[d.dt]) delete v.days[d.dt].placeholder; }); break;
+  case 'sched-split': { const dt = curDt(); commit(mm => { TC.unlinkSchedule(verIn(mm), dt, dtName(dt) + ' bells'); }, dtName(dt) + ' now has its own bell times, starting as a copy.'); break; }
+  case 'ph-dismiss': commit(mm => { const v = mm.versions.find(x => x.start === d.ver); if(v && v.schedules[d.sch]) delete v.schedules[d.sch].placeholder; }); break;
   case 'ad-apply': {
     const arr = Math.round(+S.ad.arr), dep = Math.round(+S.ad.dep);
     if(!(arr >= 0 && arr <= 240 && dep >= 0 && dep <= 240)){ S.flash = {level: 'bad', text: 'Enter whole minutes from 0 to 240.'}; schedule(); break; }
@@ -1709,24 +1842,25 @@ function field(el){
   case 'bell': {
     const id = d.id, prop = d.prop, dt = curDt();
     commit(mm => {
-      const v = verIn(mm), dd = v.days[dt], b = dd.bells.find(x => x.id === id);
+      const v = verIn(mm), b = TC.bellsOf(v, dt).find(x => x.id === id);
       if(!b) return;
       const isP = b.kind !== 'block', cur = (v.timetable[dt] || {})[id] || {};
-      if(prop === 'name') b.name = el.value.trim();
-      else if(prop === 'start' || prop === 'end'){
-        if(!el.value) return;
-        const t = T(el.value), s = prop === 'start' ? t : b.start, e = prop === 'end' ? t : b.end;
-        if(e <= s) throw new Error('A period has to end after it starts.');
-        b[prop] = t; dd.bells.sort((x, y) => x.start - y.start || x.end - y.end); delete dd.placeholder;
-      }else if(prop === 'type'){
+      if(prop === 'name') TC.updateBell(v, dt, id, {name: el.value.trim()});
+      else if(prop === 'start' || prop === 'end'){ if(!el.value) return; const o = {}; o[prop] = T(el.value); TC.updateBell(v, dt, id, o); }
+      else if(prop === 'type'){
         if(isP){ if(el.value || cur.name) TC.setTimetable(v, dt, id, {type: el.value, name: cur.name || ''}); else if(v.timetable[dt]) delete v.timetable[dt][id]; }
-        else if(el.value) b.type = el.value; else delete b.type;
+        else TC.updateBell(v, dt, id, {type: el.value});
       }else if(prop === 'cname'){
         const name = el.value.trim();
         if(name || cur.type) TC.setTimetable(v, dt, id, {type: cur.type || '', name}); else if(v.timetable[dt]) delete v.timetable[dt][id];
       }
     });
     break; }
+  case 'sched': {
+    const dt = curDt(), val = el.value;
+    commit(mm => { const v = verIn(mm); if(val === '__new') TC.unlinkSchedule(v, dt, dtName(dt) + ' bells'); else TC.linkSchedule(v, dt, val); });
+    break; }
+  case 'schedName': { const dt = curDt(); commit(mm => { const sc = TC.scheduleOf(verIn(mm), dt); if(sc) TC.renameSchedule(verIn(mm), sc.id, el.value.trim() || 'Bell times'); }); break; }
   case 'adFrom': { const base = TC.versionFor(S.model, el.value || S.model.calendar.start); S.ad.from = el.value; S.ad.arr = base.arrival; S.ad.dep = base.departure; schedule(); break; }
   case 'adArr': S.ad.arr = el.value; break;
   case 'adDep': S.ad.dep = el.value; break;
@@ -2092,9 +2226,12 @@ check(21, 'From Jan 4, remove Period 8 on Mondays and add a Period 9 on Tuesdays
   const stale = TC.addEdit(m, '2027-01-11', {op:'change', ref:'p8', typeId:'prep', note:'Prep moved'});   // Mon, before the change
   TC.confirmWeek(m, '2027-01-18');
   const v = TC.ensureVersion(m, '2027-01-04');
+  TC.unlinkSchedule(v, 'mon', 'Monday bells');      // Monday and Tuesday stop sharing the Mon\u2013Thu bell times
+  TC.unlinkSchedule(v, 'tue', 'Tuesday bells');
   TC.removePeriod(v, 'mon', 'p8');
   const id = TC.addPeriod(v, 'tue', {start:T('14:47'), end:T('15:30')});
   t.eq(id, 'p9', 'the new period on Tuesdays is Period 9');
+  t.ok(has('2027-01-06', 'p8') && !has('2027-01-06', 'p9'), 'Wednesdays, which still share the Mon\u2013Thu bells, are untouched');
   t.ok(!has('2027-01-25', 'p8') && !has('2027-01-11', 'p8'), 'Mondays from Jan 4 have no Period 8');
   t.ok(has('2027-01-05', 'p9') && has('2027-01-26', 'p9'), 'Tuesdays from Jan 4 have a Period 9');
   t.eq(TC.resolveDay(m, '2027-01-05').blocks.find(b => b.ref === 'p9').label, 'Period 9', 'and it is labelled Period 9');
@@ -2135,7 +2272,8 @@ check('E2', 'Extra: rotation fill', t => {
 check('E3', 'Extra: split and merge periods', t => {
   const m = TC.newModel(), v = m.versions[0], d = '2026-09-14';
   TC.setTimetable(v, 'mon', 'p1', {type:'class', name:'Math 8'});
-  const before = JSON.stringify(v.days.mon.bells);
+  TC.setTimetable(v, 'tue', 'p1', {type:'prep', name:''});
+  const before = JSON.stringify(TC.bellsOf(v, 'mon'));
   const a = TC.resolveDay(m, d);
   const id = TC.splitPeriod(v, 'mon', 'p1', T('8:30'));
   const b = TC.resolveDay(m, d);
@@ -2143,10 +2281,11 @@ check('E3', 'Extra: split and merge periods', t => {
   t.eq(b.blocks.filter(x => x.source === 'bell').length, 9, 'Monday now has 9 periods');
   t.eq([b.totals.instructional, b.totals.assignable], [a.totals.instructional, a.totals.assignable], 'no minutes appear or vanish (51 min of Class, 18 of Transition)');
   t.eq(b.blocks.filter(x => x.ref === id).map(x => [x.typeId, x.name]), [['class', 'Math 8']], 'the second half keeps the time type and class name');
+  t.eq([TC.bellsOf(v, 'tue').length, v.timetable.tue[id].type], [9, 'prep'], 'Tuesday shares the bells, so it is split too, and keeps its own entry (Prep)');
   t.eq(b.blocks.filter(x => x.source === 'bell').map(x => x.label).slice(0, 3), ['Period 1', 'Period 2', 'Period 3'], 'period numbers renumber on their own');
   TC.mergePeriods(v, 'mon', 'p1', id);
-  t.eq(JSON.stringify(v.days.mon.bells), before, 'merging them back restores the original bells');
-  t.ok(!v.timetable.mon[id], 'and drops the extra timetable entry');
+  t.eq(JSON.stringify(TC.bellsOf(v, 'mon')), before, 'merging them back restores the original bells');
+  t.ok(!v.timetable.mon[id] && !v.timetable.tue[id], 'and drops the extra timetable entries');
   let threw = false; try{ TC.mergePeriods(v, 'mon', 'p1', 'p3'); }catch(e){ threw = true; }
   t.ok(threw, 'only neighbouring periods can be merged');
 });
@@ -2189,7 +2328,7 @@ check('E6', 'Extra: copying and deleting a day type', t => {
   const m = TC.newModel();
   TC.setTimetable(m.versions[0], 'friA', 'p1', {type:'class', name:'Math 8'});
   const id = TC.copyDayType(m, 'friA', 'Friday E');
-  t.eq(m.versions[0].days[id].bells, m.versions[0].days.friA.bells, 'the copy has the same bells');
+  t.eq(m.versions[0].days[id].schedule, m.versions[0].days.friA.schedule, 'the copy follows the same bell times');
   t.eq(m.versions[0].timetable[id].p1.name, 'Math 8', 'and the same timetable');
   m.versions[0].timetable[id].p1.name = 'Science 8';
   t.eq(m.versions[0].timetable.friA.p1.name, 'Math 8', 'but they are independent');
@@ -2220,6 +2359,69 @@ check('E7', 'Extra: arrival and departure by version and by day type', t => {
   t.eq(m.versions.map(v => v.start), [start, '2027-03-01'], 'a version can be deleted');
   let threw = false; try{ TC.deleteVersion(m, start); }catch(e){ threw = true; }
   t.ok(threw, 'but not the first one');
+});
+
+check('E8', 'Extra: shared bell times', t => {
+  const m = TC.newModel(), v = m.versions[0], d = {mon:'2026-09-14', tue:'2026-09-08', wed:'2026-09-09', thu:'2026-09-10'};
+  t.eq(['mon', 'tue', 'wed', 'thu'].map(id => v.days[id].schedule), ['mt', 'mt', 'mt', 'mt'], 'Monday to Thursday share one set of bell times');
+  t.eq(['friA', 'friB', 'friC', 'friD'].map(id => v.days[id].schedule), ['fri', 'fri', 'fri', 'fri'], 'Friday A to D share another');
+  t.ok(v.days.early.schedule === 'early' && v.schedules.early.placeholder, 'Early dismissal has its own placeholder times');
+  const mon = TC.bellsOf(v, 'mon').find(b => b.id === 'p1'), end = mon.end;
+  TC.updateBell(v, 'thu', 'p1', {end: T('8:57')});
+  t.eq(['mon', 'tue', 'wed', 'thu'].map(id => TC.resolveDay(m, d[id]).blocks.find(b => b.ref === 'p1').end), [T('8:57'), T('8:57'), T('8:57'), T('8:57')],
+       'a bell time changed on Thursday changes on all four days');
+  t.eq(end, T('8:56'), '(it was 8:56)');
+  // every day keeps its own classes and prep
+  TC.setTimetable(v, 'mon', 'p2', {type:'class', name:'Math 8'});
+  TC.setTimetable(v, 'tue', 'p2', {type:'prep', name:''});
+  const at = id => TC.resolveDay(m, d[id]).blocks.find(b => b.ref === 'p2');
+  t.eq([at('mon').typeId, at('tue').typeId, at('wed').typeId], ['class', 'prep', null], 'the timetable is separate for each day');
+  // making one day different
+  TC.unlinkSchedule(v, 'tue', 'Tuesday bells');
+  TC.updateBell(v, 'tue', 'p1', {end: T('8:50')});
+  t.eq([TC.resolveDay(m, d.tue).blocks.find(b => b.ref === 'p1').end, TC.resolveDay(m, d.wed).blocks.find(b => b.ref === 'p1').end], [T('8:50'), T('8:57')], 'Tuesday can have its own bell times without moving the others');
+  t.eq(at('tue').typeId, 'prep', 'and keeps its timetable');
+  TC.linkSchedule(v, 'tue', 'mt');
+  t.eq([TC.resolveDay(m, d.tue).blocks.find(b => b.ref === 'p1').end, v.schedules.s1], [T('8:57'), undefined], 'pointing it back at the shared times drops its private copy');
+  t.eq(at('tue').typeId, 'prep', 'and keeps its timetable');
+  // a period only some days share
+  const id = TC.addPeriod(v, 'mon', {start: T('15:00'), end: T('15:30')});
+  t.ok(['mon', 'tue', 'wed', 'thu'].every(x => TC.bellsOf(v, x).some(b => b.id === id)), 'a period added on Monday is added to all four days');
+  TC.setTimetable(v, 'wed', id, {type:'class', name:'Extra'});
+  TC.removePeriod(v, 'thu', id);
+  t.ok(!TC.bellsOf(v, 'mon').some(b => b.id === id) && !v.timetable.wed[id], 'removing it takes it, and each day’s entry for it, away from all four');
+  let threw = false; try{ TC.updateBell(v, 'mon', 'p1', {end: T('7:00')}); }catch(e){ threw = true; }
+  t.ok(threw, 'an end before the start is refused');
+  t.eq(TC.moveTimetableEntry(v, 'mon', 'p2', 'p3'), true, 'a timetable entry can be moved to a free period');
+  TC.setTimetable(v, 'tue', 'p3', {type:'class', name:'x'});
+  t.eq(TC.moveTimetableEntry(v, 'tue', 'p2', 'p3'), false, 'but not onto a period that already has one');
+});
+
+check('E9', 'Extra: a model saved in the earlier layout still opens', t => {
+  const m = withClasses();
+  TC.addEdit(m, '2026-09-08', {op:'add', start:T('14:45'), end:T('15:30'), typeId:'meeting', name:'Meeting'});
+  const want = TC.yearTotals(m);
+  // rebuild the old layout: a separate copy of the bells inside every day type
+  const old = JSON.parse(JSON.stringify(m));
+  old.version = 1;
+  old.versions.forEach(v => {
+    Object.keys(v.days).forEach(id => {
+      const sc = v.schedules[v.days[id].schedule];
+      v.days[id].bells = sc ? JSON.parse(JSON.stringify(sc.bells)) : [];
+      if(sc && sc.placeholder) v.days[id].placeholder = sc.placeholder;
+      delete v.days[id].schedule;
+    });
+    delete v.schedules;
+  });
+  const up = TC.migrate(old);
+  t.eq(up.version, 2, 'it is upgraded to the new layout');
+  t.eq(TC.yearTotals(up), want, 'with identical year totals');
+  const v = up.versions[0], sc = id => v.days[id].schedule;
+  t.ok(sc('mon') === sc('tue') && sc('tue') === sc('wed') && sc('wed') === sc('thu') && sc('mon') !== sc('friA'), 'days with identical bells share one set again');
+  t.ok(sc('friA') === sc('friD') && sc('early') !== sc('friA') && v.schedules[sc('early')].placeholder, 'Friday A to D share, and the Early dismissal placeholder keeps its own');
+  t.ok(sc('nid') === null && sc('convention') === null, 'a day type with no bells follows none');
+  t.eq(v.schedules[sc('mon')].name, 'Monday – Thursday', 'and the shared set is named after its days');
+  t.eq([TC.migrate({format:'other'}), TC.migrate(Object.assign(JSON.parse(JSON.stringify(m)), {version:9}))], [null, null], 'anything else is not opened');
 });
 
 pending(14, 'Import a colleague’s TimeTracker.pdf as School setup only', 'stage 5');

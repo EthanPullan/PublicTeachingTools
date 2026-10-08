@@ -130,6 +130,13 @@ and port it upstream by hand.
   focus by control name or position, so keep new controls in the same DOM order.
 - **Plan changes apply from a date forward.** A timetable version is a full copy of
   the generic week; edits go to the version in force, never to earlier ones.
+- **Bell times are shared, the timetable is not.** A version holds named bell
+  *schedules*, and each day type follows one: Monday to Thursday share one and
+  Friday A to D share another, so a bell time is changed once. Each day type keeps
+  its own timetable (the time type and class on each period), so classes and prep
+  differ by day. "Make this day different" gives a day type its own copy. Models
+  saved before this (`version: 1`, bells inside each day type) are upgraded by
+  `TC.migrate()` when they are opened.
 
 ## Commit / PR rules — IMPORTANT
 
