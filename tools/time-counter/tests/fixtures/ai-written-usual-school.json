@@ -1,0 +1,147 @@
+{
+  "format": "time-counter-setup",
+  "version": 1,
+  "about": {
+    "name": "Alex Rivera",
+    "school": "Example Middle School",
+    "fte": 1
+  },
+  "timetable": [
+    {
+      "dayTypes": ["mon", "tue", "wed", "thu"],
+      "period": 1,
+      "type": "Class",
+      "name": "Math 8"
+    },
+    {
+      "dayTypes": ["mon", "wed"],
+      "period": 2,
+      "type": "Class",
+      "name": "Science 8"
+    },
+    {
+      "dayTypes": ["tue", "thu"],
+      "period": 2,
+      "type": "Prep"
+    },
+    {
+      "dayTypes": ["mon", "tue", "wed", "thu"],
+      "period": 3,
+      "type": "Class",
+      "name": "Math 9"
+    },
+    {
+      "dayTypes": ["mon", "wed"],
+      "period": 4,
+      "type": "Prep"
+    },
+    {
+      "dayTypes": ["tue", "thu"],
+      "period": 4,
+      "type": "Class",
+      "name": "Science 8"
+    },
+    {
+      "dayTypes": ["mon", "tue", "wed", "thu"],
+      "period": 5,
+      "type": "Lunch / break"
+    },
+    {
+      "dayTypes": ["mon", "tue", "wed", "thu"],
+      "period": 6,
+      "type": "Class",
+      "name": "Science 9"
+    },
+    {
+      "dayTypes": ["mon", "tue", "wed", "thu"],
+      "period": 7,
+      "type": "Class",
+      "name": "Science 9"
+    },
+    {
+      "dayTypes": ["mon", "wed"],
+      "period": 8,
+      "type": "Class",
+      "name": "Math 8"
+    },
+    {
+      "dayTypes": ["tue", "thu"],
+      "period": 8,
+      "type": "Supervision",
+      "name": "Hallway supervision"
+    },
+    {
+      "dayTypes": ["friA", "friB", "friC", "friD"],
+      "period": 1,
+      "type": "Class",
+      "name": "Math 8"
+    },
+    {
+      "dayTypes": ["friA", "friB", "friC", "friD"],
+      "period": 2,
+      "type": "Class",
+      "name": "Science 8"
+    },
+    {
+      "dayTypes": ["friA", "friB", "friC", "friD"],
+      "period": 3,
+      "type": "Class",
+      "name": "Math 9"
+    },
+    {
+      "dayTypes": ["friA", "friB", "friC", "friD"],
+      "period": 4,
+      "type": "Prep"
+    },
+    {
+      "dayTypes": ["friA", "friB", "friC", "friD"],
+      "period": 5,
+      "type": "Class",
+      "name": "Science 9"
+    }
+  ],
+  "fridayLetters": {
+    "sequence": ["friA", "friB", "friC", "friD"],
+    "weekday": "fri",
+    "startDate": "2026-09-04"
+  },
+  "duties": [
+    {
+      "name": "Morning bus duty",
+      "type": "Supervision",
+      "start": "08:00",
+      "end": "08:05",
+      "repeat": {
+        "dayTypes": ["tue", "thu"]
+      }
+    },
+    {
+      "name": "Chess club",
+      "type": "Extra-curricular volunteer",
+      "start": "15:00",
+      "end": "16:00",
+      "repeat": {
+        "dayTypes": ["wed"]
+      }
+    },
+    {
+      "name": "Junior volleyball",
+      "type": "Extra-curricular assigned",
+      "start": "15:15",
+      "end": "16:30",
+      "repeat": {
+        "dayTypes": ["mon"]
+      }
+    },
+    {
+      "name": "Staff meeting",
+      "type": "Meeting",
+      "start": "15:00",
+      "end": "16:00",
+      "repeat": {
+        "nthWeekday": 1,
+        "weekday": "tue"
+      }
+    }
+  ]
+}

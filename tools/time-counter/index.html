@@ -1699,6 +1699,7 @@ function changeLog(m, filter){
     else if(e.kind === 'unlock') out.push(Object.assign(base, {kind: 'event', what: 'Unlocked the ' + wk(e.week) + ' (kept exactly as it was)'}));
     else if(e.kind === 'import') out.push(Object.assign(base, {kind: 'event', what: 'Opened a TimeTracker.pdf and replaced everything'}));
     else if(e.kind === 'import-setup') out.push(Object.assign(base, {kind: 'event', what: 'Brought in school setup' + (e.from ? ' from ' + e.from : '') + (e.changes && e.changes.length ? ': ' + e.changes.join('; ') : '')}));
+    else if(e.kind === 'setup-file') out.push(Object.assign(base, {kind: 'event', what: 'Applied a setup file' + (e.changes && e.changes.length ? ': ' + e.changes.join('; ') : '')}));
     else if(e.kind === 'new-year') out.push(Object.assign(base, {kind: 'event', what: 'Started ' + (e.to || 'a new year') + (e.from ? ' (after ' + e.from + ')' : '')}));
   });
   out.sort((a, b) => (a.date || '') < (b.date || '') ? -1 : (a.date || '') > (b.date || '') ? 1 : ((a.entered || '') < (b.entered || '') ? -1 : 1));
@@ -1789,6 +1790,27 @@ function checkModel(m){
   }catch(e){ return 'it could not be worked out (' + e.message + ')'; }
   return null;
 }
+const NEWER = 'This file was saved by a newer version of Time Counter than this page. Open the latest version of the tool and try again.';
+// Text that should be a whole model (inside a save, or kept in browser storage), checked
+// before anything runs on it. Never throws: {ok: true, model} or {ok: false, code, why}.
+function readModel(text){
+  let model;
+  try{ model = JSON.parse(text, (k, v) => { if(k === '__proto__') throw new Error('bad key'); return v; }); }
+  catch(e){ return {ok: false, code: 'damaged'}; }
+  if(model && typeof model.version === 'number' && model.version > MODEL_VERSION) return {ok: false, code: 'newer'};
+  try{ model = migrate(model); }catch(e){ model = null; }
+  if(!model) return {ok: false, code: 'unreadable'};
+  const why = checkModel(model);
+  return why ? {ok: false, code: 'unreadable', why} : {ok: true, model};
+}
+// What browser storage holds, as plain words when it cannot be used.
+function openSaved(raw){
+  const r = readModel(raw);
+  if(r.ok) return r;
+  r.reason = r.code === 'damaged' ? 'The saved text could not be read; it may be cut off.' : r.code === 'newer' ? 'It was saved by a newer version of Time Counter than this page.' :
+    'It is not a year this page can open' + (r.why ? ' (' + r.why + ')' : '') + '.';
+  return r;
+}
 // Open the text of a save envelope. Never throws and never changes anything:
 // {ok: true, model, saved} or {ok: false, code, message}.
 function unpack(text){
@@ -1796,19 +1818,15 @@ function unpack(text){
   let env;
   try{ env = JSON.parse(text); }catch(e){ return bad('damaged', 'The data inside this PDF could not be read.'); }
   if(!env || typeof env !== 'object' || env.format !== FILE_FORMAT) return bad('foreign', 'This is not Time Counter data.');
-  if(typeof env.version !== 'number' || env.version > FILE_VERSION) return bad('newer', 'This file was saved by a newer version of Time Counter than this page. Open the latest version of the tool and try again.');
+  if(typeof env.version !== 'number' || env.version > FILE_VERSION) return bad('newer', NEWER);
   const ck = env.checksum, payload = env.payload;
   if(typeof payload !== 'string' || !ck || ck.alg !== 'crc32') return bad('damaged', 'The data inside this PDF is incomplete.');
   const bytes = utf8(payload);
   if(ck.bytes !== bytes.length || ck.value !== crc32(bytes)) return bad('damaged', 'The data inside this PDF does not match its checksum, so the file is damaged or was changed after it was saved.');
-  let model;
-  try{ model = JSON.parse(payload, (k, v) => { if(k === '__proto__') throw new Error('bad key'); return v; }); }
-  catch(e){ return bad('damaged', 'The data inside this PDF could not be read.'); }
-  if(model && typeof model.version === 'number' && model.version > MODEL_VERSION) return bad('newer', 'This file was saved by a newer version of Time Counter than this page. Open the latest version of the tool and try again.');
-  try{ model = migrate(model); }catch(e){ model = null; }
-  if(!model) return bad('unreadable', 'The data inside this PDF is not a Time Counter year this page can open.');
-  const why = checkModel(model);
-  if(why) return bad('unreadable', 'The data inside this PDF is not usable: ' + why + '.');
+  const r = readModel(payload);
+  if(!r.ok) return bad(r.code, r.code === 'damaged' ? 'The data inside this PDF could not be read.' : r.code === 'newer' ? NEWER :
+    r.why ? 'The data inside this PDF is not usable: ' + r.why + '.' : 'The data inside this PDF is not a Time Counter year this page can open.');
+  const model = r.model;
   return {ok: true, model, saved: env.saved || null, appVersion: typeof env.appVersion === 'string' ? env.appVersion : null};
 }
 // Every note on the year as it shows (planned, edited or confirmed), once each.
@@ -2007,6 +2025,394 @@ function newYear(m, cal, meta){
   touch(m);
 }
 
+/* ---------- a setup file that an AI (or a person) writes for a teacher ---------- */
+// A teacher gives an AI their calendar, bell times, timetable and duties; the AI writes this
+// file; Time Counter checks every line of it and shows what it will do before anything changes.
+// `setupInstructions()` below is what the teacher gives the AI, and it is built from the same
+// lists this code checks against, so the two cannot drift apart.
+const SETUP_FORMAT = 'time-counter-setup', SETUP_VERSION = 1;
+const WD_KEYS = {mon: 1, tue: 2, wed: 3, thu: 4, fri: 5};
+const SETUP_KEYS = {
+  top: ['format', 'version', 'comment', 'about', 'calendar', 'dayTypes', 'defaultDayTypes', 'bells', 'arrivalMinutes', 'departureMinutes', 'timetable', 'fridayLetters', 'duties'],
+  about: ['name', 'school', 'fte', 'typicalAssignedHours'],
+  calendar: ['name', 'firstOperationalDay', 'firstStudentDay', 'lastStudentDay', 'lastOperationalDay', 'dates'],
+  dayType: ['id', 'name'], bells: ['name', 'dayTypes', 'periods', 'blocks'], period: ['start', 'end', 'name'], block: ['name', 'start', 'end', 'type'],
+  timetable: ['dayTypes', 'period', 'type', 'name'], letters: ['sequence', 'weekday', 'startDate', 'countNonInstructionDays', 'dates'],
+  duty: ['name', 'type', 'start', 'end', 'repeat', 'from', 'to', 'shared'], repeat: ['dayTypes', 'everyNWeeks', 'startDate', 'weekdays', 'nthWeekday', 'weekday', 'dates']
+};
+
+// Text from a file or a paste: the JSON, even if it came wrapped in a code block or a chat reply.
+function readSetupText(text){
+  let t = String(text == null ? '' : text).trim();
+  if(!t) return {ok: false, errors: [{path: '', message: 'The file is empty.'}]};
+  if(t.length > 1000000) return {ok: false, errors: [{path: '', message: 'That is too big to be a setup file.'}]};
+  const fence = /^```[A-Za-z]*[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*$/.exec(t);
+  if(fence) t = fence[1].trim();
+  const parse = s => JSON.parse(s, (k, v) => { if(k === '__proto__') throw new Error('bad key'); return v; });
+  try{ return {ok: true, file: parse(t)}; }
+  catch(e1){
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if(a >= 0 && b > a){ try{ return {ok: true, file: parse(t.slice(a, b + 1))}; }catch(e2){ /* fall through to the error below */ } }
+    const at = /position (\d+)/.exec(String(e1.message)), line = at ? t.slice(0, +at[1]).split('\n').length : null;
+    return {ok: false, errors: [{path: '', message: 'This is not valid JSON' + (line ? ' (near line ' + line + ')' : '') + '. Look for a missing comma, quote or bracket, and use only the JSON.'}]};
+  }
+}
+
+// Apply a setup file to a copy of the model; if every line checks out, put the result in m.
+// Returns {ok: true, changes: [{label, text}]} or {ok: false, errors: [{path, message}]}.
+// Nothing is changed unless ok. What the file leaves out is left as it is.
+function applySetupFile(m, file, meta){
+  const w = clone(m), errors = [], changes = [];
+  const err = (path, message) => { errors.push({path, message}); };
+  const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const keysOk = (o, allowed, path) => { Object.keys(o).forEach(k => { if(allowed.indexOf(k) < 0) err(path ? path + '.' + k : k, 'Unknown key “' + k + '”. Allowed here: ' + allowed.join(', ') + '.'); }); };
+  const str = (v, path, what, opt) => {
+    if(v == null && opt) return null;
+    if(typeof v !== 'string' || !v.trim()){ err(path, what + ' must be some text.'); return null; }
+    return v.trim();
+  };
+  const isDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && isoOf(dayNum(s)) === s;
+  const date = (v, path, what) => { if(!isDate(v)){ err(path, what + ' must be a date like 2027-09-06.'); return null; } return v; };
+  const time = (v, path) => {
+    const x = typeof v === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(v.trim()) : null;
+    if(!x || +x[1] > 23 || +x[2] > 59){ err(path, 'Times use the 24-hour clock, like 08:05 or 13:45. Got ' + JSON.stringify(v) + '.'); return null; }
+    return +x[1] * 60 + +x[2];
+  };
+  const lc = s => String(s).trim().toLowerCase();
+  const typeId = (v, path) => {
+    const t = typeof v === 'string' ? w.timeTypes.find(x => x.id === v.trim() || lc(x.name) === lc(v)) : null;
+    if(!t){ err(path, 'There is no time type called ' + JSON.stringify(v) + '. Use one of: ' + w.timeTypes.map(x => x.name).join(', ') + '.'); return null; }
+    return t.id;
+  };
+  const dayTypeIds = (v, path) => {
+    if(!Array.isArray(v) || !v.length){ err(path, 'List at least one day type, like [“mon”, “tue”].'); return []; }
+    return v.map((x, i) => {
+      const d = typeof x === 'string' ? w.dayTypes.find(y => y.id === x.trim() || lc(y.name) === lc(x)) : null;
+      if(!d) err(path + '[' + i + ']', 'There is no day type called ' + JSON.stringify(x) + '. Use one of: ' + w.dayTypes.map(y => y.id).join(', ') + '.');
+      return d ? d.id : null;
+    }).filter(Boolean);
+  };
+  const weekdayNum = (v, path) => {
+    const n = typeof v === 'string' ? WD_KEYS[lc(v).slice(0, 3)] : null;
+    if(!n || !/^(mon|tue|wed|thu|fri)/.test(lc(v))){ err(path, 'A weekday is one of mon, tue, wed, thu, fri. Got ' + JSON.stringify(v) + '.'); return null; }
+    return n;
+  };
+  const list = (v, path) => { if(!Array.isArray(v)){ err(path, 'This must be a list.'); return []; } return v; };
+
+  if(!isObj(file)){ return {ok: false, errors: [{path: '', message: 'The file must be one JSON object.'}]}; }
+  if(file.format !== SETUP_FORMAT) err('format', 'The “format” must be “' + SETUP_FORMAT + '”.');
+  if(file.version !== SETUP_VERSION) err('version', 'The “version” must be ' + SETUP_VERSION + '.');
+  if(errors.length) return {ok: false, errors};            // not a setup file we can read at all: say so before anything else
+  keysOk(file, SETUP_KEYS.top, '');                        // a misspelt key is reported with the rest, so one pass finds everything
+  const v0 = w.versions[0], problems = errors.length;
+  const touchesPlan = ['calendar', 'bells', 'arrivalMinutes', 'departureMinutes', 'timetable'].some(k => k in file);
+  if(touchesPlan && w.versions.length > 1) err('', 'This year already has timetable versions that start later, so a setup file cannot replace its bell times and timetable. Start a new school year first (Settings & data), then open the setup file.');
+  if('calendar' in file && (Object.keys(w.edits).length || Object.keys(w.confirmed).length)) err('calendar', 'This year already has edits or confirmed weeks, which belong to its calendar. Start a new school year first (Settings & data), then open the setup file.');
+  if(errors.length > problems) return {ok: false, errors};
+
+  // about you
+  if('about' in file){
+    const a = file.about;
+    if(!isObj(a)) err('about', 'This must be an object with your name, school and FTE.');
+    else{
+      keysOk(a, SETUP_KEYS.about, 'about');
+      const name = 'name' in a ? str(a.name, 'about.name', 'The name', true) : null, school = 'school' in a ? str(a.school, 'about.school', 'The school', true) : null;
+      if(name != null) w.settings.teacher = name;
+      if(school != null) w.settings.school = school;
+      if('fte' in a){ if(typeof a.fte === 'number' && a.fte > 0 && a.fte <= 1) w.settings.fte = Math.round(a.fte * 100) / 100; else err('about.fte', 'FTE is a number above 0 and at most 1 (1 is full time).'); }
+      if('typicalAssignedHours' in a){ if(a.typicalAssignedHours === null || (typeof a.typicalAssignedHours === 'number' && a.typicalAssignedHours > 0)) w.settings.typicalAssignedHours = a.typicalAssignedHours; else err('about.typicalAssignedHours', 'This is a number of hours, or null.'); }
+      changes.push({label: 'About you', text: [w.settings.teacher, w.settings.school, 'FTE ' + w.settings.fte].filter(Boolean).join(', ')});
+    }
+  }
+  // the calendar: the same four dates and one-line-per-date format as a new school year
+  if('calendar' in file){
+    const c = file.calendar;
+    if(!isObj(c)) err('calendar', 'This must be an object.');
+    else{
+      keysOk(c, SETUP_KEYS.calendar, 'calendar');
+      const lines = 'dates' in c ? list(c.dates, 'calendar.dates') : [];
+      lines.forEach((x, i) => { if(typeof x !== 'string') err('calendar.dates[' + i + ']', 'Each date is a line of text like “2027-09-06 closed Labour Day”.'); });
+      const res = parseCalendar(w, {name: c.name || '', start: c.firstOperationalDay, firstStudentDay: c.firstStudentDay, lastStudentDay: c.lastStudentDay, end: c.lastOperationalDay}, lines.join('\n'));
+      if(!res.ok){
+        const FLD = {start: 'calendar.firstOperationalDay', firstStudentDay: 'calendar.firstStudentDay', lastStudentDay: 'calendar.lastStudentDay', end: 'calendar.lastOperationalDay'};
+        res.errors.forEach(e => err(e.line ? 'calendar.dates (line ' + e.line + ')' : (FLD[e.field] || 'calendar'), e.msg));
+      }else{
+        w.calendar = res.calendar; w.calendarEdits = {}; w.dayTypeOverrides = {}; v0.start = res.calendar.start;
+        changes.push({label: 'Calendar', text: res.calendar.name + ': ' + res.counts.operational + ' operational days, ' + res.counts.instructional + ' instructional'});
+      }
+    }
+  }
+  // extra day types, and which one each weekday runs
+  if('dayTypes' in file){
+    const added = [];
+    list(file.dayTypes, 'dayTypes').forEach((d, i) => {
+      const p = 'dayTypes[' + i + ']';
+      if(!isObj(d)){ err(p, 'Each day type is an object like {“id”: “day1”, “name”: “Day 1”}.'); return; }
+      keysOk(d, SETUP_KEYS.dayType, p);
+      const id = typeof d.id === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,23}$/.test(d.id) ? d.id : null, name = str(d.name, p + '.name', 'The name');
+      if(!id){ err(p + '.id', 'The id is letters and digits, starting with a letter, like day1.'); return; }
+      if(!name) return;
+      const have = w.dayTypes.find(x => x.id === id);
+      if(have){ if(have.name !== name){ have.name = name; added.push(name + ' (renamed)'); } }
+      else{ addDayType(w, {id, name}); added.push(name); }
+    });
+    if(added.length) changes.push({label: 'Day types', text: added.join(', ')});
+  }
+  if('defaultDayTypes' in file){
+    const dd = file.defaultDayTypes;
+    if(!isObj(dd)) err('defaultDayTypes', 'This must be an object like {“mon”: “mon”, “fri”: “day5”}.');
+    else Object.keys(dd).forEach(k => {
+      const p = 'defaultDayTypes.' + k;
+      if(!(k in WD_KEYS) && k !== 'nid' && k !== 'convention'){ err(p, 'The key is mon, tue, wed, thu, fri, nid or convention.'); return; }
+      const ids = dd[k] === null ? [] : dayTypeIds([dd[k]], p).filter(Boolean);
+      if(dd[k] !== null && !ids.length) return;
+      const target = k in WD_KEYS ? w.dayTypeDefaults.weekday : w.dayTypeDefaults.status, key = k in WD_KEYS ? WD_KEYS[k] : k;
+      if(ids.length) target[key] = ids[0]; else delete target[key];
+    });
+    if(!errors.length) changes.push({label: 'Default day types', text: Object.keys(file.defaultDayTypes).join(', ') + ' set'});
+  }
+  // bell times, one entry for each group of day types that share them
+  if('bells' in file){
+    const seen = {}, made = [];
+    list(file.bells, 'bells').forEach((b, i) => {
+      const p = 'bells[' + i + ']';
+      if(!isObj(b)){ err(p, 'Each entry is an object with a name, dayTypes and periods.'); return; }
+      keysOk(b, SETUP_KEYS.bells, p);
+      const name = str(b.name, p + '.name', 'The name'), dts = dayTypeIds(b.dayTypes, p + '.dayTypes'), bells = [];
+      dts.forEach(id => { if(seen[id]) err(p + '.dayTypes', id + ' is in two bell time entries.'); seen[id] = 1; });
+      const periods = list(b.periods, p + '.periods');
+      if(!periods.length) err(p + '.periods', 'List at least one period.');
+      periods.forEach((x, j) => {
+        const q = p + '.periods[' + j + ']';
+        if(!isObj(x)){ err(q, 'Each period is {“start”: “08:05”, “end”: “08:56”}.'); return; }
+        keysOk(x, SETUP_KEYS.period, q);
+        const s = time(x.start, q + '.start'), e = time(x.end, q + '.end');
+        if(s != null && e != null) bells.push({kind: 'period', name: x.name ? String(x.name).trim() : '', start: s, end: e});
+      });
+      if('blocks' in b) list(b.blocks, p + '.blocks').forEach((x, j) => {
+        const q = p + '.blocks[' + j + ']';
+        if(!isObj(x)){ err(q, 'Each block is {“name”: “Lunch”, “start”: “12:10”, “end”: “13:00”, “type”: “Lunch / break”}.'); return; }
+        keysOk(x, SETUP_KEYS.block, q);
+        const s = time(x.start, q + '.start'), e = time(x.end, q + '.end'), t = typeId(x.type, q + '.type'), n = str(x.name, q + '.name', 'The name');
+        if(s != null && e != null && t && n) bells.push({kind: 'block', name: n, start: s, end: e, type: t});
+      });
+      bells.forEach((x, j) => { if(x.end <= x.start) err(p, 'A period or block ends at ' + fmtTime(x.end, false) + ', which is not after it starts at ' + fmtTime(x.start, false) + '.'); });
+      bells.sort((x, y) => x.start - y.start || x.end - y.end);
+      for(let j = 1; j < bells.length; j++) if(bells[j].start < bells[j - 1].end) err(p, 'Two times overlap: ' + fmtTime(bells[j - 1].start, false) + '–' + fmtTime(bells[j - 1].end, false) + ' and ' + fmtTime(bells[j].start, false) + '–' + fmtTime(bells[j].end, false) + '.');
+      if(!name || !dts.length || !bells.length) return;
+      made.push({name, dts, bells});
+    });
+    if(!errors.length){
+      made.forEach(e => {
+        const id = nextScheduleId(v0);
+        let pn = 0, bn = 0;
+        v0.schedules[id] = {id, name: e.name, bells: e.bells.map(x => { const o = {id: x.kind === 'period' ? 'p' + (++pn) : 'b' + (++bn), kind: x.kind, name: x.name, start: x.start, end: x.end}; if(x.type) o.type = x.type; return o; })};
+        e.dts.forEach(d => { v0.days[d].schedule = id; });
+      });
+      gcSchedules(v0);
+      Object.keys(v0.timetable).forEach(d => { const have = {}; bellsOf(v0, d).forEach(b => { have[b.id] = 1; }); Object.keys(v0.timetable[d]).forEach(k => { if(!have[k]) delete v0.timetable[d][k]; }); });
+      changes.push({label: 'Bell times', text: made.map(e => e.name + ': ' + plural(e.bells.filter(x => x.kind === 'period').length, 'period', 'periods') + (e.bells.some(x => x.kind === 'block') ? ' and ' + plural(e.bells.filter(x => x.kind === 'block').length, 'block', 'blocks') : '')).join('; ')});
+    }
+  }
+  ['arrivalMinutes', 'departureMinutes'].forEach(k => {
+    if(!(k in file)) return;
+    if(Number.isInteger(file[k]) && file[k] >= 0 && file[k] <= 240){ v0[k === 'arrivalMinutes' ? 'arrival' : 'departure'] = file[k]; changes.push({label: k === 'arrivalMinutes' ? 'Required arrival' : 'Required departure', text: file[k] + ' min'}); }
+    else err(k, 'This is a whole number of minutes from 0 to 240.');
+  });
+  // the timetable: what each period is, by day type; this replaces the one you have
+  if('timetable' in file){
+    const entries = list(file.timetable, 'timetable'), seen = {};
+    let n = 0;
+    const next = {};
+    entries.forEach((x, i) => {
+      const p = 'timetable[' + i + ']';
+      if(!isObj(x)){ err(p, 'Each entry is {“dayTypes”: [“mon”], “period”: 1, “type”: “Class”, “name”: “Math 8”}.'); return; }
+      keysOk(x, SETUP_KEYS.timetable, p);
+      const dts = dayTypeIds(x.dayTypes, p + '.dayTypes'), t = typeId(x.type, p + '.type');
+      if(!Number.isInteger(x.period) || x.period < 1){ err(p + '.period', 'The period is a number from 1: the first period of the day is 1.'); return; }
+      const name = 'name' in x ? (x.name == null ? '' : String(x.name).trim()) : '';
+      if(!t) return;
+      dts.forEach(d => {
+        const periods = bellsOf(v0, d).filter(b => b.kind !== 'block'), dn = (w.dayTypes.find(y => y.id === d) || {name: d}).name;
+        if(x.period > periods.length){ err(p + '.period', dn + ' has ' + plural(periods.length, 'period', 'periods') + ', so there is no period ' + x.period + '.'); return; }
+        const key = d + '|' + x.period;
+        if(seen[key]){ err(p, dn + ' period ' + x.period + ' is listed twice (also at timetable[' + (seen[key] - 1) + ']).'); return; }
+        seen[key] = i + 1;
+        (next[d] || (next[d] = {}))[periods[x.period - 1].id] = {type: t, name};
+        n++;
+      });
+    });
+    if(!errors.length){ v0.timetable = next; changes.push({label: 'Timetable', text: plural(n, 'period typed', 'periods typed') + ' on ' + plural(Object.keys(next).length, 'day type', 'day types')}); }
+  }
+  // Friday letters, or any rotation
+  if('fridayLetters' in file){
+    const f = file.fridayLetters;
+    if(!isObj(f)) err('fridayLetters', 'This must be an object.');
+    else{
+      keysOk(f, SETUP_KEYS.letters, 'fridayLetters');
+      if('dates' in f){
+        if(!isObj(f.dates)) err('fridayLetters.dates', 'This is an object from a date to a day type, like {“2026-09-04”: “friA”}.');
+        else{
+          let n = 0;
+          Object.keys(f.dates).forEach(d => {
+            const p = 'fridayLetters.dates.' + d;
+            if(!isDate(d) || d < w.calendar.start || d > w.calendar.end){ err(p, d + ' is not a date inside the school year.'); return; }
+            const ids = dayTypeIds([f.dates[d]], p);
+            if(ids.length){ setDayType(w, d, ids[0]); n++; }
+          });
+          if(n) changes.push({label: 'Friday letters', text: plural(n, 'date set', 'dates set')});
+        }
+      }
+      if('sequence' in f){
+        const seq = dayTypeIds(f.sequence, 'fridayLetters.sequence'), wd = 'weekday' in f ? weekdayNum(f.weekday, 'fridayLetters.weekday') : 5, start = date(f.startDate, 'fridayLetters.startDate', 'The start date');
+        if(seq.length && wd && start){
+          const plan = rotationPlan(w, {dayTypes: seq, weekday: wd, start, countNid: f.countNonInstructionDays === true});
+          if(!plan.length) err('fridayLetters', 'No ' + ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][wd] + ' school days on or after ' + start + ' needed a day type.');
+          else{ applyRotation(w, plan); changes.push({label: 'Friday letters', text: plan.length + ' ' + ['', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays'][wd] + ' set, starting ' + seq.map(id => (w.dayTypes.find(y => y.id === id) || {name: id}).name).join(', ')}); }
+        }
+      }else if(!('dates' in f)) err('fridayLetters', 'Give a “sequence” with a “startDate”, or “dates”.');
+    }
+  }
+  // duties: a duty with the same name is replaced, the rest are added
+  if('duties' in file){
+    const added = [], replaced = [];
+    list(file.duties, 'duties').forEach((x, i) => {
+      const p = 'duties[' + i + ']';
+      if(!isObj(x)){ err(p, 'Each duty is an object with a name, type, start, end and repeat.'); return; }
+      keysOk(x, SETUP_KEYS.duty, p);
+      const name = str(x.name, p + '.name', 'The name'), t = typeId(x.type, p + '.type'), s = time(x.start, p + '.start'), e = time(x.end, p + '.end');
+      if(s != null && e != null && e <= s) err(p, 'The duty ends at ' + fmtTime(e, false) + ', which is not after it starts at ' + fmtTime(s, false) + '.');
+      let rule = null;
+      const r = x.repeat;
+      if(!isObj(r)) err(p + '.repeat', 'Say when it repeats: {“dayTypes”: […]}, {“everyNWeeks”: 2, “startDate”: …}, {“nthWeekday”: 1, “weekday”: “tue”} or {“dates”: […]}.');
+      else{
+        keysOk(r, SETUP_KEYS.repeat, p + '.repeat');
+        if('dayTypes' in r) rule = {kind: 'weekly', dayTypes: dayTypeIds(r.dayTypes, p + '.repeat.dayTypes')};
+        else if('everyNWeeks' in r){
+          const n = r.everyNWeeks, sd = date(r.startDate, p + '.repeat.startDate', 'The start date');
+          if(!Number.isInteger(n) || n < 2 || n > 12) err(p + '.repeat.everyNWeeks', 'This is a whole number of weeks from 2 to 12.');
+          else if(sd){ rule = {kind: 'everyNWeeks', n, startDate: sd}; if('weekdays' in r) rule.weekdays = list(r.weekdays, p + '.repeat.weekdays').map((d, j) => weekdayNum(d, p + '.repeat.weekdays[' + j + ']')).filter(Boolean); }
+        }else if('nthWeekday' in r){
+          const n = r.nthWeekday, wd = weekdayNum(r.weekday, p + '.repeat.weekday');
+          if(!Number.isInteger(n) || n < 1 || n > 5) err(p + '.repeat.nthWeekday', 'This is 1 to 5: 1 is the first Tuesday of each month, say.');
+          else if(wd) rule = {kind: 'nthWeekday', n, weekday: wd};
+        }else if('dates' in r){
+          const ds = list(r.dates, p + '.repeat.dates').map((d, j) => date(d, p + '.repeat.dates[' + j + ']', 'Each date')).filter(Boolean);
+          rule = {kind: 'dates', dates: ds};
+        }else err(p + '.repeat', 'Give one of dayTypes, everyNWeeks, nthWeekday or dates.');
+      }
+      const from = 'from' in x && x.from != null ? date(x.from, p + '.from', 'The from date') : null, to = 'to' in x && x.to != null ? date(x.to, p + '.to', 'The to date') : null;
+      if(!name || !t || s == null || e == null || e <= s || !rule) return;
+      const have = w.duties.find(d => lc(d.name) === lc(name));
+      const duty = {id: have ? have.id : 'd' + (++w.seq), name, typeId: t, start: s, end: e, from, to, off: [], shared: 'shared' in x ? x.shared === true : (have ? !!have.shared : false), rule};
+      if(have){ Object.assign(have, duty); replaced.push(name); } else{ w.duties.push(duty); added.push(name); }
+    });
+    if(added.length || replaced.length) changes.push({label: 'Duties', text: [added.length && 'added ' + added.join(', '), replaced.length && 'replaced ' + replaced.join(', ')].filter(Boolean).join('; ')});
+  }
+  if(errors.length) return {ok: false, errors};
+  const why = checkModel(w);
+  if(why) return {ok: false, errors: [{path: '', message: 'The result is not a usable year (' + why + '). Nothing was changed.'}]};
+  if(!changes.length) return {ok: true, changes};
+  w.log.push({kind: 'setup-file', at: (meta && meta.at) || null, changes: changes.map(c => c.label + ': ' + c.text)});
+  Object.keys(m).forEach(k => { delete m[k]; });
+  Object.keys(w).forEach(k => { m[k] = w[k]; });
+  touch(m);
+  return {ok: true, changes};
+}
+const previewSetupFile = (m, file) => applySetupFile(clone(m), file);
+
+// A made-up setup file. It appears in the instructions, and the self-test imports it, so what
+// the AI is shown is always something Time Counter really accepts.
+const SETUP_EXAMPLE = {
+  format: SETUP_FORMAT, version: SETUP_VERSION, comment: 'Example only: every value here is made up.',
+  about: {name: 'Pat Teacher', school: 'Example School', fte: 1},
+  calendar: {name: '2027–28 school year', firstOperationalDay: '2027-08-25', firstStudentDay: '2027-08-30', lastStudentDay: '2028-06-23', lastOperationalDay: '2028-06-28',
+    dates: ['2027-08-25 to 2027-08-27 nid Before students start', '2027-09-06 closed Labour Day', '2027-11-10 to 2027-11-12 closed Fall Break', '2027-12-20 to 2028-01-02 closed Winter Break', '2028-06-23 early Last day for students']},
+  bells: [
+    {name: 'Monday to Thursday', dayTypes: ['mon', 'tue', 'wed', 'thu'], periods: [{start: '08:05', end: '08:56'}, {start: '08:58', end: '09:45'}, {start: '09:53', end: '10:40'}, {start: '10:42', end: '11:29'}]},
+    {name: 'Friday', dayTypes: ['friA', 'friB', 'friC', 'friD'], periods: [{start: '08:05', end: '08:56'}, {start: '08:58', end: '09:48'}], blocks: [{name: 'Lunch', start: '12:10', end: '13:00', type: 'Lunch / break'}]}
+  ],
+  timetable: [
+    {dayTypes: ['mon', 'tue', 'wed', 'thu'], period: 1, type: 'Class', name: 'Math 8'},
+    {dayTypes: ['mon', 'wed'], period: 2, type: 'Class', name: 'Science 8'},
+    {dayTypes: ['tue', 'thu'], period: 2, type: 'Prep'},
+    {dayTypes: ['mon', 'tue', 'wed', 'thu'], period: 3, type: 'Class', name: 'Math 9'},
+    {dayTypes: ['mon', 'tue', 'wed', 'thu'], period: 4, type: 'Supervision', name: 'Lunch supervision'},
+    {dayTypes: ['friA', 'friB', 'friC', 'friD'], period: 1, type: 'Class', name: 'Math 8'}
+  ],
+  fridayLetters: {sequence: ['friA', 'friB', 'friC', 'friD'], weekday: 'fri', startDate: '2027-09-03'},
+  duties: [
+    {name: 'Staff meeting', type: 'Meeting', start: '15:00', end: '16:00', repeat: {nthWeekday: 1, weekday: 'tue'}},
+    {name: 'Bus duty', type: 'Supervision', start: '08:00', end: '08:05', repeat: {dayTypes: ['mon', 'wed']}}
+  ]
+};
+
+// What the teacher gives to an AI assistant. Built from the lists the importer checks against.
+function setupInstructions(){
+  const hm = s => s.padStart(5, '0'), rows = list => list.map(b => hm(b[1]) + '–' + hm(b[2])).join(', ');
+  const cats = [['instructional', 'INSTRUCTIONAL (counts toward the instructional limit and the total)'], ['assignable', 'ASSIGNABLE (counts toward the total assignable limit only)'], ['notCounted', 'NOT COUNTED (counts toward neither limit; Time Counter keeps a record)']];
+  const L = [];
+  const add = (...x) => x.forEach(l => L.push(l));
+  add('TIME COUNTER SETUP: INSTRUCTIONS FOR AN AI ASSISTANT',
+    '(Teacher: copy everything on this page, paste it into your AI assistant, and answer its questions.)', '',
+    'YOUR JOB',
+    'You are helping a teacher set up Time Counter (version ' + VERSION + '), a free tool that runs offline in a web browser and tracks a teacher’s instructional and assignable time against the limits in the ATA/CBE collective agreement. Time Counter does all the counting. Your job is to interview the teacher and then write ONE setup file that Time Counter can import, so the teacher does not have to type in the calendar, bell times, timetable and duties by hand.', '',
+    'HOW TO WORK',
+    '1. Ask first, then write. Ask for what is missing, a few questions at a time, in plain words. Never invent a date, a time, a class or a duty. If something is unclear, ask.',
+    '2. If the teacher gives you documents (a school calendar, a bell schedule, a timetable, a screenshot), read them, say back what you understood, and let the teacher correct you before you write the file.',
+    '3. Leave student names, and anything else about students, out of the file. The file is private. Time Counter reads it on the teacher’s own computer and never sends it anywhere.',
+    '4. When you have everything, give the file as ONE code block of JSON, in exactly the format below, and nothing else inside the code block. Then add a short note in plain words saying what you assumed or could not find out.', '',
+    'WHAT TO ASK THE TEACHER FOR',
+    'A. About them: name, school, and FTE (1 for full time, 0.5 for half time, and so on). If the FTE is below 1, also the typical annual assigned hours for a full-time teacher at their school.',
+    'B. The school year. If the teacher has no calendar for you, or says to use the usual one, LEAVE OUT the "calendar" key. Time Counter then keeps its built-in calendar: the CBE 2026–27 school year (first operational day ' + CAL_2026_27.start + ', students ' + CAL_2026_27.firstStudentDay + ' to ' + CAL_2026_27.lastStudentDay + ', last operational day ' + CAL_2026_27.end + ').',
+    '   Otherwise you need four dates: the first and last OPERATIONAL day (the days teachers work, usually a few days before and after students), and the first and last STUDENT day. Then list every date inside the year that is not an ordinary school day, one line each, as "DATE STATUS Name" or "DATE to DATE STATUS Name". STATUS is one of:',
+    '     closed (a holiday or break: no work), nid (a non-instruction day teachers work), convention (Teachers’ Convention), early (a school day with early dismissal), conference (a non-instruction day used for conferences), school (a school day inside a break).',
+    '   Days teachers work before the first or after the last student day are nid. Weekends are closed automatically, so do not list them. Every other weekday between the first and last student day is a school day. Dates are written like 2027-09-06.',
+    'C. Bell times for each kind of day. If the teacher says their school uses the usual bell times, leave out the "bells" key; Time Counter then keeps its defaults, below. Otherwise ask for the start and end of every period, and of any lunch or other fixed block, on each kind of day. Convert all times to the 24-hour clock (1:45 pm is 13:45).',
+    'D. The teacher’s timetable: for each kind of day, what each period is (a class and its name, prep, their own lunch, a supervision, and so on). Periods are counted from 1 at the start of the day, ignoring lunch blocks. Days that share the same bell times often share the same timetable, but the classes can differ by day, so ask.',
+    'E. Day types and Friday letters. Time Counter’s starting day types are below. If the school runs a rotation (for example Friday A to D, or Day 1 to Day 6), ask which day the rotation is on, the order of the letters, and the date it starts. If the school publishes a list of dates with letters, use that instead.',
+    'F. Duties: supervision, recurring meetings and anything else the school assigns at a set time. For each: what it is, its time, and when it repeats (certain days of the week, every second week, the first Tuesday of the month, or particular dates).',
+    'G. Anything else: required arrival before the first bell or departure after the last bell, in minutes, if the school requires it.', '',
+    'WHAT TIME COUNTER ALREADY KNOWS (do not repeat it)',
+    '- Day types (use the id, or the exact name): ' + DAY_TYPES.map(d => d.id + ' = ' + d.name).join('; ') + '.',
+    '  By default Monday to Thursday run mon, tue, wed and thu. Fridays have no letter until fridayLetters sets one. A school with a different pattern can add day types with "dayTypes" and say which one each weekday runs with "defaultDayTypes".',
+    '- Default bell times. Monday to Thursday (day types mon, tue, wed, thu), 8 periods: ' + rows(MON_THU_BELLS) + '. Friday (friA, friB, friC, friD), 5 periods: ' + rows(FRIDAY_BELLS) + ', then a lunch block ' + hm(String(Math.floor(FRIDAY_LUNCH().start / 60)) + ':' + String(FRIDAY_LUNCH().start % 60).padStart(2, '0')) + '–' + hm(String(Math.floor(FRIDAY_LUNCH().end / 60)) + ':' + String(FRIDAY_LUNCH().end % 60).padStart(2, '0')) + '. Early dismissal starts as a copy of the Friday periods.',
+    '- A duty that is already there: the Friday meeting (named Meeting, 13:00–14:45, on Friday A to D). Do not add it again. If the school has no Friday meeting, or does not use Friday A to D, say in your note that the teacher can delete it under Plan, then Duties; it only counts on days that use Friday A to D.',
+    '- Passing time between periods (gaps of 10 minutes or less) becomes Transition automatically. Never add it. Teachers’ Convention days count a fixed 6 hours on their own.',
+    '- Time types. Every block has a time type, and each type is in one category. In the timetable and in duties, use the type’s name exactly (or its id):');
+  cats.forEach(c => {
+    add('  ' + c[1] + ':');
+    TIME_TYPES.filter(t => t.category === c[0]).forEach(t => add('    ' + t.name + ' [' + t.id + ']: ' + t.includes + '.'));
+  });
+  add('  Hints: a timetabled class is Class. A prep period is Prep. The teacher’s own lunch is Lunch / break, and a lunch or recess supervision they are assigned is Supervision. Conference time, evenings too, is School event. Extra-curricular activities are Extra-curricular volunteer when the teacher takes them on themselves and Extra-curricular assigned when admin gives them a set time and place. Every period needs a time type, so ask what each one is rather than leaving it out: a period left out is not counted, and Time Counter flags it until it is typed.', '',
+    'THE FILE FORMAT',
+    'The file is one JSON object. Use exactly these key names. Every key except "format" and "version" is optional, and anything you leave out is left as it is in Time Counter. Dates are YYYY-MM-DD. Times are 24-hour HH:MM. Use plain JSON: double quotes, no comments, no trailing commas.',
+    '- "format": "' + SETUP_FORMAT + '", "version": ' + SETUP_VERSION + '. Required, exactly like this. An optional "comment" is ignored.',
+    '- "about": {"name", "school", "fte" (a number above 0 up to 1), "typicalAssignedHours" (a number, or null)}.',
+    '- "calendar": {"name", "firstOperationalDay", "firstStudentDay", "lastStudentDay", "lastOperationalDay", "dates": [one line of text for each date or range, as described in B]}. Leave the whole key out to keep the built-in calendar.',
+    '- "dayTypes": [{"id": letters and digits starting with a letter, "name"}]: only to add day types the school uses beyond the starting set.',
+    '- "defaultDayTypes": {"mon": id, "tue": id, "wed": id, "thu": id, "fri": id or null, "nid": id, "convention": id}: which day type each weekday (or kind of day) runs. Only for schools that differ from the usual.',
+    '- "bells": a list; each entry is {"name", "dayTypes": [ids that share these bell times], "periods": [{"start", "end", "name" (optional, like "Advisory")}], "blocks": [{"name", "start", "end", "type"}] (optional: lunch and other fixed blocks, each with a time type)}. A day type goes in only one entry. Times must not overlap. Leave out to keep the default bell times.',
+    '- "arrivalMinutes", "departureMinutes": whole minutes from 0 to 240.',
+    '- "timetable": a list of {"dayTypes": [ids], "period": the period number (1 is the first period of the day), "type": a time type, "name": the class or what it is (optional)}. Each day type and period appears once. The timetable in the file replaces the one in Time Counter.',
+    '- "fridayLetters": {"sequence": [day type ids in order], "weekday": "fri", "startDate": the first date of the pattern, "countNonInstructionDays": false (optional)} and/or {"dates": {"2027-09-03": "friA", ...}}.',
+    '- "duties": a list of {"name", "type", "start", "end", "repeat": ONE of {"dayTypes": [ids]}, {"everyNWeeks": 2, "startDate": date, "weekdays": ["tue"] (optional)}, {"nthWeekday": 1, "weekday": "tue"}, {"dates": [dates]}, "shared": true (optional: a duty the whole school has), "from"/"to": dates (optional)}. A duty with the same name as one already in Time Counter replaces it.',
+    '', 'Here is a complete example. Every value in it is made up. Do not copy its values; copy its shape.',
+    '```json', JSON.stringify(SETUP_EXAMPLE, null, 2), '```', '',
+    'BEFORE YOU ANSWER, CHECK',
+    '- The JSON is valid, and every key is spelled exactly as above.',
+    '- Every date is real and in YYYY-MM-DD form, and every time is 24-hour HH:MM.',
+    '- Every day type id and time type name is one that is listed above (or that you added under "dayTypes").',
+    '- Within a bell time entry the periods do not overlap and each ends after it starts. Each timetable "period" number is no larger than the number of periods that day type has, and no day type and period is listed twice.',
+    '- You did not invent anything the teacher did not tell you or show you, and there are no student names.', '',
+    'AFTER THE CODE BLOCK, TELL THE TEACHER',
+    '1. Save the code block as a plain text file named TimeCounter-setup.json (or copy it).',
+    '2. Open Time Counter, go to Settings & data, and in "Set up from a file or with an AI" choose the file, or paste the text in the box and press Check.',
+    '3. Time Counter lists what it is going to change and changes nothing until the teacher confirms. It can be undone. If it reports problems, the teacher can copy them, paste them back to you, and you send the whole corrected file again.');
+  return L.join('\n');
+}
+
 /* ---------- time types: rename them, add your own (each stays in one category) ---------- */
 function typeName(m, name, exceptId){
   name = String(name || '').trim();
@@ -2042,7 +2448,7 @@ window.TimeCounter = {
   renameDayType, copyDayType, dayTypeUsage, deleteDayType, rotationPlan, applyRotation, planDay, dayTypeTotals, planSummary,
   dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
   resolveDay, sumRange, yearTotals, limits, weekFlags, flagsByDate, missingDayTypeDates, yearSummary, weekSheet, changeLog, filterLog,
-  VERSION, FILE_FORMAT, FILE_VERSION, crc32, pack, unpack, checkModel, notesList, fileSummary, replaceModel, applySetup, previewSetup,
+  VERSION, FILE_FORMAT, FILE_VERSION, crc32, pack, unpack, readModel, openSaved, SETUP_FORMAT, SETUP_EXAMPLE, readSetupText, applySetupFile, previewSetupFile, setupInstructions, checkModel, notesList, fileSummary, replaceModel, applySetup, previewSetup,
   parseCalendar, newYear, addTimeType, renameTimeType
 };
 })();
@@ -2423,10 +2829,24 @@ const catChip = c => c ? '<span class="chip ' + CAT[c].cls + '"><b aria-hidden="
 const KEY = 'teachingtools:timeCounter:model', UIKEY = 'teachingtools:timeCounter:ui';
 const readJSON = k => { try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; }catch(e){ return null; } };
 const writeJSON = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } };
+// Saved data that cannot be opened is never written over. It is copied aside first, and each
+// visit that opens fine keeps a copy as it found it, so there is something to go back to.
+const GOOD = KEY + ':lastGood', GOODAT = KEY + ':lastGoodAt', BAD = KEY + ':unreadable', BADAT = KEY + ':unreadableAt';
+const rawGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const rawSet = (k, v) => { try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } };
+let lost = null;
 function loadModel(){
-  let m = readJSON(KEY);
-  try{ m = m && TC.migrate(m); }catch(e){ m = null; }
-  return m || TC.newModel();
+  const raw = rawGet(KEY);
+  if(!raw) return TC.newModel();
+  const r = TC.openSaved(raw);
+  if(r.ok){
+    if(raw !== rawGet(GOOD)){ rawSet(GOOD, raw); rawSet(GOODAT, new Date().toISOString()); }
+    return r.model;
+  }
+  rawSet(BAD, raw); rawSet(BADAT, new Date().toISOString());
+  const good = rawGet(GOOD);
+  lost = {reason: r.reason, goodOk: !!good && TC.openSaved(good).ok, goodAt: rawGet(GOODAT)};
+  return TC.newModel();                                           // blank for now: it is not saved unless something is changed
 }
 const ui = readJSON(UIKEY) || {};
 const S = {
@@ -2438,9 +2858,9 @@ const S = {
   lastSaved: ui.lastSaved || null, firstUse: ui.firstUse || null, nudgeOff: false, busy: false,
   ny: {name: '', start: '', firstStudentDay: '', lastStudentDay: '', end: '', text: ''}, tt: {name: '', category: 'notCounted'},
   rep: ui.rep || 'dash', log: {from: '', to: '', type: 'all'},
-  setupSeen: !!ui.setupSeen, setupStep: 1, day: null, focusSel: null
+  setupSeen: !!ui.setupSeen, setupStep: 1, day: null, focusSel: null, lost, aiText: ''
 };
-if(!S.setupSeen && !S.model.modified) S.view = 'setup';          // a device that has never been used starts with the guided setup
+if(!S.setupSeen && !S.model.modified && !lost) S.view = 'setup';          // a device that has never been used starts with the guided setup
 const hist = {undo: [], redo: []};
 const saveUi = () => writeJSON(UIKEY, {view: S.view, tab: S.tab, dt: S.dt, rotWd: S.rotWd, showWeekend: S.showWeekend, lastSaved: S.lastSaved, firstUse: S.firstUse, rep: S.rep, setupSeen: S.setupSeen});
 const persist = () => { S.saved = writeJSON(KEY, S.model); };
@@ -2554,7 +2974,7 @@ function render(){
   if(!VIEWS.some(v => v[0] === S.view) && S.view !== 'setup') S.view = 'week';
   const flash = S.flash ? '<div class="banner ' + S.flash.level + '" role="status">' + esc(S.flash.text) + (S.flash.undo && hist.undo.length ? ' <button class="link" data-act="undo">Undo</button>' : '') + '</div>' : '';
   const body = S.view === 'week' ? weekHtml() : S.view === 'cal' ? calHtml() : S.view === 'totals' ? totalsHtml() : S.view === 'data' ? dataHtml() : S.view === 'setup' ? setupHtml() : planHtml();
-  root.innerHTML = '<nav class="views" aria-label="Views">' + VIEWS.map(v => '<button class="vbtn" data-act="view" data-view="' + v[0] + '"' + (S.view === v[0] ? ' aria-current="page"' : '') + '>' + v[1] + '</button>').join('') + '</nav>' + (backupDue() ? nudgeHtml() : '') + flash + body;
+  root.innerHTML = '<nav class="views" aria-label="Views">' + VIEWS.map(v => '<button class="vbtn" data-act="view" data-view="' + v[0] + '"' + (S.view === v[0] ? ' aria-current="page"' : '') + '>' + v[1] + '</button>').join('') + '</nav>' + (S.lost ? lostHtml() : '') + (backupDue() ? nudgeHtml() : '') + flash + body;
   root.classList.toggle('isreport', S.view === 'totals' && S.rep !== 'dash');
   pill.textContent = S.saved ? 'Saved on this device' : 'Not saved \u2014 storage is unavailable';
   pill.className = 'pill ' + (S.saved ? 'ok' : 'bad');
@@ -3901,7 +4321,8 @@ function setupHtml(){
   if(n === 1){
     const c = TC.countDays(S.model), cal = S.model.calendar;
     h += '<section class="card"><h2>' + esc(cal.name || 'Your calendar') + '</h2><p><strong>' + c.operational + ' operational days</strong>, <strong>' + c.instructional + ' instructional days</strong> (Mon ' + c.byWeekday[1] + ', Tue ' + c.byWeekday[2] + ', Wed ' + c.byWeekday[3] + ', Thu ' + c.byWeekday[4] + ', Fri ' + c.byWeekday[5] + '), ' + c.nid + ' non-instruction days and ' + c.convention + ' Teachers’ Convention days.</p>' +
-      '<p class="hint">' + esc(cal.source || '') + (cal.source ? '. ' : '') + 'If your school’s calendar has changed (for example it uses a non-instruction day for conferences), you can edit any date on the Calendar view with <em>Edit dates</em>. A different school year is started under Settings &amp; data.</p></section>';
+      '<p class="hint">' + esc(cal.source || '') + (cal.source ? '. ' : '') + 'If your school’s calendar has changed (for example it uses a non-instruction day for conferences), you can edit any date on the Calendar view with <em>Edit dates</em>. A different school year is started under Settings &amp; data.</p></section>' +
+      '<section class="card"><h2>Rather not type it all in?</h2><p class="hint">Give an AI assistant your calendar, bell times and timetable, and it writes a setup file that fills in the steps for you. <button class="btn" data-act="goto-ai">Set up with an AI…</button></p></section>';
   }else if(n === 2) h += pAbout(P, {short: true});
   else if(n === 3){
     h += '<section class="card"><h2>A colleague has already set this up?</h2><p class="hint">Open their TimeTracker.pdf and choose <strong>School setup only</strong>. It brings in the calendar, day types, bell times, Friday letters and shared duties, and leaves your timetable, notes and settings alone.</p><p><button class="btn" data-act="pdf-open">Open a TimeTracker.pdf…</button></p></section>' + pDayTypes(P);
@@ -3931,12 +4352,26 @@ function backupDue(){
   if(S.lastSaved && m.modified <= S.lastSaved) return false;           // nothing has changed since the last save
   return Date.now() - new Date(since).getTime() >= 7 * 86400000;
 }
+function lostHtml(){
+  const l = S.lost, when = stamp(l.goodAt);
+  return '<div class="banner bad" role="alert"><strong>Your saved data could not be opened.</strong> ' + esc(l.reason) + ' Time Counter has started a blank year and kept the unreadable copy on this device, so nothing has been thrown away. ' +
+    (l.goodOk ? '<button class="btn sm primary" data-act="lost-restore">Restore the copy from your last visit' + (when ? ' (' + esc(when) + ')' : '') + '</button> ' : 'There is no earlier copy to restore. ') +
+    '<button class="btn sm" data-act="lost-download">Download the unreadable copy</button> <button class="btn sm" data-act="lost-close">Close</button></div>';
+}
+function recoveryHtml(){
+  const bad = rawGet(BAD), good = rawGet(GOOD);
+  if(!bad) return '';
+  const goodOk = !!good && TC.openSaved(good).ok;
+  return '<section class="card"><h2>Recovery</h2><p>An unreadable copy of your data from ' + esc(stamp(rawGet(BADAT)) || 'an earlier visit') + ' is kept on this device. Time Counter never writes over data it cannot open, so it is still there.</p>' +
+    '<div class="form-row"><button class="btn" data-act="lost-download">Download it</button>' + (goodOk ? '<button class="btn" data-act="lost-restore">Restore the copy from your last good visit (' + esc(stamp(rawGet(GOODAT)) || 'earlier') + ')</button>' : '') +
+    '<button class="btn danger" data-act="lost-delete">Delete the unreadable copy</button></div></section>';
+}
 function nudgeHtml(){
   return '<div class="banner warn" role="status"><strong>' + (S.lastSaved ? 'Your last TimeTracker.pdf was saved ' + esc(agoText(S.lastSaved)) + ', and your data has changed since.' : 'You have not saved a TimeTracker.pdf yet.') + '</strong> ' +
     'Browser storage can be cleared without warning, so a saved copy is your backup. <button class="btn sm primary" data-act="pdf-save">Save as PDF</button> <button class="btn sm" data-act="nudge-off">Not now</button></div>';
 }
-function download(bytes, name){
-  const url = URL.createObjectURL(new Blob([bytes], {type: 'application/pdf'}));
+function download(bytes, name, type){
+  const url = URL.createObjectURL(new Blob([bytes], {type: type || 'application/pdf'}));
   const a = document.createElement('a');
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -3968,6 +4403,12 @@ async function importFail(text){
 }
 async function importFile(file){
   if(!file || S.busy) return;
+  if(!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf'){      // not a PDF: a setup file if it looks like one
+    let head = '';
+    try{ head = await file.slice(0, 200).text(); }catch(e){ /* treated as not a setup file */ }
+    if(/^\s*(\{|```)/.test(head)) return importSetupFile(file);
+    return importFail('That file is not a PDF, and it does not look like a setup file either. Choose a TimeTracker.pdf, or a setup file an AI wrote for you.');
+  }
   if(!window.PDFLib) return importFail('The PDF library has not finished loading. Try again in a moment.');
   if(file.size > 60e6) return importFail('That file is too big to be a TimeTracker.pdf.');
   S.busy = true;
@@ -4037,6 +4478,80 @@ async function setupDialog(inc){
   return true;
 }
 
+async function restoreLastGood(){
+  const r = TC.openSaved(rawGet(GOOD) || '');
+  if(!r.ok){ S.flash = {level: 'bad', text: 'The earlier copy could not be opened either, so nothing was changed.'}; schedule(); return; }
+  if(S.model.modified){
+    const c = await ask('Restore the earlier copy?', '<p>This replaces what is in Time Counter now, including anything you entered since, with the copy from your last good visit.</p>', [CANCEL, {label: 'Restore', value: 'ok', kind: 'danger'}]);
+    if(c.value !== 'ok') return;
+  }
+  S.model = r.model; hist.undo.length = 0; hist.redo.length = 0;
+  S.week = null; S.ver = null; S.dt = null; S.ad = null; S.duty = null; S.openDuty = null;
+  S.rev++; persist(); S.lost = null; S.view = 'week';
+  S.flash = {level: 'ok', text: 'Restored the copy from your last good visit.'}; saveUi(); schedule();
+}
+
+
+/* ---------- setup from a file, or with an AI ---------- */
+async function copyText(text){
+  // the clipboard can wait forever on a permission prompt, so give it a moment and then use the older way
+  try{ if(navigator.clipboard && navigator.clipboard.writeText){ await Promise.race([navigator.clipboard.writeText(text), new Promise((_, no) => setTimeout(() => no(new Error('slow')), 1500))]); return true; } }catch(e){ /* fall through */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+  let ok = false; try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
+  ta.remove(); return ok;
+}
+async function copyInstructions(){
+  const ok = await copyText(TC.setupInstructions());
+  S.flash = ok ? {level: 'ok', text: 'Copied. Paste it into your AI assistant (ChatGPT, Claude, Gemini or similar) and answer its questions.'}
+               : {level: 'bad', text: 'Your browser would not copy it. Open “Read the instructions” below, select all of it, and copy it yourself.'};
+  schedule();
+}
+async function showSetupProblems(errors, label){
+  const shown = errors.slice(0, 30);
+  const r = await ask('That setup file has problems', '<p>Nothing was changed. These need fixing in ' + esc(label) + ':</p><ul class="plain">' +
+    shown.map(e => '<li>' + (e.path ? '<strong>' + esc(e.path) + '</strong>: ' : '') + esc(e.message) + '</li>').join('') + '</ul>' + (errors.length > shown.length ? '<p class="hint">And ' + (errors.length - shown.length) + ' more.</p>' : '') +
+    '<p class="hint">If an AI wrote the file, copy these problems and paste them back to it, and ask it for the whole corrected file.</p>',
+    [{label: 'Close', value: 'cancel'}, {label: 'Copy the problems for the AI', value: 'copy', kind: 'primary'}]);
+  if(r.value === 'copy'){
+    const ok = await copyText('Time Counter could not use the setup file. Please fix these problems and send the whole corrected file again, as one JSON code block:\n' + errors.map(e => '- ' + (e.path ? e.path + ': ' : '') + e.message).join('\n'));
+    S.flash = {level: ok ? 'ok' : 'bad', text: ok ? 'Copied. Paste it back to the AI.' : 'Your browser would not copy it.'}; schedule();
+  }
+}
+async function runSetupText(text, label){
+  const rd = TC.readSetupText(text);
+  const res = rd.ok ? TC.previewSetupFile(S.model, rd.file) : rd;
+  if(!res.ok) return showSetupProblems(res.errors, label);
+  if(!res.changes.length){ await ask('Nothing to change', '<p>' + esc(label) + ' is a good setup file, but it does not set anything.</p>', [{label: 'Close', value: 'cancel'}]); return; }
+  const r = await ask('Set up your year from ' + label + '?',
+    '<p>Time Counter checked every line. This is what it will set:</p><ul class="plain">' + res.changes.map(c => '<li><strong>' + esc(c.label) + ':</strong> ' + esc(c.text) + '</li>').join('') + '</ul>' +
+    '<p class="hint">Anything not listed stays as it is. A timetable in the file replaces the timetable you have now. Nothing changes until you confirm, and you can undo it.</p>',
+    [CANCEL, {label: 'Set up my year', value: 'ok', kind: 'primary'}]);
+  if(r.value !== 'ok') return;
+  S.week = null; S.ver = null; S.dt = null; S.ad = null;
+  const ok = commit(mm => { const x = TC.applySetupFile(mm, rd.file, {at: localToday()}); if(!x.ok) throw new Error(x.errors[0].message); },
+    'Your year is set up from ' + label + '. ' + res.changes.map(c => c.label + ': ' + c.text + '.').join(' '));
+  if(!ok) return;
+  S.flash.undo = true; S.aiText = '';
+  if(S.view !== 'setup'){ S.view = 'plan'; S.tab = 'preview'; saveUi(); }
+  schedule();
+}
+async function importSetupFile(file){
+  if(file.size > 1000000) return showSetupProblems([{path: '', message: 'That file is too big to be a setup file.'}], file.name);
+  let text = '';
+  try{ text = await file.text(); }catch(e){ return showSetupProblems([{path: '', message: 'That file could not be read.'}], file.name); }
+  return runSetupText(text, file.name);
+}
+function aiSetupHtml(){
+  return '<section class="card" id="aisetup"><h2 tabindex="-1">Set up from a file or with an AI</h2>' +
+    '<p>Instead of typing in your calendar, bell times, timetable and duties, give an AI assistant (ChatGPT, Claude, Gemini or similar) the instructions below. It asks you questions and then writes a <strong>setup file</strong>. Open the file here, check what it will change, and confirm.</p>' +
+    '<p class="hint">Time Counter itself sends nothing anywhere. What you tell the AI goes to that AI’s service, so leave student names out. Anything you do not tell it keeps its usual setting: the built-in 2026–27 calendar and the school’s usual bell times.</p>' +
+    '<div class="form-row"><button class="btn primary" data-act="ai-copy">Copy the instructions for an AI</button><button class="btn" data-act="setup-file-open">Open a setup file…</button></div>' +
+    '<details class="tv"><summary>Read the instructions</summary><textarea readonly rows="16" aria-label="Instructions for an AI assistant" data-key="ai:instructions">' + esc(TC.setupInstructions()) + '</textarea></details>' +
+    '<div class="form-row"><label class="wide">Or paste what the AI gave you<textarea rows="5" spellcheck="false" data-f="aiText" data-key="ai:paste" placeholder="Paste the setup file here">' + esc(S.aiText) + '</textarea></label></div>' +
+    '<p><button class="btn" data-act="ai-check"' + (S.aiText.trim() ? '' : ' disabled') + '>Check the pasted text</button></p></section>';
+}
+
 /* ---------- the Settings & data screen ---------- */
 function lastSavedText(){
   if(!S.lastSaved) return 'You have not saved a TimeTracker.pdf from this device yet.';
@@ -4085,7 +4600,7 @@ function dataHtml(){
     '<p class="hint">One file is both your printout and your backup. It carries all of your data inside it, so you can open it here again, fully editable. <strong>Every note you have written is in it.</strong> Check your notes before you send it to admin or anyone else.</p>' +
     '<div class="form-row"><button class="btn primary" data-act="pdf-save"' + (S.busy ? ' disabled' : '') + '>Save as PDF</button><button class="btn" data-act="pdf-open"' + (S.busy ? ' disabled' : '') + '>Open a TimeTracker.pdf…</button><button class="btn" data-act="setup-open">Run the guided setup</button></div>' +
     '<p class="hint">You can also drop a TimeTracker.pdf anywhere on this page. When you open one you choose between <strong>Replace everything</strong> and <strong>School setup only</strong>, which takes a colleague’s calendar, day types, bell times, Friday letters and shared duties and leaves the rest of your file alone. Printing a TimeTracker.pdf to a new PDF drops the data, so keep the original.</p></section>' +
-    pAbout(P) + timeTypesHtml() + newYearHtml() + startOverHtml();
+    aiSetupHtml() + pAbout(P) + timeTypesHtml() + newYearHtml() + recoveryHtml() + startOverHtml();
 }
 async function startNewYear(){
   const m = S.model, f = S.ny, res = TC.parseCalendar(m, f, f.text);
@@ -4151,6 +4666,17 @@ async function act(a, b){
   case 'rep': S.rep = d.rep; S.flash = null; saveUi(); schedule(); break;
   case 'print': window.print(); break;
   case 'log-clear': S.log = {from: '', to: '', type: 'all'}; schedule(); break;
+  case 'goto-ai': S.view = 'data'; S.flash = null; S.focusSel = '#aisetup h2'; schedule(); break;
+  case 'ai-copy': copyInstructions(); break;
+  case 'setup-file-open': setupInput.value = ''; setupInput.click(); break;
+  case 'ai-check': runSetupText(S.aiText, 'the pasted text'); break;
+  case 'lost-close': S.lost = null; schedule(); break;
+  case 'lost-download': { const raw = rawGet(BAD); if(raw) download(new TextEncoder().encode(raw), 'TimeCounter-unreadable-data.txt', 'text/plain'); break; }
+  case 'lost-restore': restoreLastGood(); break;
+  case 'lost-delete': {
+    const r = await ask('Delete the unreadable copy?', '<p>This removes the copy of your data that could not be opened. It cannot be undone.</p><p class="hint">Download it first if you might want it.</p>', [CANCEL, {label: 'Delete', value: 'ok', kind: 'danger'}]);
+    if(r.value === 'ok'){ try{ localStorage.removeItem(BAD); localStorage.removeItem(BADAT); }catch(e){} S.lost = null; schedule(); }
+    break; }
   case 'pdf-save': savePdf(); break;
   case 'pdf-open': fileInput.value = ''; fileInput.click(); break;
   case 'nudge-off': S.nudgeOff = true; schedule(); break;
@@ -4343,6 +4869,7 @@ function field(el){
   case 'rotStart': S.rot.start = el.value; break;
   case 'rotNid': S.rot.countNid = el.checked; break;
   case 'onlyUnset': S.onlyUnset = el.checked; schedule(); break;
+  case 'aiText': S.aiText = el.value; schedule(); break;
   case 'logf': S.log[d.prop] = el.value; schedule(); break;
   case 'ny': S.ny[d.prop] = el.value; schedule(); break;
   case 'ttNew': S.tt[d.prop] = el.value; break;
@@ -4392,6 +4919,11 @@ fileInput.type = 'file'; fileInput.accept = 'application/pdf,.pdf'; fileInput.id
 fileInput.setAttribute('aria-label', 'Open a TimeTracker.pdf');
 document.body.appendChild(fileInput);
 fileInput.addEventListener('change', () => { const f = fileInput.files[0]; fileInput.value = ''; importFile(f); });
+const setupInput = document.createElement('input');
+setupInput.type = 'file'; setupInput.accept = '.json,.txt,.md,application/json,text/plain'; setupInput.id = 'setupFile'; setupInput.hidden = true;
+setupInput.setAttribute('aria-label', 'Open a setup file');
+document.body.appendChild(setupInput);
+setupInput.addEventListener('change', () => { const f = setupInput.files[0]; setupInput.value = ''; if(f) importSetupFile(f); });
 const hasFiles = e => e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0;
 document.addEventListener('dragover', e => { if(hasFiles(e)) e.preventDefault(); });      // so a dropped PDF is not opened in place of this page
 document.addEventListener('drop', e => { if(!hasFiles(e)) return; e.preventDefault(); const f = e.dataTransfer.files[0]; if(f) importFile(f); });

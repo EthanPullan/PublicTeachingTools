@@ -37,6 +37,8 @@ Those files change upstream; this one only records what is different **here**.
 - `tools/time-counter/index.html` — **native to this repo.** Plans and records a
   school year of work time against the instructional and assignable limits. Being
   built in stages, and linked from the homepage.
+- `tools/time-counter/ai-setup-instructions.md` — the instructions a teacher gives an AI so it
+  can write a setup file. **Generated** from the tool by `tests/write-instructions.js`; don't edit it by hand.
 - `tools/time-counter/self-test.js` and `tools/time-counter/tests/` — the tests, kept
   out of `index.html` so the tool itself stays small. See *Time Counter — how it's
   built*.
@@ -150,6 +152,13 @@ and port it upstream by hand.
   the model for undo/redo, saves it to `teachingtools:timeCounter:model`, and rolls
   back if the change throws. Screens re-render from the model, and keep keyboard
   focus by control name or position, so keep new controls in the same DOM order.
+- **Saved data that cannot be opened is never written over.** At load, `TC.openSaved`
+  checks what browser storage holds (parse, upgrade, `checkModel`). If it fails, the raw
+  text is copied to `…:unreadable`, a blank year is shown with a banner (restore, download,
+  close), and the Recovery card on Settings & data stays until it is deleted on purpose.
+  Each visit that opens fine also keeps the data as it found it in `…:lastGood`, the
+  restore point. Anything that changes the shape of the model must keep `checkModel`
+  accepting every model the tool can write, or it will refuse people's own data.
 - **Plan changes apply from a date forward.** A timetable version is a full copy of
   the generic week; edits go to the version in force, never to earlier ones.
 - **Bell times are shared, the timetable is not.** A version holds named bell
@@ -259,6 +268,20 @@ and port it upstream by hand.
 - **The phone shows one day at a time** with CSS alone: every day is still rendered, and
   below 640 px only the `.sel` day's header and column are shown, with a `.daybar` of day
   buttons to switch. `selectedDay()` keeps the weekday when the week changes.
+- **A setup file an AI can write.** A teacher gives an AI `TC.setupInstructions()` (the
+  *Copy the instructions* button, also committed as `ai-setup-instructions.md`), answers its
+  questions, and gets one JSON file (`format: 'time-counter-setup'`): about, calendar,
+  extra day types, bell times, timetable, Friday letters, duties. The teacher opens the
+  file or pastes the text on Settings & data. `TC.applySetupFile` checks every line,
+  reports *all* the problems at once with their paths (so the teacher can paste them back
+  to the AI), and changes nothing unless every line passes; the dialog shows what it will set
+  and it is undoable. Names or ids both work for time types and day types; a timetable in the
+  file replaces the old one; what the file leaves out is left alone. It is deliberately a
+  second thing the tool accepts besides a TimeTracker.pdf, because an AI can write text but not
+  a PDF with a checksum. The instructions are generated from the same lists the importer
+  checks, and the example inside them is imported by a self-test, so they cannot drift. After
+  changing the format, any list of time types or day types, or the default bell times, run
+  `node tools/time-counter/tests/write-instructions.js` to refresh the committed copy.
 - **Settings & data** is its own view: Your TimeTracker.pdf, About you, Limits,
   Counting and display, Time types (rename or add; each stays in one category), a new
   year, and Start over. It used to be a Plan tab.

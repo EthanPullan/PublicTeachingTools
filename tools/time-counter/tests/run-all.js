@@ -7,7 +7,7 @@ const path = require('path');
 // Files that read a saved PDF with poppler or pypdf say so here, so a machine without them skips those two.
 const NEEDS = {'stage5-pdf.js': ['pdftotext', 'pdfdetach', 'pdfinfo', 'python3'], 'stage6-reports.js': ['pdftotext', 'pdfinfo']};
 const FILES = ['selftest.js', 'stage2-plan.js', 'stage2-plan-more.js', 'stage3-week.js', 'stage4-totals.js', 'stage5-pdf.js', 'stage6-reports.js',
-               'migration.js', 'phone-widths.js', 'phone-week.js', 'hostile-text.js'];
+               'migration.js', 'storage.js', 'setup-file.js', 'phone-widths.js', 'phone-week.js', 'hostile-text.js'];
 const want = process.argv.slice(2);
 const have = cmd => spawnSync('sh', ['-c', 'command -v ' + cmd]).status === 0;
 

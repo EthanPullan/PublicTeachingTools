@@ -1061,7 +1061,7 @@ check('E24', 'Extra: extra-curricular and conference time', t => {
   t.eq([r.totals.notCounted - base.notCounted, r.totals.assignable - base.assignable, r.totals.instructional - base.instructional], [60, 60, 0], 'an hour of each: volunteer time is not counted, assigned time is Assignable');
   // a save from before the change is upgraded, and a name somebody changed is left alone
   const old = JSON.parse(JSON.stringify(TC.newModel()));
-  old.timeTypes = old.timeTypes.filter(x => x.id !== 'extraAssigned'); const v = old.timeTypes.find(x => x.id === 'voluntary'); v.name = 'Voluntary'; v.includes = 'Clubs, coaching, robotics, unless admin assigns them';
+  old.timeTypes = old.timeTypes.filter(x => x.id !== 'extraAssigned'); const v = old.timeTypes.find(x => x.id === 'voluntary'); v.name = 'Voluntary'; v.includes = 'Clubs and coaching (the old wording)';
   const up = TC.migrate(JSON.parse(JSON.stringify(old)));
   t.eq([up.timeTypes.find(x => x.id === 'voluntary').name, up.timeTypes.find(x => x.id === 'extraAssigned').category, up.timeTypes.findIndex(x => x.id === 'extraAssigned') === up.timeTypes.findIndex(x => x.id === 'event') + 1], ['Extra-curricular volunteer', 'assignable', true], 'an older save gets the new name and the new type, next to School event');
   t.ok(!JSON.stringify(up.timeTypes).toLowerCase().includes('robotic'), 'and no longer mentions robotics');
@@ -1075,6 +1075,96 @@ check('E24', 'Extra: extra-curricular and conference time', t => {
   const cd = TC.resolveDay(c, '2026-10-20');
   t.eq([cd.dayTypeId, cd.totals.assignable, cd.totals.instructional, cd.totals.notCounted], ['conference', 480, 0, 0], 'eight hours of conferences on a conference day, evening included, are all Assignable');
   t.eq(TC.TIME_TYPES.find(x => x.id === 'event').category, 'assignable', 'School event is an Assignable time type');
+});
+
+check('E25', 'Extra: data kept in the browser that cannot be opened', t => {
+  const m = richModel(), raw = JSON.stringify(m);
+  const ok = TC.openSaved(raw);
+  t.eq([ok.ok, JSON.stringify(ok.model) === raw], [true, true], 'good saved data opens, exactly as it was');
+  const cut = TC.openSaved(raw.slice(0, 4000));
+  t.eq([cut.ok, cut.code, /cut off/.test(cut.reason)], [false, 'damaged', true], 'data that is cut off is refused, and the reason says so');
+  const noCal = JSON.parse(raw); delete noCal.calendar;
+  const r2 = TC.openSaved(JSON.stringify(noCal));
+  t.eq([r2.ok, r2.code, /calendar/.test(r2.reason)], [false, 'unreadable', true], 'data that is whole JSON but not a usable year is refused, naming the problem');
+  const newer = JSON.parse(raw); newer.version = 99;
+  t.eq([TC.openSaved(JSON.stringify(newer)).code, /newer version/.test(TC.openSaved(JSON.stringify(newer)).reason)], ['newer', true], 'data from a newer version is refused, and said to be newer');
+  t.eq([TC.openSaved('').ok, TC.openSaved('null').ok, TC.openSaved('{"__proto__": {}}').ok, TC.openSaved('[1,2]').ok], [false, false, false, false], 'empty text, null, a __proto__ key and an array are all refused');
+  const v1 = JSON.parse(raw); v1.version = 1; v1.versions.forEach(v => { Object.keys(v.days).forEach(id => { v.days[id].bells = (v.schedules[v.days[id].schedule] || {bells: []}).bells; delete v.days[id].schedule; }); delete v.schedules; });
+  t.eq(TC.openSaved(JSON.stringify(v1)).ok, true, 'an older layout still opens, and is upgraded');
+  t.eq(TC.readModel(raw).ok && TC.unpack(TC.pack(m, null)).ok, true, 'a saved file and browser storage use the same checks');
+});
+
+check('E26', 'Extra: the setup file an AI writes, and the instructions that make it', t => {
+  const ins = TC.setupInstructions();
+  t.ok(TC.TIME_TYPES.every(x => ins.indexOf(x.name) >= 0 && ins.indexOf('[' + x.id + ']') >= 0) && TC.DAY_TYPES.every(x => ins.indexOf(x.id + ' = ' + x.name) >= 0), 'the instructions list every time type (with its category) and every day type');
+  t.ok(ins.indexOf('08:05–08:56, 08:58–09:45') >= 0 && ins.indexOf('13:00–14:45') >= 0 && ins.indexOf('2026-08-26') >= 0, 'they give the default bell times, the Friday meeting and the built-in calendar, so a teacher at this school need not repeat them');
+  t.ok(!/\d{3}-\d{3}-\d{4}|@/.test(ins), 'and carry no phone number or email address');
+  const fenced = /```json\n([\s\S]*?)\n```/.exec(ins);
+  t.eq(JSON.parse(fenced[1]), TC.SETUP_EXAMPLE, 'the example in them is the example the tool is tested with');
+
+  // the example really is accepted, and does what it says
+  const m = TC.newModel(), r = TC.applySetupFile(m, TC.SETUP_EXAMPLE, {at: '2027-08-01'});
+  t.eq([r.ok, TC.checkModel(m), r.changes.map(c => c.label)], [true, null, ['About you', 'Calendar', 'Bell times', 'Timetable', 'Friday letters', 'Duties']], 'the example imports, and the year it makes passes the safety checks');
+  const v = m.versions[0], bellsMon = TC.bellsOf(v, 'mon'), p2 = bellsMon[1];
+  t.eq([m.settings.teacher, m.calendar.name, m.calendar.start, v.start, bellsMon.length, p2.id], ['Pat Teacher', '2027–28 school year', '2027-08-25', '2027-08-25', 4, 'p2'], 'name, calendar, the version start and bell times are set');
+  t.eq([v.timetable.mon.p2, v.timetable.tue.p2, v.timetable.mon.p4, v.timetable.friC.p1], [{type: 'class', name: 'Science 8'}, {type: 'prep', name: ''}, {type: 'supervision', name: 'Lunch supervision'}, {type: 'class', name: 'Math 8'}], 'a timetable line for several day types sets each of them, by period number');
+  t.eq([TC.bellsOf(v, 'friA').map(b => b.kind + ':' + b.id), TC.bellsOf(v, 'friA')[2].type], [['period:p1', 'period:p2', 'block:b1'], 'lunch'], 'a fixed block comes after the periods and keeps its time type');
+  t.eq([Object.keys(m.dayTypeOverrides).length, m.dayTypeOverrides['2027-09-03'], TC.missingDayTypeDates(m, 5).length], [39, 'friA', 0], 'the Friday letters are filled in from the start date, skipping days with no school');
+  t.eq(m.duties.map(d => d.name + ':' + d.rule.kind), ['Meeting:weekly', 'Staff meeting:nthWeekday', 'Bus duty:weekly'], 'duties are added beside the Friday meeting that is already there');
+  t.eq(m.log[m.log.length - 1].kind, 'setup-file', 'it is logged');
+  t.eq(TC.changeLog(m).some(x => x.kind === 'event' && /setup file/.test(x.what)), true, 'and shows in the change log');
+
+  // what the file leaves out is left alone, and a preview changes nothing
+  const keep = TC.newModel(); TC.setTimetable(keep.versions[0], 'mon', 'p1', {type: 'class', name: 'Mine'}); const snap = JSON.stringify(keep);
+  t.eq(TC.previewSetupFile(keep, {format: 'time-counter-setup', version: 1, about: {fte: 0.5}}).ok && JSON.stringify(keep) === snap, true, 'a preview changes nothing');
+  TC.applySetupFile(keep, {format: 'time-counter-setup', version: 1, about: {fte: 0.5}});
+  t.eq([keep.settings.fte, keep.versions[0].timetable.mon.p1.name, keep.calendar.id], [0.5, 'Mine', 'cbe-2026-27'], 'a file that only sets FTE changes only that: the timetable and the built-in calendar stay');
+  // with no bells in the file, the default eight periods are there to type into
+  const d = TC.newModel(); TC.applySetupFile(d, {format: 'time-counter-setup', version: 1, timetable: [{dayTypes: ['mon'], period: 8, type: 'prep'}, {dayTypes: ['mon'], period: 1, type: 'class', name: 'Math'}]});
+  t.eq([d.versions[0].timetable.mon.p8.type, d.versions[0].timetable.mon.p1.name], ['prep', 'Math'], 'with no bells in the file the default bell times are used');
+  // a timetable in a file replaces the old one; a duty with the same name is replaced, with its id kept
+  TC.applySetupFile(d, {format: 'time-counter-setup', version: 1, timetable: [{dayTypes: ['tue'], period: 1, type: 'class'}]});
+  t.eq([Object.keys(d.versions[0].timetable), d.versions[0].timetable.tue.p1.name], [['tue'], ''], 'a timetable in a file replaces the one before');
+  TC.applySetupFile(d, {format: 'time-counter-setup', version: 1, duties: [{name: 'meeting', type: 'Committee', start: '15:00', end: '16:00', repeat: {dayTypes: ['mon']}}]});
+  t.eq([d.duties.length, d.duties[0].id, d.duties[0].typeId, d.duties[0].shared], [1, 'friMeeting', 'committee', true], 'a duty with the same name is replaced, and keeps its id and whether it is shared');
+  // extra day types, and a rotation by dates
+  const c = TC.newModel(), rc = TC.applySetupFile(c, {format: 'time-counter-setup', version: 1, dayTypes: [{id: 'day1', name: 'Day 1'}, {id: 'day2', name: 'Day 2'}], defaultDayTypes: {fri: 'day1'}, fridayLetters: {dates: {'2026-09-04': 'Day 2'}},
+    bells: [{name: 'Cycle', dayTypes: ['day1', 'day2'], periods: [{start: '09:00', end: '10:00'}]}], timetable: [{dayTypes: ['Day 1', 'day2'], period: 1, type: 'Class'}]});
+  t.eq([rc.ok, c.dayTypes.map(x => x.id).slice(-2), c.dayTypeDefaults.weekday[5], c.dayTypeOverrides['2026-09-04'], c.versions[0].timetable.day2.p1.type], [true, ['day1', 'day2'], 'day1', 'day2', 'class'], 'a school with its own day types can add them, make one the default, and write letters by date (names work as well as ids)');
+
+  // wrong files are refused, line by line, and nothing changes
+  const bad = (file, base) => { const x = base || TC.newModel(), s0 = JSON.stringify(x), r = TC.applySetupFile(x, file); return {ok: r.ok, errs: r.errors || [], same: JSON.stringify(x) === s0}; };
+  const F = o => Object.assign({format: 'time-counter-setup', version: 1}, o);
+  const one = (file, re, msg, base) => { const b = bad(file, base); t.eq([b.ok, b.same, b.errs.some(e => re.test(e.path + ' ' + e.message))], [false, true, true], msg); };
+  one({format: 'other', version: 1}, /format/, 'a file of another format is refused');
+  one(F({timeTable: []}), /Unknown key .timeTable./, 'a misspelt key is refused rather than ignored');
+  one(F({timetable: [{dayTypes: ['mon'], period: 9, type: 'class'}]}), /Monday has 8 periods, so there is no period 9/, 'a period that does not exist is named, with how many there are');
+  one(F({timetable: [{dayTypes: ['mon'], period: 1, type: 'Teaching'}]}), /no time type called "Teaching".*Class/, 'an unknown time type lists the ones there are');
+  const all = bad(F({timeTable: [], timetable: [{dayTypes: ['mon'], period: 9, type: 'Teaching'}], bells: [{name: 'x', dayTypes: ['mon'], periods: [{start: '8:05 am', end: '08:56'}]}]}));
+  t.eq([all.ok, all.same, all.errs.length >= 3], [false, true, true], 'every problem is reported in one pass, so an AI can fix them all at once');
+  one(F({timetable: [{dayTypes: ['mon'], period: 1, type: 'class'}, {dayTypes: ['mon', 'tue'], period: 1, type: 'prep'}]}), /Monday period 1 is listed twice/, 'the same period listed twice is refused');
+  one(F({timetable: [{dayTypes: ['monday2'], period: 1, type: 'class'}]}), /no day type called "monday2"/, 'an unknown day type is refused');
+  one(F({bells: [{name: 'x', dayTypes: ['mon'], periods: [{start: '8:05 am', end: '08:56'}]}]}), /24-hour/, 'a time with am or pm is refused, with how to write it');
+  one(F({bells: [{name: 'x', dayTypes: ['mon'], periods: [{start: '08:00', end: '09:00'}, {start: '08:30', end: '09:30'}]}]}), /overlap/, 'bell times that overlap are refused');
+  one(F({bells: [{name: 'x', dayTypes: ['mon'], periods: [{start: '09:00', end: '08:00'}]}]}), /not after it starts/, 'a period that ends before it starts is refused');
+  one(F({bells: [{name: 'a', dayTypes: ['mon'], periods: [{start: '08:00', end: '09:00'}]}, {name: 'b', dayTypes: ['mon'], periods: [{start: '08:00', end: '09:00'}]}]}), /in two bell time entries/, 'a day type in two bell entries is refused');
+  one(F({calendar: {firstOperationalDay: '2027-02-30', firstStudentDay: '2027-09-01', lastStudentDay: '2028-06-01', lastOperationalDay: '2028-06-05', dates: []}}), /calendar\.firstOperationalDay.*needs a date/, 'a date that does not exist is refused, naming the field');
+  one(F({calendar: {firstOperationalDay: '2027-08-25', firstStudentDay: '2027-08-30', lastStudentDay: '2028-06-23', lastOperationalDay: '2028-06-28', dates: ['Labour Day 2027-09-06']}}), /calendar\.dates \(line 1\)/, 'a calendar line that is not in the format is refused, with its line');
+  one(F({duties: [{name: 'x', type: 'Meeting', start: '15:00', end: '16:00'}]}), /duties\[0\]\.repeat/, 'a duty with no repeat is refused');
+  one(F({duties: [{name: 'x', type: 'Meeting', start: '16:00', end: '15:00', repeat: {dayTypes: ['mon']}}]}), /not after it starts/, 'a duty that ends before it starts is refused');
+  one(F({fridayLetters: {dates: {'2030-01-04': 'friA'}}}), /not a date inside the school year/, 'a Friday letter outside the year is refused');
+  one(F({about: {fte: 3}}), /FTE is a number above 0/, 'an FTE above 1 is refused');
+  const used = TC.newModel(); TC.addBlock(used, '2026-10-06', {start: T('15:00'), end: T('15:30'), typeId: 'meeting', name: 'x'});
+  one(F({calendar: SETUP_CAL()}), /edits or confirmed weeks/, 'a new calendar is refused when the year already has edits', used);
+  const two = TC.newModel(); TC.ensureVersion(two, '2027-01-04');
+  one(F({timetable: [{dayTypes: ['mon'], period: 1, type: 'class'}]}), /timetable versions that start later/, 'a timetable is refused when the plan has a later version', two);
+  function SETUP_CAL(){ return TC.SETUP_EXAMPLE.calendar; }
+  // text from a paste or a file
+  const text = JSON.stringify(TC.SETUP_EXAMPLE, null, 2);
+  t.eq([TC.readSetupText(text).ok, TC.readSetupText('```json\n' + text + '\n```').ok, TC.readSetupText('Here you go!\n```json\n' + text + '\n```\nLet me know.').ok, TC.readSetupText('Sure. ' + text + ' Done.').ok], [true, true, true, true], 'the JSON is found whether it is bare, in a code block, or in a chat reply');
+  const broken = TC.readSetupText(text.replace('"fte": 1', '"fte": 1,'));
+  t.eq([broken.ok, /not valid JSON/.test(broken.errors[0].message)], [false, true], 'JSON with a stray comma is refused in plain words');
+  t.eq([TC.readSetupText('').ok, TC.readSetupText('{"__proto__": 1}').ok, TC.readSetupText('[1]').ok && TC.applySetupFile(TC.newModel(), TC.readSetupText('[1]').file).ok], [false, false, false], 'an empty paste, a __proto__ key and a list are refused');
 });
 
 await Promise.all(jobs);

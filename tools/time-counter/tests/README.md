@@ -21,7 +21,10 @@ NODE_PATH=$(npm root -g) node tools/time-counter/tests/run-all.js stage5     # j
 - `stage5-pdf.js` and `stage6-reports.js` read the saved PDFs with a second, unrelated reader
   (`pdftotext`, `pdfdetach`, `pdfinfo` from poppler, and Python's `pypdf`). Without them
   those two files are skipped.
+- `check-setup-file.js file.json` is not a test either: it checks a setup file the way the tool does and prints every problem, or what it would set.
+- `write-instructions.js` is not a test: it rewrites `ai-setup-instructions.md` from the tool. `setup-file.js` fails when that copy is out of date.
 - `selftest.js` runs `?test` in four time zones (Edmonton, UTC, Auckland, London) to show that
   a daylight-saving change never moves a block.
+- `fixtures/` holds two setup files that AI assistants really wrote from the instructions, for two different (made-up) teachers. `setup-file.js` checks that they still import.
 - The files are named for the build stage that introduced them. Scratch files go in the
   system temp folder, never in the repo.
