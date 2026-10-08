@@ -111,9 +111,11 @@ and port it upstream by hand.
 
 ## Time Counter — how it's built
 
-- **Engine first, screens later.** The first `<script>` is a DOM-free engine
-  exposed as `window.TimeCounter`; the second is the self-test. Opening the page
-  with `?test` runs every check and shows pass or fail for each.
+- **Engine first, screens later.** The scripts, in order: a DOM-free engine
+  (`window.TimeCounter`), the PDF layer (`window.TimeCounterPdf`), the screens, the
+  self-test, and last of all the inlined pdf-lib. Opening the page with `?test` runs
+  every check and shows pass or fail for each. The self-test is async because the PDF
+  checks wait for the library; `window.TimeCounterTest` is set when all have finished.
 - **Minutes and local dates only.** Dates are `YYYY-MM-DD` strings, times are
   minutes after midnight, totals are whole minutes (hours are for display). No
   `Date` with a time zone anywhere, so daylight-saving changes can't move a block.
@@ -180,8 +182,43 @@ and port it upstream by hand.
   counts school days, so the even-pace line to the limit is straight. Text uses text
   colours, never the series colour. Big numbers use proportional figures.
 - The calendar year view opens a date's week; its **Edit dates** switch changes a
-  date's status instead. Importing a later year's calendar comes with the *New year*
-  flow in the PDF stage, not as its own screen.
+  date's status instead.
+- **TimeTracker.pdf is the only export, and the only import.** `TimeCounterPdf.build`
+  draws a short report with pdf-lib's built-in fonts and attaches `timetracker-data.json`:
+  an envelope (`format: 'time-counter-save'`, `version`, a CRC-32 `checksum`) whose
+  `payload` is the whole model as text (`TC.pack`). The page swaps characters the fonts
+  cannot draw (arrows, emoji, many accents) through `printable()`; the attachment keeps
+  the exact text. `TimeCounterPdf.read` finds the attachment by scanning every embedded
+  file, so it survives other tools that rename it. A PDF printed to a new PDF has no
+  attachment, which is reported as "no Time Counter data found".
+- **Opening a file never changes anything until it is confirmed.** `TC.unpack` never
+  throws: it checks the format, version, checksum, then `TC.checkModel` (types, dates,
+  every reference, and a trial calculation) and returns a reason. The dialog shows the
+  file next to what is on the device, offers a save first, and either replaces
+  everything (`TC.replaceModel`, undoable) or brings in only the **school setup**
+  (`TC.applySetup`). When the envelope or model changes shape, bump `FILE_VERSION` or
+  the model `version` and add a step to `TC.migrate`.
+- **School setup is the shareable part:** calendar and its edits, day types, Friday
+  letters, the bell times *in force today* (put into the importer's version in force
+  today), and duties marked `shared`. The timetable, personal duties, edits, notes,
+  confirmed weeks and settings are never touched. `applySetup` computes the counts it
+  reports before it changes anything, so `previewSetup` (on a copy) and the real import
+  agree and a repeat import reports nothing.
+- **A new year** (`TC.newYear`) keeps day types, bell times, the timetable, time types
+  and settings, loads a new calendar, and clears Friday letters, edits, confirmed weeks,
+  dates on duties and the log. The calendar is typed in, one line per exception
+  (`2027-11-11 to 2027-11-13 closed Fall Break`), and `TC.parseCalendar` reports line
+  numbers and the day counts to check against the school's calendar. To start from last
+  year's file, open it first, then start the new year.
+- **`commit()` stamps `model.modified`** (shown as "last changed" when a file is opened).
+  Opening a file restores the file's own stamp, so it is not treated as unsaved work.
+  The backup reminder (a week since the last save, and changes since) uses it; the last
+  save time is a device fact, kept in the UI storage and not in the model.
+- **Settings & data** is its own view: Your TimeTracker.pdf, About you, Limits,
+  Counting and display, Time types (rename or add; each stays in one category), a new
+  year, and Start over. It used to be a Plan tab.
+- **pdf-lib 1.17.1 (MIT) is inlined unchanged** in the last `<script>`, so the page
+  works offline with no CDN. To upgrade it, replace that block and run the self-test.
 
 ## Commit / PR rules — IMPORTANT
 
