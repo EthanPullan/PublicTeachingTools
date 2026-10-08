@@ -51,12 +51,12 @@
   .card h2{margin:0;font-size:14.5px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .card h2 .n{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:2.2em;}
   .card h2 .t{flex:1;min-width:12em;}
-  .card ul{margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--muted);}
-  .card li{padding:2px 0 2px 20px;position:relative;}
-  .card li::before{content:"\2713";position:absolute;left:0;color:var(--ok);font-weight:700;}
-  .card li.fail{color:var(--ink);}
-  .card li.fail::before{content:"\2717";color:var(--danger);}
-  .card details summary{cursor:pointer;font-size:12px;color:var(--muted);margin-top:8px;}
+  .tcard ul{margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--muted);}
+  .tcard li{padding:2px 0 2px 20px;position:relative;}
+  .tcard li::before{content:"\2713";position:absolute;left:0;color:var(--ok);font-weight:700;}
+  .tcard li.fail{color:var(--ink);}
+  .tcard li.fail::before{content:"\2717";color:var(--danger);}
+  .tcard details summary{cursor:pointer;font-size:12px;color:var(--muted);margin-top:8px;}
   .card.pending{background:var(--panel-2);border-style:dashed;box-shadow:none;color:var(--muted);}
   .card.pending h2{color:var(--muted);}
   .card p{margin:8px 0 0;font-size:13px;color:var(--muted);}
@@ -102,8 +102,9 @@
   .slabel{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   .scard.k-i{border-top:3px solid var(--c-i);} .scard.k-a{border-top:3px solid var(--c-a);} .scard.k-n{border-top:3px solid var(--c-n);}
   .scard .dot{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font-size:9px;color:#fff;}
+  .scard .dot.tot{background:var(--board);}
   .scard.k-i .dot{background:var(--c-i);} .scard.k-a .dot{background:var(--c-a);} .scard.k-n .dot{background:var(--c-n);}
-  .big{font-size:24px;font-weight:700;letter-spacing:-.01em;margin:4px 0 6px;font-variant-numeric:tabular-nums;}
+  .big{font-size:24px;font-weight:700;letter-spacing:-.01em;margin:4px 0 6px;}
   .sub{font-size:12px;color:var(--muted);margin-top:5px;}
   .lvl{font-size:12px;font-weight:700;margin-top:3px;} .lvl.ok{color:var(--ok);} .lvl.near{color:var(--accent-deep);} .lvl.over{color:var(--danger);}
   .meter{height:8px;background:var(--panel-2);border-radius:6px;overflow:hidden;border:1px solid var(--line);}
@@ -234,6 +235,29 @@
   .cd.st-instructional{background:#fff;border-color:var(--board-line);} .cd.st-nid{background:var(--c-a-soft);border-color:var(--c-a);} .cd.st-convention{background:var(--c-i-soft);border-color:var(--c-i);} .cd.st-closed{background:var(--panel-2);color:var(--muted);}
   .cd.today{outline:2px solid var(--accent);outline-offset:1px;} .cd.miss{box-shadow:inset 0 -3px 0 var(--accent);} .cd.edited b{text-decoration:underline dotted;}
   .legend2{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;} .legend2 .cd{flex-direction:row;gap:6px;min-height:0;padding:3px 10px;cursor:default;font-size:12px;} .legend2 .cd b{font-size:11px;}
+
+  /* ---- Totals (stage 4) ---- */
+  .answer-card .answer{font-size:17px;font-weight:700;margin:6px 0 8px;} .answer.ok{color:var(--ok);} .answer.near{color:var(--accent-deep);} .answer.over{color:var(--danger);} .answer.info{color:var(--muted);}
+  .checks .ico.inf{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border:1.5px solid var(--muted);border-radius:50%;font-size:10px;font-weight:700;font-style:italic;color:var(--muted);flex:none;}
+  .checks li.over .ico{color:var(--danger);} .checks li.ok .ico{color:var(--ok);} .checks li.info .ico{color:var(--muted);}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px;margin:0 0 14px;}
+  .tile .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:10px 0 0;font-size:12.5px;} .tile .kv dt{color:var(--muted);} .tile .kv dd{margin:0;text-align:right;}
+  .tile .sub{margin-top:0;}
+  .sub3{font-size:13px;margin:16px 0 4px;}
+  .up{color:var(--ink);font-weight:700;} .dn{color:var(--muted);font-weight:700;}
+  .chfig{margin:14px 0 0;} .chfig figcaption{margin:0 0 4px;font-size:13.5px;}
+  .chwrap{position:relative;min-width:600px;max-width:760px;outline-offset:2px;} .chwrap svg{width:100%;height:auto;display:block;overflow:visible;}
+  .chwrap .gl{stroke:var(--line);stroke-width:1;} .chwrap .gl2{stroke:var(--line);stroke-width:1;}
+  .chwrap .ax{fill:var(--muted);font-size:11px;} .chwrap .lab{fill:var(--ink);font-size:12px;font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round;}
+  .chwrap .limit,.chlegend .limit{stroke:var(--ink);stroke-width:1.2;} .chwrap .pace,.chlegend .pace{stroke:var(--muted);stroke-width:1.5;}
+  .chwrap .xh{stroke:var(--ink);stroke-width:1;opacity:.45;} .chwrap .chhit{cursor:crosshair;}
+  .chtip{position:absolute;z-index:4;background:var(--ink);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 6px 16px rgba(20,40,33,.3);}
+  .chtip .tv1 strong{font-size:14px;} .chtip .tv1 span{opacity:.8;} .chtip .tv2{opacity:.85;margin-top:2px;}
+  .chlegend{display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 4px;font-size:12px;color:var(--muted);} .chlegend span{display:inline-flex;align-items:center;gap:6px;}
+  details.tv{margin:2px 0 10px;font-size:12.5px;} details.tv summary{cursor:pointer;color:var(--muted);} .tvscroll{max-height:280px;overflow:auto;}
+  details.wkdet summary{cursor:pointer;font-size:14px;} details.wkdet .tvscroll{margin-top:8px;max-height:420px;}
+  .tbl tr.cur th,.tbl tr.cur td{background:var(--accent-soft);}
+  ul.plain{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.6;} ul.plain li{margin:3px 0;}
 </style>
 </head>
 <body>
@@ -1354,6 +1378,95 @@ function limits(m){
           totalAssignableMinutes: totalAssignableHours == null ? null : totalAssignableHours * 60};
 }
 
+
+/* ---------- the tracked year: what has happened, and where it is heading ---------- */
+// Every date counts as resolveDay reports it: a confirmed week as it was confirmed,
+// any other week as the plan plus its edits. `pastUnconfirmed: 'plan'` instead counts
+// past weeks that are not confirmed as the plan alone, ignoring their edits.
+// "To date" is the weeks before the current one; the current week and everything
+// after it is the rest of the year.
+function trackYear(m, today, opts){
+  opts = opts || {};
+  const policy = opts.pastUnconfirmed === 'plan' ? 'plan' : 'edits';
+  const cal = m.calendar, cur = weekStart(today), KEYS = ['instructional', 'assignable', 'notCounted', 'unassigned'];
+  const blank = () => ({instructional: 0, assignable: 0, notCounted: 0, unassigned: 0, byType: {}});
+  const addDay = (acc, r) => { KEYS.forEach(k => { acc[k] += r.totals[k]; }); for(const t in r.byType) acc.byType[t] = (acc.byType[t] || 0) + r.byType[t]; };
+  const addAcc = (acc, o) => { KEYS.forEach(k => { acc[k] += o[k]; }); for(const t in o.byType) acc.byType[t] = (acc.byType[t] || 0) + o.byType[t]; };
+  const fin = o => { o.totalAssignable = o.instructional + o.assignable; o.total = o.totalAssignable + o.notCounted + o.unassigned; return o; };
+  const toDate = blank(), projected = blank(), plan = blank(), months = {}, weeks = [], ticks = [], seen = {};
+  let opsTotal = 0, opsGone = 0;
+  for(let ws = weekStart(cal.start); ws <= weekStart(cal.end); ws = addDays(ws, 7)){
+    const w = {ws, status: weekStatus(m, ws), past: ws < cur, current: ws === cur, operational: 0, totals: blank()};
+    for(let k = 0; k < 7; k++){
+      const d = addDays(ws, k);
+      if(d < cal.start || d > cal.end) continue;
+      const st = statusOf(m, d), p = resolveDay(m, d, {planOnly: true});
+      const a = (w.past && policy === 'plan' && !m.confirmed[ws]) ? p : resolveDay(m, d);
+      const mk = d.slice(0, 7), mo = months[mk] || (months[mk] = {key: mk, operational: 0, totals: blank()});
+      if(st.status !== 'closed'){
+        w.operational++; mo.operational++;
+        if(!seen[mk]){ seen[mk] = 1; ticks.push({key: mk, x: opsTotal + w.operational - 1}); }
+      }
+      addDay(w.totals, a); addDay(mo.totals, a); addDay(plan, p);
+    }
+    opsTotal += w.operational;
+    if(w.past){ opsGone += w.operational; addAcc(toDate, w.totals); }
+    addAcc(projected, w.totals);
+    fin(w.totals); weeks.push(w);
+  }
+  Object.keys(months).forEach(k => fin(months[k].totals));
+  let x = 0, ci = 0, ct = 0;
+  const series = [{x: 0, ws: null, i: 0, t: 0, past: true}];
+  weeks.forEach(w => { x += w.operational; ci += w.totals.instructional; ct += w.totals.totalAssignable; series.push({x, ws: w.ws, i: ci, t: ct, past: w.past}); });
+  return {today, policy, currentWeek: cur, weeks, months: Object.keys(months).sort().map(k => months[k]), ticks, series,
+          toDate: fin(toDate), projected: fin(projected), plan: fin(plan), operational: {total: opsTotal, gone: opsGone}, limits: limits(m)};
+}
+
+// The four figures the dashboard leads with, each with where it stands, where it is
+// heading and, if it has a limit, how close that is and what moved it.
+function dashboard(m, ty){
+  const lim = ty.limits, warn = m.settings.warnPercent / 100, types = typeMap(m);
+  const gone = ty.operational.total ? ty.operational.gone / ty.operational.total : 0;
+  const ok = !lim.error;
+  const defs = [
+    {key: 'instructional',   label: 'Instructional',         cats: {instructional: 1},                  limit: ok ? lim.instructionalMinutes : null},
+    {key: 'totalAssignable', label: 'Total assignable',      cats: {instructional: 1, assignable: 1},   limit: ok ? lim.totalAssignableMinutes : null, needsTypical: ok && lim.needsTypicalHours},
+    {key: 'assignable',      label: 'Assignable on its own', cats: {assignable: 1},                     limit: null},
+    {key: 'notCounted',      label: 'Not counted',           cats: {notCounted: 1},                     limit: null}
+  ];
+  const ids = {};
+  Object.keys(ty.projected.byType).concat(Object.keys(ty.plan.byType)).forEach(id => { ids[id] = 1; });
+  return defs.map(d => {
+    const toDate = ty.toDate[d.key], projected = ty.projected[d.key], plan = ty.plan[d.key];
+    const o = {key: d.key, label: d.label, toDate, projected, plan, drift: projected - plan, limit: d.limit, needsTypical: !!d.needsTypical, level: 'none', yearGone: gone};
+    if(d.limit != null){
+      o.headroom = d.limit - projected;
+      o.limitUsed = toDate / d.limit;
+      o.projectedShare = projected / d.limit;
+      o.ahead = o.limitUsed - gone;
+      o.level = (toDate > d.limit || projected > d.limit) ? 'over' : projected >= warn * d.limit ? 'near' : 'ok';
+      o.reason = toDate > d.limit ? 'actual' : projected > d.limit ? 'projected' : null;
+    }
+    o.causes = Object.keys(ids).map(id => {
+      const t = types[id], dl = (ty.projected.byType[id] || 0) - (ty.plan.byType[id] || 0);
+      return t && d.cats[t.category] && dl >= 15 ? {typeId: id, name: t.name, minutes: dl} : null;
+    }).filter(Boolean).sort((a, b) => b.minutes - a.minutes).slice(0, 3);
+    return o;
+  });
+}
+
+// Every time type that has any minutes, to date, projected and in the plan, with its drift.
+function typeRows(m, ty){
+  const types = typeMap(m), ids = {};
+  [ty.toDate, ty.projected, ty.plan].forEach(o => Object.keys(o.byType).forEach(id => { ids[id] = 1; }));
+  return Object.keys(ids).map(id => {
+    const t = types[id], r = {typeId: id, name: t ? t.name : id, category: t ? t.category : null,
+      toDate: ty.toDate.byType[id] || 0, projected: ty.projected.byType[id] || 0, plan: ty.plan.byType[id] || 0};
+    r.drift = r.projected - r.plan;
+    return r;
+  }).sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift) || b.projected - a.projected);
+}
+
 /* ---------- flags ---------- */
 function weekFlags(m, ws, opts){
   const out = [];
@@ -1381,6 +1494,7 @@ window.TimeCounter = {
   newModel, touch, statusOf, setCalendarDate, datesWhere, countDays,
   dayTypeFor, setDayType, addDayType, versionFor, ensureVersion, addPeriod, removePeriod, setTimetable, setArrivalDeparture,
   splitPeriod, mergePeriods, moveTimetableEntry, deleteVersion, setDayTypeArrivalDeparture,
+  trackYear, dashboard, typeRows,
   liveBlock, addBlock, editBlock, deleteBlock, resetBlock, splitBlock, ranOver, scheduledEnd, afterSchoolMeeting, swapDuty,
   setLeave, setDayTypeEdit, resetDay, resetWeek, describeChange, weekSummary, weekRange, weeksToReview, confirmedDrift,
   scheduleOf, bellsOf, dayTypesUsing, unlinkSchedule, linkSchedule, renameSchedule, updateBell, migrate,
@@ -1393,7 +1507,7 @@ window.TimeCounter = {
 
 <script>
 /* =====================================================================
-   Time Counter — the screens: This week, Calendar and Plan.
+   Time Counter — the screens: This week, Calendar, Totals and Plan.
    Opens by default; ?test shows the engine self-test instead.
    ===================================================================== */
 (function(){
@@ -1539,7 +1653,7 @@ const TABS = () => [['preview', 'Preview'], ['daytypes', 'Day types'], ['bells',
   ['rot', S.rotWd === 5 ? 'Friday letters' : WD[S.rotWd] + ' rotation'], ['limits', 'About you & limits']];
 
 const FOCUSABLE = 'input,select,button,textarea';
-const VIEWS = [['week', 'This week'], ['cal', 'Calendar'], ['plan', 'Plan']];
+const VIEWS = [['week', 'This week'], ['cal', 'Calendar'], ['totals', 'Totals'], ['plan', 'Plan']];
 function planHtml(){
   const P = preview();
   const panels = {preview: pPreview, daytypes: pDayTypes, bells: pBells, arrival: pArrival, duties: pDuties, rot: pRot, limits: pLimits};
@@ -1555,7 +1669,7 @@ function render(){
   const pos = inRoot ? Array.prototype.indexOf.call(root.querySelectorAll(FOCUSABLE), ae) : -1;
   if(!VIEWS.some(v => v[0] === S.view)) S.view = 'week';
   const flash = S.flash ? '<div class="banner ' + S.flash.level + '" role="status">' + esc(S.flash.text) + (S.flash.undo && hist.undo.length ? ' <button class="link" data-act="undo">Undo</button>' : '') + '</div>' : '';
-  const body = S.view === 'week' ? weekHtml() : S.view === 'cal' ? calHtml() : planHtml();
+  const body = S.view === 'week' ? weekHtml() : S.view === 'cal' ? calHtml() : S.view === 'totals' ? totalsHtml() : planHtml();
   root.innerHTML = '<nav class="views" aria-label="Views">' + VIEWS.map(v => '<button class="vbtn" data-act="view" data-view="' + v[0] + '"' + (S.view === v[0] ? ' aria-current="page"' : '') + '>' + v[1] + '</button>').join('') + '</nav>' + flash + body;
   pill.textContent = S.saved ? 'Saved on this device' : 'Not saved \u2014 storage is unavailable';
   pill.className = 'pill ' + (S.saved ? 'ok' : 'bad');
@@ -2072,7 +2186,7 @@ function weekFlagsHtml(ws, locked){
     if(f.code === 'missing-day-type' && !locked) act = '<button class="link" data-act="qa-daytype" data-date="' + f.date + '">Set the day type</button>';
     items.push('<li><span class="ico" aria-hidden="true">⚠</span><span class="txt"><strong>' + fmtDay(f.date) + ':</strong> ' + esc(f.msg) + '</span>' + act + '</li>');
   });
-  if(unassigned) items.push('<li><span class="ico" aria-hidden="true">ℹ</span><span class="txt">' + unassigned + ' min over ' + udays + ' day' + (udays === 1 ? '' : 's') + ' have no time type yet and are not counted. Set them under Plan → Bells &amp; timetable.</span></li>');
+  if(unassigned) items.push('<li class="info"><span class="ico inf" aria-hidden="true">i</span><span class="txt">' + unassigned + ' min over ' + udays + ' day' + (udays === 1 ? '' : 's') + ' have no time type yet and are not counted. Set them under Plan → Bells &amp; timetable.</span></li>');
   if(!items.length) return '';
   return '<section class="card"><h2>Needs a look</h2><ul class="checks">' + items.join('') + '</ul></section>';
 }
@@ -2511,6 +2625,241 @@ async function calDateDialog(date){
   const f = r.data;
   commit(mm => { TC.setCalendarDate(mm, date, f.status, f.label.trim()); TC.setDayType(mm, date, f.dt || null); }, fmtDay(date) + ' updated.');
 }
+
+
+/* =====================================================================
+   Totals (stage 4): will I stay within my limits this year?
+   ===================================================================== */
+const LVL_TXT = {ok: '✓ Within the limit', near: '⚠ Near the limit', over: '✗ Over the limit'};
+const pct0 = x => Math.round(x * 100) + '%';
+const nf0 = new Intl.NumberFormat('en-CA', {maximumFractionDigits: 0});
+const nf1 = new Intl.NumberFormat('en-CA', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+let tcache = null;
+function tracked(){
+  const td = localToday();
+  if(!tcache || tcache.rev !== S.rev || tcache.td !== td){
+    const ty = TC.trackYear(S.model, td);
+    tcache = {rev: S.rev, td, ty, dash: TC.dashboard(S.model, ty), rows: TC.typeRows(S.model, ty)};
+  }
+  return tcache;
+}
+const dashCat = k => (k === 'instructional' || k === 'assignable' || k === 'notCounted') ? k : null;
+const causeText = d => d.causes.map(x => '+' + hrs(x.minutes) + ' ' + x.name.toLowerCase()).join(' and ');
+const wkLabel = ws => 'Week of ' + fmtShort(ws);
+
+/* ---------- the four figures ---------- */
+function tileHtml(d){
+  const cat = dashCat(d.key);
+  let h = '<div class="scard tile' + (cat ? ' ' + KCLS[cat] : '') + '"><div class="slabel">' + (cat ? '<b class="dot" aria-hidden="true">' + CAT[cat].icon + '</b>' : '<b class="dot tot" aria-hidden="true">+</b>') + esc(d.label) + '</div>' +
+    '<div class="big">' + hrs(d.projected) + '</div><div class="sub">projected for the year</div>';
+  if(d.needsTypical){
+    h += '<div class="sub">The limit needs the school’s typical full-time hours (Plan → About you &amp; limits).</div>';
+  }else if(d.limit != null){
+    const pct = d.projectedShare * 100;
+    h += '<div class="meter ' + d.level + '" role="img" aria-label="' + pct.toFixed(0) + ' percent of the limit, projected"><span style="width:' + Math.min(100, pct).toFixed(1) + '%"></span></div><div class="lvl ' + d.level + '">' + LVL_TXT[d.level] + '</div>';
+  }
+  h += '<dl class="kv"><dt>To date</dt><dd>' + hrs(d.toDate) + '</dd>';
+  if(d.limit != null){
+    h += '<dt>Limit</dt><dd>' + hrs(d.limit) + '</dd><dt>Headroom</dt><dd>' + (d.headroom < 0 ? '<span class="neg">−' + hrs(-d.headroom) + ' (over)</span>' : hrs(d.headroom)) + '</dd>' +
+      '<dt>Pace</dt><dd>' + pct0(d.yearGone) + ' of the year, ' + pct0(d.limitUsed) + ' of the limit' + (d.ahead > 0.03 ? '<br><span class="warn-t">⚠ using it faster than the year goes</span>' : '') + '</dd>';
+  }else{
+    h += '<dt>In the plan</dt><dd>' + hrs(d.plan) + '</dd><dt>Against plan</dt><dd>' + (d.drift ? signed(d.drift) : 'no change') + '</dd>';
+  }
+  return h + '</dl></div>';
+}
+
+function answerHtml(c){
+  const m = S.model, items = [];
+  let worst = 'ok', any = false;
+  c.dash.forEach(d => {
+    if(d.limit == null) return;
+    any = true;
+    const cause = d.causes.length ? ' Mostly ' + causeText(d) + ' against your plan.' : '';
+    if(d.level === 'over'){
+      worst = 'over';
+      items.push(['over', '✗', d.label + ': ' + (d.reason === 'actual' ? hrs(d.toDate) + ' so far is already over the ' + hrs(d.limit) + ' limit.' : 'projected ' + hrs(d.projected) + ' is ' + hrs(-d.headroom) + ' over the ' + hrs(d.limit) + ' limit.') + cause]);
+    }else if(d.level === 'near'){
+      if(worst !== 'over') worst = 'near';
+      items.push(['near', '⚠', d.label + ': projected ' + hrs(d.projected) + ' reaches ' + pct0(d.projectedShare) + ' of the ' + hrs(d.limit) + ' limit (' + hrs(d.headroom) + ' headroom).' + cause]);
+    }else{
+      items.push(['ok', '✓', d.label + ': projected ' + hrs(d.projected) + ', ' + hrs(d.headroom) + ' under the ' + hrs(d.limit) + ' limit.' + cause]);
+    }
+  });
+  c.dash.filter(d => d.needsTypical).forEach(d => items.push(['info', 'ℹ', d.label + ': add the school’s typical full-time hours to see its limit (Plan → About you & limits).']));
+  const missing = TC.missingDayTypeDates(m).length;
+  if(missing) items.push(['near', '⚠', missing + ' school day' + (missing === 1 ? ' has' : 's have') + ' no day type, so ' + (missing === 1 ? 'it is' : 'they are') + ' left out and the totals are low (Plan → Friday letters).']);
+  const review = TC.weeksToReview(m, c.td).length;
+  if(review) items.push(['info', 'ℹ', review + ' past week' + (review === 1 ? ' is' : 's are') + ' not confirmed. They count with their edits until you confirm them (This week → the review list).']);
+  if(c.ty.projected.unassigned) items.push(['info', 'ℹ', hrs(c.ty.projected.unassigned) + ' of planned time has no time type yet and is not counted.']);
+  // A clean yes needs a finished plan: days with no day type, or time with no time type, are not counted yet.
+  const incomplete = missing > 0 || c.ty.projected.unassigned > 0;
+  const head = !any ? 'Your limits are not available yet.' : worst === 'over' ? 'Not at this rate.' : worst === 'near' ? 'Close: keep an eye on it.'
+    : incomplete ? 'So far so good, but the plan is not finished, so this is not the full picture yet.' : 'Yes: on this plan you stay within your limits.';
+  const cls = !any ? 'info' : (worst === 'ok' && incomplete) ? 'info' : worst;
+  return '<section class="card answer-card"><h2>Will I stay within my limits this year?</h2><p class="answer ' + cls + '">' + head + '</p><ul class="checks">' +
+    items.map(i => '<li class="' + i[0] + '"><span class="ico' + (i[0] === 'info' ? ' inf' : '') + '" aria-hidden="true">' + (i[0] === 'info' ? 'i' : i[1]) + '</span><span class="txt">' + esc(i[2]) + '</span></li>').join('') + '</ul>' +
+    '<p class="hint">Through the week before this one, ' + pct0(c.dash[0].yearGone) + ' of the school year’s ' + c.ty.operational.total + ' operational days have gone by. Warnings are amber at ' + m.settings.warnPercent + '% of a limit and red when the projection, or what has actually happened, goes over.</p></section>';
+}
+
+/* ---------- the cumulative charts ---------- */
+function niceAxis(maxHours){
+  const raw = Math.max(maxHours, 1) / 5, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(x => x >= raw);
+  return {step, max: Math.ceil(maxHours / step) * step};
+}
+function chartHtml(o){
+  // o: {id, title, color, vkey, limit, series, ticks, ops, gone}; values in minutes, drawn in hours
+  const W = 720, H = 300, L = 50, R = 84, Tp = 20, B = 34, pw = W - L - R, ph = H - Tp - B;
+  const pts = [];
+  o.series.forEach(p => { if(pts.length && pts[pts.length - 1].x === p.x) pts[pts.length - 1] = p; else pts.push(p); });
+  const hv = p => p[o.vkey] / 60, limH = o.limit != null ? o.limit / 60 : null;
+  const endH = hv(pts[pts.length - 1]);
+  const ax = niceAxis(Math.max(endH, limH || 0) * 1.04);
+  const X = x => L + (o.ops ? x / o.ops : 0) * pw, Y = v => Tp + ph - (v / ax.max) * ph;
+  const past = pts.filter(p => p.past), future = pts.filter(p => !p.past);
+  const lastPast = past[past.length - 1], first = future.length ? [lastPast].concat(future) : null;
+  const path = arr => arr.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(hv(p)).toFixed(1)).join(' ');
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" role="img" aria-label="' + esc(o.title + '. ' + hrs(lastPast[o.vkey]) + ' so far, ' + hrs(pts[pts.length - 1][o.vkey]) + ' projected at the end of the year' + (limH != null ? ', against a limit of ' + nf.format(limH) + ' h' : '') + '. The table view has the numbers.') + '">';
+  for(let v = 0; v <= ax.max + 1e-9; v += ax.step){
+    svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '" class="gl"/><text x="' + (L - 7) + '" y="' + (Y(v) + 4).toFixed(1) + '" class="ax" text-anchor="end">' + nf0.format(v) + '</text>';
+  }
+  svg += '<text x="' + L + '" y="11" class="ax">hours</text>';
+  o.ticks.forEach((t, i) => {
+    const crowded = o.ticks[i + 1] && X(o.ticks[i + 1].x) - X(t.x) < 30;      // a short month: leave its name off, the next one keeps the room
+    if(crowded) return void (svg += '<line x1="' + X(t.x).toFixed(1) + '" x2="' + X(t.x).toFixed(1) + '" y1="' + (Tp + ph) + '" y2="' + (Tp + ph + 4) + '" class="gl2"/>');
+    svg += '<line x1="' + X(t.x).toFixed(1) + '" x2="' + X(t.x).toFixed(1) + '" y1="' + (Tp + ph) + '" y2="' + (Tp + ph + 4) + '" class="gl2"/><text x="' + (X(t.x) + 2).toFixed(1) + '" y="' + (H - 12) + '" class="ax">' + MON[+t.key.slice(5) - 1] + '</text>';
+  });
+  svg += '<path d="' + path(pts) + ' L' + X(pts[pts.length - 1].x).toFixed(1) + ' ' + (Tp + ph) + ' L' + X(0) + ' ' + (Tp + ph) + ' Z" fill="' + o.color + '" opacity="0.08"/>';
+  if(limH != null){
+    svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(limH).toFixed(1) + '" y2="' + Y(limH).toFixed(1) + '" class="limit"/><text x="' + (L + 6) + '" y="' + (Y(limH) - 6).toFixed(1) + '" class="lab">Limit ' + nf.format(limH) + ' h</text>';
+    svg += '<line x1="' + X(0) + '" y1="' + Y(0) + '" x2="' + X(o.ops).toFixed(1) + '" y2="' + Y(limH).toFixed(1) + '" class="pace"/>';
+  }
+  svg += '<path d="' + path(past) + '" fill="none" stroke="' + o.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  if(first) svg += '<path d="' + path(first) + '" fill="none" stroke="' + o.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 5"/>';
+  const lastP = pts[pts.length - 1], tx = X(lastPast.x), ty = Y(hv(lastPast));
+  if(first){
+    svg += '<circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="5" fill="' + o.color + '" stroke="#fff" stroke-width="2"/>' +
+      '<text x="' + (tx > W * 0.6 ? tx - 9 : tx + 9).toFixed(1) + '" y="' + (ty + 22 < Tp + ph - 2 ? ty + 22 : ty - 12).toFixed(1) + '" class="lab" text-anchor="' + (tx > W * 0.6 ? 'end' : 'start') + '">So far ' + nf.format(hv(lastPast)) + ' h</text>';
+  }
+  svg += '<circle cx="' + X(lastP.x).toFixed(1) + '" cy="' + Y(hv(lastP)).toFixed(1) + '" r="5" fill="' + o.color + '" stroke="#fff" stroke-width="2"/>' +
+    '<text x="' + (X(lastP.x) + 10).toFixed(1) + '" y="' + (Y(hv(lastP)) + (limH != null && Math.abs(Y(hv(lastP)) - Y(limH)) < 12 ? 16 : 4)).toFixed(1) + '" class="lab">' + nf.format(hv(lastP)) + ' h</text>';
+  svg += '<line class="xh" x1="0" x2="0" y1="' + Tp + '" y2="' + (Tp + ph) + '" style="visibility:hidden"/><rect class="chhit" x="' + L + '" y="' + Tp + '" width="' + pw + '" height="' + ph + '" fill="transparent"/></svg>';
+  const data = pts.map(p => [Math.round(X(p.x) * 10) / 10, p.ws, Math.round(hv(p) * 100) / 100, p.past ? 1 : 0, limH != null && o.ops ? Math.round(limH * p.x / o.ops * 100) / 100 : null]);
+  const rows = o.series.slice(1).map((p, i) => '<tr><th scope="row">' + wkLabel(p.ws) + '</th><td class="num">' + hrs(p[o.vkey] - o.series[i][o.vkey]) + '</td><td class="num">' + hrs(p[o.vkey]) + '</td><td>' + (p.past ? 'So far' : 'Projected') + '</td>' + (limH != null ? '<td class="num">' + nf.format(limH * p.x / o.ops) + ' h</td>' : '') + '</tr>').join('');
+  return '<figure class="chfig"><figcaption><strong>' + esc(o.title) + '</strong>' + (limH != null ? ' <span class="muted">· limit ' + nf.format(limH) + ' h</span>' : ' <span class="muted">· no limit set yet</span>') + '</figcaption>' +
+    '<div class="scroll"><div class="chwrap" tabindex="0" data-pts="' + esc(JSON.stringify(data)) + '" data-name="' + esc(o.short) + '" data-i="' + (past.length - 1) + '" data-today="' + (past.length - 1) + '" aria-label="' + esc(o.title + ': use the left and right arrow keys to read each week') + '">' + svg + '<div class="chtip" role="status" hidden></div></div></div>' +
+    '<div class="chlegend"><span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" stroke="' + o.color + '" stroke-width="2" stroke-linecap="round"/></svg> So far</span><span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" stroke="' + o.color + '" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 5"/></svg> Projected</span>' +
+    (limH != null ? '<span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" class="pace"/></svg> Even pace to the limit</span><span><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" class="limit"/></svg> Limit</span>' : '') + '</div>' +
+    '<details class="tv"><summary>Table view</summary><div class="scroll tvscroll"><table class="tbl"><thead><tr><th>Week</th><th class="num">That week</th><th class="num">Running total</th><th>Basis</th>' + (limH != null ? '<th class="num">Even pace</th>' : '') + '</tr></thead><tbody>' + rows + '</tbody></table></div></details></figure>';
+}
+
+/* ---------- breakdown tables ---------- */
+const sgn = (min, empty) => min ? '<span class="' + (min > 0 ? 'up' : 'dn') + '">' + signed(min) + '</span>' : (empty || '—');
+function categoryDriftTable(c){
+  const ty = c.ty;
+  const row = (label, cat, k) => '<tr><th scope="row">' + label + (cat ? ' ' + catChip(cat) : '') + '</th><td class="num">' + hrs(ty.toDate[k]) + '</td><td class="num">' + hrs(ty.projected[k]) + '</td><td class="num">' + hrs(ty.plan[k]) + '</td><td class="num">' + sgn(ty.projected[k] - ty.plan[k]) + '</td></tr>';
+  return '<div class="scroll"><table class="tbl"><thead><tr><th>Category</th><th class="num">To date</th><th class="num">Projected year</th><th class="num">Plan</th><th class="num">Drift</th></tr></thead><tbody>' +
+    row('Instructional', 'instructional', 'instructional') + row('Assignable', 'assignable', 'assignable') + row('Total assignable', null, 'totalAssignable') + row('Not counted', 'notCounted', 'notCounted') + '</tbody></table></div>';
+}
+function typeTable(c){
+  const rows = c.rows;
+  if(!rows.length) return '<p class="hint">Nothing is planned or recorded yet.</p>';
+  return '<div class="scroll"><table class="tbl"><thead><tr><th>Time type</th><th>Category</th><th class="num">To date</th><th class="num">Projected year</th><th class="num">Plan</th><th class="num">Drift</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><th scope="row">' + esc(r.name) + '</th><td>' + catChip(r.category) + '</td><td class="num">' + hrs(r.toDate) + '</td><td class="num">' + hrs(r.projected) + '</td><td class="num">' + hrs(r.plan) + '</td><td class="num">' + sgn(r.drift) + '</td></tr>').join('') + '</tbody></table></div>' +
+    '<p class="hint">Ordered by how far each has moved from the plan. Time types are the line items on the Local 38 calculator.</p>';
+}
+function monthTable(c){
+  const anyU = c.ty.months.some(x => x.totals.unassigned);
+  return '<div class="scroll"><table class="tbl"><thead><tr><th>Month</th><th class="num">School days</th><th class="num">Instructional</th><th class="num">Assignable</th><th class="num">Total assignable</th><th class="num">Not counted</th>' + (anyU ? '<th class="num">No type</th>' : '') + '</tr></thead><tbody>' +
+    c.ty.months.map(x => '<tr><th scope="row">' + MONTH_NAMES[+x.key.slice(5) - 1] + ' ' + x.key.slice(0, 4) + '</th><td class="num">' + x.operational + '</td><td class="num">' + hrs(x.totals.instructional) + '</td><td class="num">' + hrs(x.totals.assignable) + '</td><td class="num">' + hrs(x.totals.totalAssignable) + '</td><td class="num">' + hrs(x.totals.notCounted) + '</td>' + (anyU ? '<td class="num">' + hrs(x.totals.unassigned) + '</td>' : '') + '</tr>').join('') +
+    '<tr class="total"><th scope="row">Year</th><td class="num">' + c.ty.operational.total + '</td><td class="num">' + hrs(c.ty.projected.instructional) + '</td><td class="num">' + hrs(c.ty.projected.assignable) + '</td><td class="num">' + hrs(c.ty.projected.totalAssignable) + '</td><td class="num">' + hrs(c.ty.projected.notCounted) + '</td>' + (anyU ? '<td class="num">' + hrs(c.ty.projected.unassigned) + '</td>' : '') + '</tr></tbody></table></div>';
+}
+function weekTable(c){
+  let ci = 0, ct = 0;
+  const rows = c.ty.weeks.map(w => {
+    ci += w.totals.instructional; ct += w.totals.totalAssignable;
+    const st = w.status === 'confirmed' ? 'Confirmed' : w.status === 'edited' ? 'Edited' : 'Planned';
+    const review = w.past && w.operational && w.status !== 'confirmed';
+    return '<tr' + (w.current ? ' class="cur"' : '') + '><th scope="row">' + wkLabel(w.ws) + (w.current ? ' <span class="chip c-u">this week</span>' : '') + '</th><td>' + st + (review ? ' · <span class="warn-t">to review</span>' : '') + '</td><td class="num">' + hrs(w.totals.instructional) + '</td><td class="num">' + hrs(w.totals.assignable) + '</td><td class="num">' + hrs(w.totals.totalAssignable) + '</td><td class="num">' + hrs(w.totals.notCounted) + '</td><td class="num">' + hrs(ci) + '</td><td class="num">' + hrs(ct) + '</td></tr>';
+  }).join('');
+  return '<div class="scroll tvscroll"><table class="tbl"><thead><tr><th>Week</th><th>Status</th><th class="num">Instructional</th><th class="num">Assignable</th><th class="num">Total assignable</th><th class="num">Not counted</th><th class="num">Running instructional</th><th class="num">Running total assignable</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+function notCountedLog(c){
+  const rows = c.rows.filter(r => r.category === 'notCounted');
+  const weeks = c.ty.weeks.filter(w => w.past && w.operational > 0).length;
+  if(!rows.length) return '<p class="hint">No Prep, marking, reporting or other Not counted time is planned or recorded yet. Add blocks on This week to keep a record.</p>';
+  return '<div class="scroll"><table class="tbl"><thead><tr><th>Time type</th><th class="num">To date</th><th class="num">Projected year</th><th class="num">Average per school week to date</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><th scope="row">' + esc(r.name) + '</th><td class="num">' + hrs(r.toDate) + '</td><td class="num">' + hrs(r.projected) + '</td><td class="num">' + (weeks ? hrs(r.toDate / weeks) : '—') + '</td></tr>').join('') +
+    '<tr class="total"><th scope="row">All Not counted</th><td class="num">' + hrs(c.ty.toDate.notCounted) + '</td><td class="num">' + hrs(c.ty.projected.notCounted) + '</td><td class="num">' + (weeks ? hrs(c.ty.toDate.notCounted / weeks) : '—') + '</td></tr></tbody></table></div>';
+}
+
+function totalsHtml(){
+  const c = tracked(), ty = c.ty;
+  const d = k => c.dash.find(x => x.key === k);
+  let h = answerHtml(c);
+  h += '<div class="tiles">' + c.dash.map(tileHtml).join('') + '</div>';
+  h += '<section class="card"><h2>Running totals</h2><p class="hint">What has been counted so far and where the year is heading, against an even pace to each limit. The time axis counts school days, so a break does not stretch it.</p>' +
+    chartHtml({id: 'i', title: 'Instructional hours, running total', short: 'Instructional', color: '#2f6f9f', vkey: 'i', limit: d('instructional').limit, series: ty.series, ticks: ty.ticks, ops: ty.operational.total, gone: ty.operational.gone}) +
+    chartHtml({id: 't', title: 'Total assignable hours, running total', short: 'Total assignable', color: '#1f3d35', vkey: 't', limit: d('totalAssignable').limit, series: ty.series, ticks: ty.ticks, ops: ty.operational.total, gone: ty.operational.gone}) + '</section>';
+  h += '<section class="card"><h2>How far the year has moved from the plan</h2><p class="hint">The plan is your generic week. Drift is what edits, confirmed weeks and later plan changes have added or taken away.</p>' + categoryDriftTable(c) + '<h3 class="sub3">By time type</h3>' + typeTable(c) + '</section>';
+  h += '<section class="card"><h2>By month</h2>' + monthTable(c) + '</section>';
+  h += '<details class="card wkdet"><summary><strong>By week</strong> <span class="muted">· ' + ty.weeks.length + ' weeks, with the running totals</span></summary>' + weekTable(c) + '</details>';
+  h += '<section class="card"><h2>Not counted: the record</h2><p class="hint">Prep, marking, reporting and the like count toward neither limit. This is the record of how much of it there is, if workload ever needs raising with admin or Local 38. Voluntary time becomes Assignable only when admin assigns it a time and place.</p>' + notCountedLog(c) + '</section>';
+  h += '<section class="card"><h2>How this is counted</h2><ul class="plain"><li><strong>To date</strong> is the weeks before this one: confirmed weeks as confirmed, and past weeks you have not confirmed with their edits' + (TC.weeksToReview(S.model, c.td).length ? ' (' + TC.weeksToReview(S.model, c.td).length + ' to review)' : '') + '.</li>' +
+    '<li><strong>Projected year end</strong> is that plus this week and every later date as planned, including edits already entered.</li>' +
+    '<li><strong>Headroom</strong> is the limit minus the projection. <strong>Pace</strong> compares the share of school days gone by with the share of the limit used.</li>' +
+    '<li>Both limits scale with FTE (now ' + S.model.settings.fte + '). Sick and personal leave days keep their time, and each Teachers’ Convention day counts a fixed 6 h.</li></ul></section>';
+  return h;
+}
+
+/* ---------- reading a chart: crosshair and tooltip ---------- */
+function chartShow(wrap, i){
+  const pts = JSON.parse(wrap.dataset.pts), p = pts[i];
+  if(!p) return;
+  wrap.dataset.i = i;
+  const svg = wrap.querySelector('svg'), vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect();
+  const line = wrap.querySelector('.xh');
+  line.setAttribute('x1', p[0]); line.setAttribute('x2', p[0]); line.style.visibility = 'visible';
+  const tip = wrap.querySelector('.chtip');
+  tip.textContent = '';
+  const v = document.createElement('div'); v.className = 'tv1';
+  const b = document.createElement('strong'); b.textContent = nf.format(p[2]) + ' h';
+  const sp = document.createElement('span'); sp.textContent = ' ' + wrap.dataset.name.toLowerCase() + ', running total';
+  v.appendChild(b); v.appendChild(sp); tip.appendChild(v);
+  const rows = [p[1] ? wkLabel(p[1]) + ' · ' + (p[3] ? 'so far' : 'projected') : 'Start of the year'];
+  if(p[4] != null) rows.push('Even pace: ' + nf.format(p[4]) + ' h');
+  rows.forEach(t => { const d = document.createElement('div'); d.className = 'tv2'; d.textContent = t; tip.appendChild(d); });
+  tip.hidden = false;
+  const left = p[0] / vb.width * r.width, flip = left > r.width - 190;
+  tip.style.left = (flip ? left - tip.offsetWidth - 12 : left + 12) + 'px';
+  tip.style.top = '24px';
+}
+function chartHide(wrap){
+  const line = wrap.querySelector('.xh'), tip = wrap.querySelector('.chtip');
+  if(line) line.style.visibility = 'hidden';
+  if(tip) tip.hidden = true;
+}
+document.addEventListener('pointermove', e => {
+  const hit = e.target.closest && e.target.closest('.chhit');
+  document.querySelectorAll('.chwrap').forEach(w => { if(!hit || !w.contains(hit)) if(w !== document.activeElement) chartHide(w); });
+  if(!hit) return;
+  const wrap = hit.closest('.chwrap'), svg = wrap.querySelector('svg'), vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * vb.width, pts = JSON.parse(wrap.dataset.pts);
+  let best = 0;
+  pts.forEach((p, i) => { if(Math.abs(p[0] - x) < Math.abs(pts[best][0] - x)) best = i; });
+  chartShow(wrap, best);
+});
+root.addEventListener('focusin', e => { const w = e.target.closest && e.target.closest('.chwrap'); if(w && e.target === w){ w.dataset.i = w.dataset.today; chartShow(w, +w.dataset.today); } });
+root.addEventListener('focusout', e => { const w = e.target.closest && e.target.closest('.chwrap'); if(w && e.target === w) chartHide(w); });
+root.addEventListener('keydown', e => {
+  const w = e.target.closest && e.target.closest('.chwrap');
+  if(!w || e.target !== w) return;
+  const n = JSON.parse(w.dataset.pts).length;
+  let i = +w.dataset.i;
+  if(e.key === 'ArrowLeft') i = Math.max(0, i - 1); else if(e.key === 'ArrowRight') i = Math.min(n - 1, i + 1);
+  else if(e.key === 'Home') i = 0; else if(e.key === 'End') i = n - 1; else return;
+  e.preventDefault(); chartShow(w, i);
+});
 
 /* =====================================================================
    Actions
@@ -3406,6 +3755,66 @@ check('E14', 'Extra: the weeks to review', t => {
   t.ok(TC.weeksToReview(m, '2027-09-01').every(x => x.ws <= '2027-06-28'), 'and nothing past the end of the year is listed');
 });
 
+check('E15', 'Extra: the tracked year', t => {
+  const m = withClasses(), today = '2026-10-08';
+  const ty = TC.trackYear(m, today);
+  t.eq([ty.currentWeek, ty.operational], ['2026-10-05', {total:196, gone:26}], 'on Oct 8 the current week starts Oct 5, and 26 of 196 school days are in the weeks before it');
+  const through = TC.sumRange(m, '2026-08-24', '2026-10-04');
+  t.eq([ty.toDate.instructional, ty.toDate.assignable, ty.toDate.notCounted], [through.instructional, through.assignable, through.notCounted], '“to date” is the weeks before this one');
+  const y = TC.yearTotals(m), py = TC.yearTotals(m, {planOnly:true});
+  t.eq([ty.projected.instructional, ty.projected.assignable, ty.plan.instructional, ty.plan.assignable], [y.instructional, y.assignable, py.instructional, py.assignable], 'the projected year and the plan match the plain year totals');
+  t.eq([ty.weeks.reduce((n, w) => n + w.totals.instructional, 0), ty.months.reduce((n, x) => n + x.totals.instructional, 0), ty.weeks.length, ty.months.length], [y.instructional, y.instructional, 45, 11], 'the weeks (45) and months (11) each add up to the year');
+  const last = ty.series[ty.series.length - 1];
+  t.eq([last.x, last.i, last.t], [196, y.instructional, y.totalAssignable], 'the running totals end at the projected year');
+  t.eq([ty.series.find(x => x.ws === '2026-09-28').past, ty.series.find(x => x.ws === '2026-10-05').past], [true, false], 'weeks before this one are “so far”; this week on is projected');
+  t.eq([ty.ticks[0], ty.ticks[1], ty.ticks.length], [{key:'2026-08', x:0}, {key:'2026-09', x:4}, 11], 'month ticks sit at the first school day of each month');
+  // an edit in a past week that is not confirmed
+  TC.afterSchoolMeeting(m, '2026-09-08', {name:'Grad', minutes:45});
+  const withEdits = TC.trackYear(m, today), planned = TC.trackYear(m, today, {pastUnconfirmed:'plan'});
+  t.eq([withEdits.toDate.assignable - ty.toDate.assignable, planned.toDate.assignable - ty.toDate.assignable], [45, 0], 'a past, unconfirmed week counts with its edits (and as the plan alone if asked)');
+  t.eq(planned.projected.assignable - ty.projected.assignable, 0, 'under that choice its edits are left out of the projection too');
+  TC.confirmWeek(m, '2026-09-07');
+  t.eq(TC.trackYear(m, today, {pastUnconfirmed:'plan'}).toDate.assignable - ty.toDate.assignable, 45, 'once confirmed, the edits count either way');
+  TC.afterSchoolMeeting(m, '2026-11-10', {name:'Later', minutes:30});
+  const fut = TC.trackYear(m, today);
+  t.eq([fut.projected.assignable - withEdits.projected.assignable, fut.toDate.assignable - withEdits.toDate.assignable], [30, 0], 'a future edit is in the projection, not in “to date”');
+  const early = TC.trackYear(m, '2026-08-01'), late = TC.trackYear(m, '2027-07-15');
+  t.eq([early.toDate.total, early.operational.gone, late.operational.gone, late.toDate.instructional === late.projected.instructional], [0, 0, 196, true], 'before the year nothing is to date; after it everything is');
+});
+
+check('E16', 'Extra: the dashboard', t => {
+  const m = withClasses(), today = '2026-10-08';
+  const make = () => { const ty = TC.trackYear(m, today); return {ty, d: TC.dashboard(m, ty)}; };
+  let {ty, d} = make();
+  const by = k => d.find(x => x.key === k);
+  t.eq(d.map(x => x.key), ['instructional', 'totalAssignable', 'assignable', 'notCounted'], 'four totals: Instructional, Total assignable, Assignable on its own, Not counted');
+  t.eq([by('instructional').limit, by('totalAssignable').limit, by('assignable').limit, by('notCounted').level], [916 * 60, 1200 * 60, null, 'none'], 'the first two have limits; the others have none');
+  t.eq([by('instructional').level, by('instructional').headroom], ['ok', 916 * 60 - ty.projected.instructional], 'headroom is the limit minus the projection');
+  t.ok(Math.abs(by('instructional').yearGone - 26 / 196) < 1e-9 && Math.abs(by('instructional').limitUsed - ty.toDate.instructional / (916 * 60)) < 1e-12, 'pace compares the share of the year gone (26 of 196 days) with the share of the limit used');
+  const proj = ty.projected.instructional / 60, set = h => { m.settings.limits.instructionalHours = h; return make(); };
+  ({d} = set(proj / 0.96)); t.eq([by('instructional').level, by('instructional').reason], ['near', null], 'a projection at 96% of the limit is amber (the warning is at 95%)');
+  ({d} = set(proj - 1)); t.eq([by('instructional').level, by('instructional').reason], ['over', 'projected'], 'a projection over the limit is red');
+  ({d} = set(ty.toDate.instructional / 60 - 1)); t.eq([by('instructional').level, by('instructional').reason], ['over', 'actual'], 'so is actual time already over it');
+  set(916);
+  // what moved it: coverage added to a Tuesday Prep (one past, two to come)
+  TC.setTimetable(m.versions[0], 'tue', 'p4', {type:'prep', name:''});
+  const base = make().ty;
+  ['2026-09-08', '2026-11-03', '2026-11-10'].forEach(dt => TC.coverClass(m, dt, 'p4', {whose:'a colleague'}));
+  ({ty, d} = make());
+  t.eq([by('instructional').drift, by('instructional').causes], [141, [{typeId:'coverage', name:'Coverage', minutes:141}]], 'Coverage explains +141 min of Instructional against the plan');
+  t.eq([by('totalAssignable').causes.length, by('notCounted').causes.length, by('notCounted').drift], [1, 0, -141 + 0], 'it shows under Total assignable too, and Not counted drifts down by the Prep it replaced');
+  const rows = TC.typeRows(m, ty), cov = rows.find(r => r.typeId === 'coverage'), prep = rows.find(r => r.typeId === 'prep');
+  t.eq([cov.toDate, cov.projected, cov.plan, cov.drift], [47, 141, 0, 141], 'by time type: Coverage 47 min to date, 141 projected, 0 planned');
+  t.eq([prep.drift, rows[0].typeId === 'coverage' || rows[0].typeId === 'prep'], [-141, true], 'and the rows are ordered by how far each has moved');
+  // limits that are not known yet
+  m.settings.fte = 0.5;
+  ({d} = make());
+  t.eq([by('instructional').limit, by('totalAssignable').needsTypical, by('totalAssignable').level], [458 * 60, true, 'none'], 'at 0.5 FTE the instructional limit is 458 h, and the total limit waits for the typical hours');
+  m.settings.fte = 2;
+  ({d} = make());
+  t.eq([by('instructional').limit, by('instructional').level], [null, 'none'], 'an invalid FTE gives no limits rather than wrong ones');
+});
+
 pending(14, 'Import a colleague’s TimeTracker.pdf as School setup only', 'stage 5');
 pending(18, 'Save as PDF, then open that PDF in a fresh browser', 'stage 5');
 pending(19, 'Import a PDF that was printed to a new PDF', 'stage 5');
@@ -3418,12 +3827,12 @@ const ran = results.filter(r => !r.pending), passed = ran.filter(r => r.pass);
 let html = '';
 results.forEach(r => {
   if(r.pending){
-    html += '<section class="card pending"><h2><span class="n">' + r.n + '</span><span class="t">' + esc(r.title) +
+    html += '<section class="card tcard pending"><h2><span class="n">' + r.n + '</span><span class="t">' + esc(r.title) +
             '</span><span class="pill">not yet — ' + r.pending + '</span></h2></section>';
     return;
   }
   const bad = r.asserts.filter(a => !a.pass);
-  html += '<section class="card" data-check="' + r.n + '"><h2><span class="n">' + r.n + '</span><span class="t">' + esc(r.title) +
+  html += '<section class="card tcard" data-check="' + r.n + '"><h2><span class="n">' + r.n + '</span><span class="t">' + esc(r.title) +
           '</span><span class="pill ' + (r.pass ? 'ok' : 'bad') + '">' + (r.pass ? '✓ pass' : '✗ fail') + ' · ' +
           (r.asserts.length - bad.length) + '/' + r.asserts.length + '</span></h2>';
   if(bad.length) html += '<ul>' + bad.map(a => '<li class="fail">' + esc(a.msg) + '</li>').join('') + '</ul>';

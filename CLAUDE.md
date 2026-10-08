@@ -155,6 +155,23 @@ and port it upstream by hand.
   block, its top or bottom edge, or a time type from the palette. Touch and keyboard:
   press a block, an empty slot or a palette item to open the same form. Anything a
   drag can do, a form can do.
+- **Totals read one tracked year** (`TC.trackYear`). Every date counts as `resolveDay`
+  reports it, so a confirmed week counts as confirmed and any other week as the plan
+  plus its edits. "To date" is the weeks *before the current one*; the current week
+  and everything after it is the rest of the projection. Past weeks that are not
+  confirmed count **with their edits** (a deliberate choice: an unconfirmed week must
+  not silently drop what was recorded). `trackYear(m, today, {pastUnconfirmed: 'plan'})`
+  counts them as the plan alone, if that is ever wanted. `TC.dashboard` turns it into
+  the four figures, levels (amber at the warning % of a limit, red when the
+  projection *or* actual time is over) and the time types that moved it.
+- **The headline is only a clean "Yes" when the plan is finished.** Days with no day
+  type, or time with no time type, are not counted, so with either it says the plan is
+  not finished rather than showing green.
+- **Charts are hand-built inline SVG** (no library): one series per chart, a 2px line
+  (solid so far, dashed projected), halo-backed direct labels, a crosshair and tooltip
+  that also work from the keyboard, and a table view for every chart. The time axis
+  counts school days, so the even-pace line to the limit is straight. Text uses text
+  colours, never the series colour. Big numbers use proportional figures.
 - The calendar year view opens a date's week; its **Edit dates** switch changes a
   date's status instead. Importing a later year's calendar comes with the *New year*
   flow in the PDF stage, not as its own screen.
