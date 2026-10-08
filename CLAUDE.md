@@ -36,7 +36,7 @@ Those files change upstream; this one only records what is different **here**.
   Printable blank grids of every common kind.
 - `tools/time-counter/index.html` — **native to this repo.** Plans and records a
   school year of work time against the instructional and assignable limits. Being
-  built in stages; not yet linked from the homepage.
+  built in stages, and linked from the homepage.
 - `.nojekyll` — serve files as-is on GitHub Pages.
 
 ## The EAL tool has forked from upstream
