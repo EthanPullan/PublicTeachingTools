@@ -469,6 +469,7 @@ const TIME_TYPES = [
   {id:'convention',       name:'Teachers’ Convention',    category:'assignable',    includes:'Fixed at 6 h per full day', fixedMinutesPerDay:360},
   {id:'event',            name:'School event',                 category:'assignable',    includes:'Parent-teacher and student-led conferences (evenings too), meet-the-teacher, open houses'},
   {id:'extraAssigned',    name:'Extra-curricular assigned',    category:'assignable',    includes:'Clubs, coaching or teams admin assigns, with a set time and place'},
+  {id:'fullDay',          name:'Full day assignable time',     category:'assignable',    includes:'A whole day assigned from start to finish: a field trip, a sports day and the like'},
   {id:'arrivalDeparture', name:'Required arrival / departure', category:'assignable',    includes:'Before the first bell or after the last, when admin requires it'},
   {id:'fieldDuties',      name:'Field trip duties',            category:'assignable',    includes:'Travel, bus rides, on-call evening supervision'},
   {id:'other',            name:'Other assigned',               category:'assignable',    includes:'Anything else admin sets for a time and place; needs a description'},
@@ -485,12 +486,15 @@ const DAY_TYPES = [
   {id:'mon', name:'Monday'}, {id:'tue', name:'Tuesday'}, {id:'wed', name:'Wednesday'}, {id:'thu', name:'Thursday'},
   {id:'friA', name:'Friday A'}, {id:'friB', name:'Friday B'}, {id:'friC', name:'Friday C'}, {id:'friD', name:'Friday D'},
   {id:'nid', name:'Non-instruction day'}, {id:'convention', name:'Teachers’ Convention'},
-  {id:'early', name:'Early dismissal'}, {id:'conference', name:'Conference day'}
+  {id:'early', name:'Early dismissal'}, {id:'conference', name:'Conference day'},
+  {id:'fullDay', name:'Full day assignable time'}
 ];
 const MON_THU_BELLS = [['p1','8:05','8:56'], ['p2','8:58','9:45'], ['p3','9:53','10:40'], ['p4','10:42','11:29'],
                        ['p5','11:31','12:18'], ['p6','12:18','13:07'], ['p7','13:09','13:56'], ['p8','13:58','14:45']];
 const FRIDAY_BELLS  = [['p1','8:05','8:56'], ['p2','8:58','9:48'], ['p3','9:56','10:26'], ['p4','10:28','11:19'],
                        ['p5','11:21','12:10']];
+// One block from start to finish: all of it is Assignable. Change the times on the day itself.
+const FULL_DAY_BELLS = () => [{id:'fullday', kind:'block', name:'Full day', start:T('8:05'), end:T('14:45'), type:'fullDay'}];
 const periods = rows => rows.map(r => ({id:r[0], kind:'period', name:'', start:T(r[1]), end:T(r[2])}));
 const FRIDAY_LUNCH = () => ({id:'lunch', kind:'block', name:'Lunch', start:T('12:10'), end:T('13:00'), type:'lunch'});
 
@@ -507,20 +511,22 @@ function templateVersion(start){
     // Placeholder: the real Early dismissal bell times are not known yet, so it
     // starts as a copy of the Friday periods. Edit it like any other schedule.
     early: {id:'early', name:'Early dismissal',     bells: periods(FRIDAY_BELLS),
-            placeholder:'Copy of the Friday periods until the real Early dismissal times are entered.'}
+            placeholder:'Copy of the Friday periods until the real Early dismissal times are entered.'},
+    full:  {id:'full',  name:'Full day assignable time', bells: FULL_DAY_BELLS()}
   };
   const days = {};
   DAY_TYPES.forEach(d => { days[d.id] = {schedule: null, arrival: null, departure: null}; });
   ['mon','tue','wed','thu'].forEach(id => { days[id].schedule = 'mt'; });
   ['friA','friB','friC','friD'].forEach(id => { days[id].schedule = 'fri'; });
   days.early.schedule = 'early';
+  days.fullDay.schedule = 'full';
   return {start, arrival: 0, departure: 0, schedules, days, timetable: {}};
 }
 
 function newModel(){
   const cal = clone(CAL_2026_27);
   return {
-    format: 'time-counter', version: 2, seq: 0,
+    format: 'time-counter', version: 2, seq: 0, defaultsVersion: DEFAULTS_VERSION,
     calendar: cal, calendarEdits: {},
     settings: {
       fte: 1, typicalAssignedHours: null,
@@ -541,10 +547,12 @@ function newModel(){
 }
 
 /* ---------- opening a saved model ---------- */
-// Version 1 kept a separate copy of the bells in every day type. Day types whose bells
-// are identical now share one schedule (a placeholder keeps its own).
-// Time types added or reworded since a save was made. A name someone changed is left alone.
-function upgradeTimeTypes(m){
+// Time types and day types added or reworded since a save was made. A name someone
+// changed is left alone, and a default someone deleted is not put back: `defaultsVersion`
+// says which defaults a model has already been given.
+//   1: the Full day assignable time day type, time type and bell block
+const DEFAULTS_VERSION = 1;
+function upgradeDefaults(m){
   if(!Array.isArray(m.timeTypes)) return;
   if(!m.timeTypes.some(t => t.id === 'extraAssigned')){
     const add = TIME_TYPES.find(t => t.id === 'extraAssigned'), at = m.timeTypes.findIndex(t => t.id === 'event');
@@ -552,10 +560,28 @@ function upgradeTimeTypes(m){
   }
   const v = m.timeTypes.find(t => t.id === 'voluntary');
   if(v && v.name === 'Voluntary'){ const now = TIME_TYPES.find(t => t.id === 'voluntary'); v.name = now.name; v.includes = now.includes; }
+  if(!m.defaultsVersion && Array.isArray(m.dayTypes) && Array.isArray(m.versions)){
+    if(!m.timeTypes.some(t => t.id === 'fullDay')){
+      const add = TIME_TYPES.find(t => t.id === 'fullDay'), at = m.timeTypes.findIndex(t => t.id === 'extraAssigned');
+      m.timeTypes.splice(at < 0 ? m.timeTypes.length : at + 1, 0, clone(add));
+    }
+    if(!m.dayTypes.some(d => d.id === 'fullDay')){
+      m.dayTypes.push(clone(DAY_TYPES.find(d => d.id === 'fullDay')));
+      m.versions.forEach(ver => {
+        if(!ver || typeof ver !== 'object' || !ver.days || !ver.schedules) return;
+        const sid = ver.schedules.full ? nextScheduleId(ver) : 'full';
+        ver.schedules[sid] = {id: sid, name: 'Full day assignable time', bells: FULL_DAY_BELLS()};
+        ver.days.fullDay = {schedule: sid, arrival: null, departure: null};
+      });
+    }
+    m.defaultsVersion = DEFAULTS_VERSION;
+  }
 }
+// Version 1 kept a separate copy of the bells in every day type. Day types whose bells
+// are identical now share one schedule (a placeholder keeps its own).
 function migrate(m){
   if(!m || m.format !== 'time-counter' || !m.versions || !m.versions.length) return null;
-  if(m.version === 2){ upgradeTimeTypes(m); return m; }
+  if(m.version === 2){ upgradeDefaults(m); return m; }
   if(m.version !== 1) return null;
   m.versions.forEach(v => {
     const groups = {};
@@ -582,7 +608,7 @@ function migrate(m){
     });
   });
   m.version = 2;
-  upgradeTimeTypes(m);
+  upgradeDefaults(m);
   return m;
 }
 
@@ -1038,6 +1064,29 @@ function setDayTypeEdit(m, date, dayTypeId, meta){
   let list = (m.edits[date] || []).filter(x => x.op !== 'dayType');
   if(dayTypeId && dayTypeId !== dayTypeFor(m, date)) list.push({id: 'e' + (++m.seq), op: 'dayType', dayTypeId, note: (meta && meta.note) || '', entered: (meta && meta.entered) || null});
   if(list.length) m.edits[date] = list; else delete m.edits[date];
+}
+// "This was a field trip / sports day": the whole day, start to finish, is Assignable. It
+// makes the date a Full day assignable time day and sets the times of that day type's one
+// block. Changes to the old day's periods no longer point at anything, so they go (the
+// count is returned); blocks the week added stay. Reset the day to put it back to plan.
+function setFullDay(m, date, o, meta){
+  assertUnlocked(m, date);
+  const status = statusOf(m, date).status;
+  if(status === 'closed') throw new Error('That day is closed, so there is no time to count.');
+  if(status === 'convention') throw new Error('Teachers’ Convention days count a fixed 6 h, whatever blocks are on them.');
+  if(!m.dayTypes.some(d => d.id === 'fullDay')) throw new Error('There is no “Full day assignable time” day type. Add it under Plan → Day types.');
+  if(!(o.end > o.start) || o.start < 0 || o.end > 1440) throw new Error('A day has to end after it starts, within one day.');
+  const bell = bellsOf(versionFor(m, date), 'fullDay')[0];
+  if(!bell) throw new Error('The Full day assignable time day type has no block in the timetable in force. Add one under Plan → Bells & timetable.');
+  setDayTypeEdit(m, date, 'fullDay', meta);
+  const stale = resolveDay(m, date).flags.filter(f => f.code === 'edit-orphan').map(f => f.editId);
+  if(stale.length){
+    const list = (m.edits[date] || []).filter(e => stale.indexOf(e.id) < 0);
+    if(list.length) m.edits[date] = list; else delete m.edits[date];
+  }
+  const name = (o.name || '').trim();
+  editBlock(m, date, bell.id, {start: o.start, end: o.end, name: name || undefined, note: (o.note || '').trim() || undefined}, meta);
+  return {dropped: stale.length};
 }
 // Clear a day's edits, or a whole week's. Returns how many edits were cleared.
 function resetDay(m, date){
@@ -1961,7 +2010,8 @@ const previewSetup = (m, inc, meta) => applySetup(clone(m), inc, meta);
 /* ---------- a new year: keep the set-up, load a new calendar, clear last year's dates ---------- */
 const CAL_WORDS = {
   closed: {status: 'closed'}, nid: {status: 'nid'}, convention: {status: 'convention'}, school: {status: 'instructional'},
-  early: {status: 'instructional', dayType: 'early'}, conference: {status: 'nid', dayType: 'conference'}
+  early: {status: 'instructional', dayType: 'early'}, conference: {status: 'nid', dayType: 'conference'},
+  fullday: {status: 'instructional', dayType: 'fullDay'}
 };
 // Read the four year dates and a typed list of exceptions, one per line:
 //   2027-11-11 to 2027-11-13 closed Fall Break
@@ -2350,6 +2400,7 @@ const SETUP_EXAMPLE = {
 
 // What the teacher gives to an AI assistant. Built from the lists the importer checks against.
 function setupInstructions(){
+  const clock = n => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
   const hm = s => s.padStart(5, '0'), rows = list => list.map(b => hm(b[1]) + '–' + hm(b[2])).join(', ');
   const cats = [['instructional', 'INSTRUCTIONAL (counts toward the instructional limit and the total)'], ['assignable', 'ASSIGNABLE (counts toward the total assignable limit only)'], ['notCounted', 'NOT COUNTED (counts toward neither limit; Time Counter keeps a record)']];
   const L = [];
@@ -2367,7 +2418,7 @@ function setupInstructions(){
     'A. About them: name, school, and FTE (1 for full time, 0.5 for half time, and so on). If the FTE is below 1, also the typical annual assigned hours for a full-time teacher at their school.',
     'B. The school year. If the teacher has no calendar for you, or says to use the usual one, LEAVE OUT the "calendar" key. Time Counter then keeps its built-in calendar: the CBE 2026–27 school year (first operational day ' + CAL_2026_27.start + ', students ' + CAL_2026_27.firstStudentDay + ' to ' + CAL_2026_27.lastStudentDay + ', last operational day ' + CAL_2026_27.end + ').',
     '   Otherwise you need four dates: the first and last OPERATIONAL day (the days teachers work, usually a few days before and after students), and the first and last STUDENT day. Then list every date inside the year that is not an ordinary school day, one line each, as "DATE STATUS Name" or "DATE to DATE STATUS Name". STATUS is one of:',
-    '     closed (a holiday or break: no work), nid (a non-instruction day teachers work), convention (Teachers’ Convention), early (a school day with early dismissal), conference (a non-instruction day used for conferences), school (a school day inside a break).',
+    '     closed (a holiday or break: no work), nid (a non-instruction day teachers work), convention (Teachers’ Convention), early (a school day with early dismissal), conference (a non-instruction day used for conferences), fullday (a whole school day assigned from start to finish, such as a sports day: all of it Assignable), school (a school day inside a break).',
     '   Days teachers work before the first or after the last student day are nid. Weekends are closed automatically, so do not list them. Every other weekday between the first and last student day is a school day. Dates are written like 2027-09-06.',
     'C. Bell times for each kind of day. If the teacher says their school uses the usual bell times, leave out the "bells" key; Time Counter then keeps its defaults, below. Otherwise ask for the start and end of every period, and of any lunch or other fixed block, on each kind of day. Convert all times to the 24-hour clock (1:45 pm is 13:45).',
     'D. The teacher’s timetable: for each kind of day, what each period is (a class and its name, prep, their own lunch, a supervision, and so on). Periods are counted from 1 at the start of the day, ignoring lunch blocks. Days that share the same bell times often share the same timetable, but the classes can differ by day, so ask.',
@@ -2379,6 +2430,7 @@ function setupInstructions(){
     '  By default Monday to Thursday run mon, tue, wed and thu. Fridays have no letter until fridayLetters sets one. A school with a different pattern can add day types with "dayTypes" and say which one each weekday runs with "defaultDayTypes".',
     '- Default bell times. Monday to Thursday (day types mon, tue, wed, thu), 8 periods: ' + rows(MON_THU_BELLS) + '. Friday (friA, friB, friC, friD), 5 periods: ' + rows(FRIDAY_BELLS) + ', then a lunch block ' + hm(String(Math.floor(FRIDAY_LUNCH().start / 60)) + ':' + String(FRIDAY_LUNCH().start % 60).padStart(2, '0')) + '–' + hm(String(Math.floor(FRIDAY_LUNCH().end / 60)) + ':' + String(FRIDAY_LUNCH().end % 60).padStart(2, '0')) + '. Early dismissal starts as a copy of the Friday periods.',
     '- A duty that is already there: the Friday meeting (named Meeting, 13:00–14:45, on Friday A to D). Do not add it again. If the school has no Friday meeting, or does not use Friday A to D, say in your note that the teacher can delete it under Plan, then Duties; it only counts on days that use Friday A to D.',
+    '- A day assigned from start to finish (a field trip, a sports day) is the day type fullDay, Full day assignable time: one block, ' + clock(FULL_DAY_BELLS()[0].start) + '–' + clock(FULL_DAY_BELLS()[0].end) + ', all Assignable. A whole-school one goes in the calendar lines as fullday. A single teacher’s trip is set in the week view of Time Counter, so it is not part of this file.',
     '- Passing time between periods (gaps of 10 minutes or less) becomes Transition automatically. Never add it. Teachers’ Convention days count a fixed 6 hours on their own.',
     '- Time types. Every block has a time type, and each type is in one category. In the timetable and in duties, use the type’s name exactly (or its id):');
   cats.forEach(c => {
@@ -2443,7 +2495,7 @@ window.TimeCounter = {
   splitPeriod, mergePeriods, moveTimetableEntry, deleteVersion, setDayTypeArrivalDeparture,
   trackYear, dashboard, typeRows,
   liveBlock, addBlock, editBlock, deleteBlock, resetBlock, splitBlock, ranOver, scheduledEnd, afterSchoolMeeting, swapDuty,
-  setLeave, setDayTypeEdit, resetDay, resetWeek, describeChange, weekSummary, weekRange, weeksToReview, userEdits,
+  setLeave, setDayTypeEdit, setFullDay, resetDay, resetWeek, describeChange, weekSummary, weekRange, weeksToReview, userEdits,
   scheduleOf, bellsOf, dayTypesUsing, unlinkSchedule, linkSchedule, renameSchedule, updateBell, migrate,
   renameDayType, copyDayType, dayTypeUsage, deleteDayType, rotationPlan, applyRotation, planDay, dayTypeTotals, planSummary,
   dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
@@ -3125,7 +3177,7 @@ function pDayTypes(P){
     '<div class="scroll"><table class="tbl"><thead><tr><th>Name</th><th class="num">Used on</th><th></th></tr></thead><tbody>' +
     m.dayTypes.map(d => '<tr><td><input type="text" value="' + esc(d.name) + '" data-f="dtname" data-id="' + esc(d.id) + '" data-key="dtname:' + esc(d.id) + '" aria-label="Name of day type"></td>' +
       '<td class="num">' + used[d.id] + ' date' + (used[d.id] === 1 ? '' : 's') + '</td><td class="acts"><button class="btn sm" data-act="dt-copy" data-id="' + esc(d.id) + '">Copy</button> <button class="btn sm danger" data-act="dt-delete" data-id="' + esc(d.id) + '">Delete</button></td></tr>').join('') +
-    '</tbody></table></div><p class="hint">Conference time, evenings included, counts as <strong>Assignable</strong>: give it the School event time type. A new block on a conference day starts with that type.</p><p><button class="btn" data-act="dt-add">Add a day type</button></p></section>';
+    '</tbody></table></div><p class="hint">Conference time, evenings included, counts as <strong>Assignable</strong>: give it the School event time type. A new block on a conference day starts with that type. A field trip or sports day that is assigned from start to finish uses <strong>Full day assignable time</strong>: the whole day counts as Assignable. Set it on a date from the week view (Quick actions).</p><p><button class="btn" data-act="dt-add">Add a day type</button></p></section>';
 
   h += '<section class="card"><h2>Which day type runs by default</h2><p class="hint">By weekday for school days, and by status for the rest. Any date can still be given any day type below.</p><div class="scroll"><table class="tbl"><tbody>';
   for(let wd = 1; wd <= 5; wd++){
@@ -3477,7 +3529,7 @@ function quickHtml(locked, hasEdits){
   const b = (act, label) => '<button class="btn" data-act="' + act + '"' + (locked ? ' disabled' : '') + '>' + label + '</button>';
   return '<section class="card"><h2>Quick actions</h2><div class="qa">' +
     b('qa-cover', 'Covered a class…') + b('qa-ran', 'Ran over…') + b('qa-after', 'Add after-school meeting…') + b('qa-duty', 'Swap or drop a duty…') +
-    b('qa-daytype', 'Change day type…') + b('qa-leave', 'Mark leave…') +
+    b('qa-daytype', 'Change day type…') + b('qa-fullday', 'Full day assignable time…') + b('qa-leave', 'Mark leave…') +
     '<button class="btn" data-act="qa-reset"' + (locked || !hasEdits ? ' disabled' : '') + '>Reset to plan…</button></div></section>';
 }
 
@@ -3764,6 +3816,26 @@ async function qaDayType(date){
   }
   guardedEdit([f.date], mm => TC.setDayTypeEdit(mm, f.date, f.dt || null, Object.assign({note: f.note.trim()}, meta())), f.dt ? 'Day type changed for this date.' : 'Back to the plan’s day type.');
 }
+async function qaFullDay(date){
+  if(lockedMsg()) return;
+  const m = S.model;
+  if(!m.dayTypes.some(d => d.id === 'fullDay')) return void nothingToDo('Full day assignable time', 'There is no Full day assignable time day type. Add one under Plan → Day types.');
+  const working = d => { const st = TC.statusOf(m, d).status; return st === 'instructional' || st === 'nid'; };
+  const dates = weekDays().filter(d => !weekLocked(d) && working(d));
+  if(!dates.length) return void nothingToDo('Full day assignable time', 'There is no day this week to use it on. It needs a school day or a non-instruction day that is not locked.');
+  const sel = dates.indexOf(date) >= 0 ? date : (dates.find(d => d === localToday()) || dates[0]);
+  // the times start where the day type puts them (Plan → Bells & timetable)
+  const dflt = TC.resolveDay(m, sel, {virtual: {dayTypeId: 'fullDay', versionStart: TC.versionFor(m, sel).start}}).blocks.filter(b => b.source === 'bell')[0] || {start: T('8:05'), end: T('14:45')};
+  const r = await ask('Full day assignable time', '<p>For a day assigned from start to finish, such as a field trip or a sports day. All of it counts as <strong>Assignable</strong>, and nothing is counted twice.</p><div class="dgrid">' +
+    fld('Day', '<select name="date">' + schoolDayOptions(sel, working) + '</select>') + fld('What is it? (optional)', '<input type="text" name="name" placeholder="e.g. Grade 7 field trip to the zoo">') +
+    fld('Starts', '<input type="time" name="start" value="' + tval(dflt.start) + '">') + fld('Ends', '<input type="time" name="end" value="' + tval(dflt.end) + '">') +
+    fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div>' +
+    '<p class="hint">This replaces the day’s periods for this date only; the plan stays as it is. Changes you already made to those periods are replaced, and blocks you added stay. “Reset to plan” puts the day back.</p>',
+    [CANCEL, {label: 'Set it', value: 'ok', kind: 'primary', check: true}], d => !d.start || !d.end ? 'Fill in both times.' : T(d.end) <= T(d.start) ? 'It has to end after it starts.' : null);
+  if(r.value !== 'ok') return;
+  const f = r.data;
+  guardedEdit([f.date], mm => { TC.setFullDay(mm, f.date, {start: T(f.start), end: T(f.end), name: f.name, note: f.note}, meta()); }, 'Full day assignable time set for ' + fmtDay(f.date) + '.');
+}
 async function qaLeave(date){
   if(lockedMsg()) return;
   const dates = weekDays().filter(d => !weekLocked(d));
@@ -3789,9 +3861,10 @@ async function qaReset(){
   guardedEdit(scope === 'week' ? weekDays() : [scope], mm => { if(scope === 'week') TC.resetWeek(mm, ws); else TC.resetDay(mm, scope); }, 'Back to plan.');
 }
 async function dayMenu(date){
-  const r = await ask(fmtDate(date), '<p>What would you like to do on this day?</p><div class="menu"><button class="btn" value="after">Add after-school meeting…</button><button class="btn" value="dt">Change day type…</button><button class="btn" value="leave">Mark leave…</button><button class="btn" value="reset"' + ((S.model.edits[date] || []).length ? '' : ' disabled') + '>Reset this day to plan…</button></div>', [{label: 'Close', value: 'cancel'}]);
+  const r = await ask(fmtDate(date), '<p>What would you like to do on this day?</p><div class="menu"><button class="btn" value="after">Add after-school meeting…</button><button class="btn" value="dt">Change day type…</button><button class="btn" value="fullday">Full day assignable time…</button><button class="btn" value="leave">Mark leave…</button><button class="btn" value="reset"' + ((S.model.edits[date] || []).length ? '' : ' disabled') + '>Reset this day to plan…</button></div>', [{label: 'Close', value: 'cancel'}]);
   if(r.value === 'after') qaAfter(date);
   else if(r.value === 'dt') qaDayType(date);
+  else if(r.value === 'fullday') qaFullDay(date);
   else if(r.value === 'leave') qaLeave(date);
   else if(r.value === 'reset'){
     const n = TC.userEdits(S.model, date).length, kept = (S.model.edits[date] || []).some(e => e.op === 'hold');
@@ -4061,7 +4134,7 @@ function whatCountsHtml(){
   return '<details class="card whatcounts"><summary><strong>What counts?</strong> <span class="muted">· Instructional, Assignable and Not counted, in plain words</span></summary>' +
     '<p>Every block has a time type, and every time type belongs to one of three categories. The category decides which totals the minutes go into. The wording follows the ATA’s definitions of assignable and instructional time.</p>' +
     '<ul class="plain"><li>' + catChip('instructional') + ' Time you are assigned to deliver, or evaluate outcomes from, an approved program of studies: your classes, covering a colleague’s class when there is no substitute, mandatory tutorial time and exam invigilation. The limit is 916 h × FTE. It is counted the same on a sick or personal day as on a regular day.</li>' +
-    '<li>' + catChip('assignable') + ' Other time the school assigns you at a particular time and place: supervision (before and after classes, recess, nutrition and lunch breaks), transition time between classes, staff and other mandatory meetings and committees, parent-teacher interviews and conferences (evenings included), school events, school- or board-directed training, time assigned before or after the school day, and required attendance on non-instruction days. Each Teachers’ Convention day counts 6 h. Instructional plus Assignable is your <strong>total assignable time</strong>, with a limit of 1,200 h at 1.0 FTE.</li>' +
+    '<li>' + catChip('assignable') + ' Other time the school assigns you at a particular time and place: supervision (before and after classes, recess, nutrition and lunch breaks), transition time between classes, staff and other mandatory meetings and committees, parent-teacher interviews and conferences (evenings included), school events, school- or board-directed training, time assigned before or after the school day, a whole day assigned from start to finish (a field trip or sports day), and required attendance on non-instruction days. Each Teachers’ Convention day counts 6 h. Instructional plus Assignable is your <strong>total assignable time</strong>, with a limit of 1,200 h at 1.0 FTE.</li>' +
     '<li>' + catChip('notCounted') + ' Time that counts toward neither limit: prep, marking, reporting, your own lunch, parent contact admin has not prescribed, and extra-curricular activities you volunteer for. When admin assigns one a set time and place it becomes Assignable (Extra-curricular assigned). Time Counter keeps a record of this time.</li></ul>' +
     '<p class="hint">Time Counter estimates against clause 8.1 of the ATA/CBE collective agreement. It is a reference, not an official ruling.</p></details>';
 }
@@ -4591,7 +4664,7 @@ function newYearHtml(){
     '<div class="form-row">' + date('First operational day', 'start') + date('First student day', 'firstStudentDay') + date('Last student day', 'lastStudentDay') + date('Last operational day', 'end') + '</div>' +
     '<div class="form-row"><label class="wide">Days that are not ordinary school days, one per line' +
     '<textarea rows="9" data-f="ny" data-prop="text" data-key="ny:text" spellcheck="false" placeholder="2027-09-06 closed Labour Day&#10;2027-09-24 nid Non-instruction day&#10;2027-11-10 to 2027-11-12 closed Fall Break&#10;2028-02-10 to 2028-02-11 convention Teachers’ Convention&#10;2028-06-23 early Last day for students">' + esc(f.text) + '</textarea></label></div>' +
-    '<p class="hint">Start each line with a date (or <em>date to date</em>), then a word, then a name. <strong>closed</strong> is a holiday or break, <strong>nid</strong> a non-instruction day, <strong>convention</strong> Teachers’ Convention, <strong>early</strong> a school day on the Early dismissal day type, <strong>conference</strong> a non-instruction day used for conferences, <strong>school</strong> a school day inside a break. Days teachers work before the first or after the last student day are <strong>nid</strong>. Everything else between the first and last student day is a school day. Dates are written like 2027-09-06. Lines that start with # are ignored.</p>' +
+    '<p class="hint">Start each line with a date (or <em>date to date</em>), then a word, then a name. <strong>closed</strong> is a holiday or break, <strong>nid</strong> a non-instruction day, <strong>convention</strong> Teachers’ Convention, <strong>early</strong> a school day on the Early dismissal day type, <strong>conference</strong> a non-instruction day used for conferences, <strong>fullday</strong> a school day assigned from start to finish (a sports day, say) on the Full day assignable time day type, <strong>school</strong> a school day inside a break. Days teachers work before the first or after the last student day are <strong>nid</strong>. Everything else between the first and last student day is a school day. Dates are written like 2027-09-06. Lines that start with # are ignored.</p>' +
     out + '<p><button class="btn primary" data-act="ny-start"' + (res && res.ok ? '' : ' disabled') + '>Start the new year…</button></p></section>';
 }
 function dataHtml(){
@@ -4651,6 +4724,7 @@ async function act(a, b){
   case 'qa-after': qaAfter(); break;
   case 'qa-duty': qaDuty(); break;
   case 'qa-daytype': qaDayType(d.date); break;
+  case 'qa-fullday': qaFullDay(d.date); break;
   case 'qa-leave': qaLeave(); break;
   case 'qa-reset': qaReset(); break;
   case 'cal-day':

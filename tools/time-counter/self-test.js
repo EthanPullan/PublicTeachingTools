@@ -389,7 +389,7 @@ check('E4', 'Extra: a typical day of each day type', t => {
        'Friday A: 101 Class, 14 Transition + 105 Meeting, 50 Lunch, 130 untyped');
   t.ok(!f.blocks.some(b => b.ref === 'duty:monthly'), 'duties that repeat by date are not in a typical day');
   const rows = TC.dayTypeTotals(m, v.start);
-  t.eq(rows.length, 12, 'one row per day type');
+  t.eq(rows.length, 13, 'one row per day type');
   const row = id => rows.find(r => r.id === id);
   t.eq([row('mon').totals.assignable, row('mon').totals.unassigned, row('mon').dates], [18, 382, 34], 'Monday: 18 Transition, 382 untyped, used on 34 dates');
   t.eq(row('friA').dates, 0, 'a Friday letter with no dates yet is used on 0 dates');
@@ -1165,6 +1165,63 @@ check('E26', 'Extra: the setup file an AI writes, and the instructions that make
   const broken = TC.readSetupText(text.replace('"fte": 1', '"fte": 1,'));
   t.eq([broken.ok, /not valid JSON/.test(broken.errors[0].message)], [false, true], 'JSON with a stray comma is refused in plain words');
   t.eq([TC.readSetupText('').ok, TC.readSetupText('{"__proto__": 1}').ok, TC.readSetupText('[1]').ok && TC.applySetupFile(TC.newModel(), TC.readSetupText('[1]').file).ok], [false, false, false], 'an empty paste, a __proto__ key and a list are refused');
+});
+
+check('E27', 'Extra: Full day assignable time (a field trip or sports day, start to finish)', t => {
+  const m = TC.newModel(), ver = m.versions[0], d = '2026-09-08';
+  t.eq([m.dayTypes.some(x => x.id === 'fullDay'), m.timeTypes.find(x => x.id === 'fullDay').category, m.defaultsVersion], [true, 'assignable', 1], 'a new year has the day type, an Assignable time type and the defaults marker');
+  t.eq([TC.bellsOf(ver, 'fullDay').length, TC.bellsOf(ver, 'fullDay')[0].type, TC.bellsOf(ver, 'fullDay')[0].start, TC.bellsOf(ver, 'fullDay')[0].end], [1, 'fullDay', T('8:05'), T('14:45')], 'the day type is one block, 08:05 to 14:45, typed Full day assignable time');
+  for(let p = 1; p <= 8; p++) TC.setTimetable(ver, 'tue', 'p' + p, {type: 'class', name: 'Math'});
+  const plan = TC.resolveDay(m, d).totals;
+  t.eq([plan.instructional > 0, TC.checkModel(m)], [true, null], 'a Tuesday with classes starts with Instructional time');
+  const change = TC.describeChange(m, [d], mm => TC.setFullDay(mm, d, {start: T('7:30'), end: T('16:00'), name: 'Zoo trip'}, {entered: d}));
+  t.ok(change.delta.instructional < 0 && change.after.instructional === 0, 'making it a full day lowers Instructional time, which is what the screen asks about first');
+  const r0 = TC.setFullDay(m, d, {start: T('7:30'), end: T('16:00'), name: 'Zoo trip', note: 'bus at 7:30'}, {entered: d});
+  const day = TC.resolveDay(m, d);
+  t.eq([day.dayTypeId, day.blocks.length, day.blocks[0].start, day.blocks[0].end, day.blocks[0].name, day.blocks[0].category], ['fullDay', 1, T('7:30'), T('16:00'), 'Zoo trip', 'assignable'], 'the whole day is one block from the start to the finish, with the name given');
+  t.eq([day.totals.instructional, day.totals.assignable, day.totals.notCounted, day.totals.unassigned, day.flags.length], [0, 510, 0, 0, 0], '8 h 30 min, all Assignable, nothing unassigned, nothing flagged');
+  t.eq(r0.dropped, 0, 'nothing had been changed on that day, so nothing was replaced');
+  t.eq([TC.userEdits(m, d).length, m.edits[d].map(e => e.op).sort().join()], [2, 'change,dayType'], 'it is two small edits to the plan: the day type and the block’s times');
+  TC.resetDay(m, d);
+  t.eq([JSON.stringify(TC.resolveDay(m, d).totals) === JSON.stringify(plan), m.edits[d]], [true, undefined], 'resetting the day puts it back exactly as the plan has it');
+  // a period changed earlier no longer exists on a full day, so that change goes; a block the week added stays
+  TC.editBlock(m, d, 'p1', {end: T('9:00')}, {}); TC.addBlock(m, d, {start: T('16:30'), end: T('17:30'), typeId: 'meeting', name: 'Staff meeting'});
+  const r1 = TC.setFullDay(m, d, {start: T('8:05'), end: T('14:45')}, {});
+  const d1 = TC.resolveDay(m, d);
+  t.eq([r1.dropped, d1.flags.length, d1.totals.instructional, d1.totals.assignable], [1, 0, 0, 400 + 60], 'a change to an old period is replaced (and counted), a block added that day stays, and nothing is left flagged');
+  // days it cannot be used on
+  const refuse = (date, o, re, msg) => { let e = ''; try{ TC.setFullDay(m, date, o || {start: T('8:05'), end: T('14:45')}, {}); }catch(x){ e = x.message; } t.ok(re.test(e), msg); };
+  const conv = m.calendar.exceptions.find(x => x.status === 'convention').from, closed = m.calendar.exceptions.find(x => x.status === 'closed').from;
+  refuse(conv, null, /fixed 6 h/, 'a Teachers’ Convention day is refused: it counts a fixed 6 h');
+  refuse(closed, null, /closed/, 'a closed day is refused');
+  refuse('2026-09-12', null, /closed/, 'a Saturday is refused');
+  refuse('2026-09-09', {start: T('15:00'), end: T('9:00')}, /end after it starts/, 'a day that ends before it starts is refused');
+  const before = JSON.stringify(m);
+  refuse('2026-09-09', {start: T('8:00'), end: T('25:00')}, /within one day/, 'a time past midnight is refused');
+  t.eq(JSON.stringify(m), before, 'a refused change leaves the year untouched');
+  // locked and kept weeks
+  const ws = TC.weekStart('2026-09-15'); TC.confirmWeek(m, ws, {at: '2026-09-21'});
+  refuse('2026-09-15', null, /confirmed/, 'a confirmed week is refused');
+  TC.unlockWeek(m, ws, {at: '2026-09-22'});
+  refuse('2026-09-15', null, /kept as it was/, 'a week that was unlocked and kept as it was is refused until the day is put back to plan');
+  // a calendar line, a year saved before this existed, and one where the day type was deleted
+  const cal = TC.parseCalendar(m, {start: '2027-08-23', firstStudentDay: '2027-09-01', lastStudentDay: '2028-06-24', end: '2028-06-28'}, '2027-10-15 fullday Sports day');
+  t.eq([cal.ok, cal.calendar.exceptions[0].dayType, cal.calendar.exceptions[0].status], [true, 'fullDay', 'instructional'], 'the calendar word fullday makes a school day that runs as a full day');
+  const old = JSON.parse(JSON.stringify(TC.newModel()));
+  delete old.defaultsVersion; old.dayTypes = old.dayTypes.filter(x => x.id !== 'fullDay'); old.timeTypes = old.timeTypes.filter(x => x.id !== 'fullDay');
+  old.versions.forEach(v => { delete v.days.fullDay; delete v.schedules.full; });
+  const up = TC.migrate(JSON.parse(JSON.stringify(old)));
+  t.eq([up.defaultsVersion, up.dayTypes.some(x => x.id === 'fullDay'), up.timeTypes.some(x => x.id === 'fullDay'), TC.bellsOf(up.versions[0], 'fullDay').length, TC.checkModel(up)], [1, true, true, 1, null], 'a year saved before it existed gets the day type, the time type and the block');
+  t.eq(JSON.stringify(TC.migrate(JSON.parse(JSON.stringify(up)))) === JSON.stringify(up), true, 'upgrading twice changes nothing more');
+  const gone = JSON.parse(JSON.stringify(TC.newModel())); TC.deleteDayType(gone, 'fullDay');
+  t.eq(TC.migrate(JSON.parse(JSON.stringify(gone))).dayTypes.some(x => x.id === 'fullDay'), false, 'a day type the teacher deleted is not put back');
+  const taken = JSON.parse(JSON.stringify(old)); taken.versions[0].schedules.full = {id: 'full', name: 'Mine', bells: [{id: 'p1', kind: 'period', name: '', start: 480, end: 540}]};
+  const tk = TC.migrate(taken);
+  t.eq([tk.versions[0].schedules.full.name, tk.versions[0].days.fullDay.schedule !== 'full', TC.checkModel(tk)], ['Mine', true, null], 'a schedule that already has the id is left alone and the new one gets another');
+  t.eq([TC.unpack(TC.pack(m, null)).ok, TC.unpack(TC.pack(m, null)).model.defaultsVersion], [true, 1], 'the marker survives saving and opening a TimeTracker.pdf');
+  // the instructions an AI is given
+  const ins = TC.setupInstructions();
+  t.ok(/fullday \(/.test(ins) && /fullDay = Full day assignable time/.test(ins) && ins.indexOf('Full day assignable time [fullDay]') >= 0, 'the setup instructions name the calendar word, the day type and the time type');
 });
 
 await Promise.all(jobs);

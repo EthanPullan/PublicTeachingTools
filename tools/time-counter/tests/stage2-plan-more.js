@@ -15,11 +15,11 @@ let fails = 0; const ok = (c, msg) => { if (!c) fails++; console.log((c ? 'ok   
   ok((await model()).dayTypes.find(d => d.id === 'mon').name === 'Day 1', 'a day type can be renamed');
   await p.click('[data-act=dt-add]'); await settle();
   let m = await model();
-  ok(m.dayTypes.length === 13 && m.dayTypes[12].name === 'New day type' && m.versions[0].days[m.dayTypes[12].id], 'adding a day type gives it an empty schedule in every version');
-  const newId = m.dayTypes[12].id;
+  ok(m.dayTypes.length === 14 && m.dayTypes[13].name === 'New day type' && m.versions[0].days[m.dayTypes[13].id], 'adding a day type gives it an empty schedule in every version');
+  const newId = m.dayTypes[13].id;
   await p.click(`[data-act=dt-copy][data-id=friA]`); await settle();
   m = await model();
-  ok(m.dayTypes.length === 14 && m.dayTypes[13].name === 'Friday A copy' && m.versions[0].days[m.dayTypes[13].id].schedule === 'fri', 'a copy of Friday A follows the same Friday bell times');
+  ok(m.dayTypes.length === 15 && m.dayTypes[14].name === 'Friday A copy' && m.versions[0].days[m.dayTypes[14].id].schedule === 'fri', 'a copy of Friday A follows the same Friday bell times');
   await p.selectOption('[data-key="wdDefault:5"]', 'friB'); await settle();
   ok((await model()).dayTypeDefaults.weekday[5] === 'friB', 'a weekday default can be set (Friday -> Friday B)');
   await tab('rot'); ok((await p.innerText('#app')).includes('All 31 school Fridays have a day type') || (await p.innerText('#app')).includes('no day type') === false, 'with a Friday default no Friday is left without a day type');
@@ -96,9 +96,9 @@ let fails = 0; const ok = (c, msg) => { if (!c) fails++; console.log((c ? 'ok   
   // reset
   await p.click('[data-act=view][data-view=data]'); await settle(); await p.click('[data-act=reset]'); await p.waitForSelector('dialog[open]'); await p.click('dialog[open] button[value=ok]'); await settle();
   m = await model();
-  ok(m.versions.length === 1 && m.dayTypes.length === 12 && m.dayTypeDefaults.weekday[4] === 'thu', 'reset returns to the school template');
+  ok(m.versions.length === 1 && m.dayTypes.length === 13 && m.dayTypeDefaults.weekday[4] === 'thu', 'reset returns to the school template');
   await p.click('#undo'); await settle();
-  ok((await model()).dayTypes.length === 14 || (await model()).dayTypes.length === 13, 'and reset can be undone');
+  ok((await model()).dayTypes.length === 15 || (await model()).dayTypes.length === 14, 'and reset can be undone');
   ok(errs.length === 0, 'no console errors ' + JSON.stringify(errs));
   await b.close();
   console.log(fails ? fails + ' FAILED' : 'all passed'); process.exit(fails ? 1 : 0);

@@ -141,6 +141,22 @@ and port it upstream by hand.
   renames it only if nobody changed the name, and adds the assigned type. **Conference
   time is Assignable**, under *School event*, evenings included, and a new block on a
   conference day starts with that type.
+- **Full day assignable time** is a day type *and* a time type (id `fullDay`, Assignable)
+  for a day assigned from start to finish, such as a field trip or sports day. The day
+  type follows a schedule (`full`) of one block, 08:05–14:45 (bell id `fullday`), typed
+  Full day assignable time, so it adds no arrival or departure and leaves no gaps.
+  `TC.setFullDay(m, date, {start, end, name, note})` makes one date run as it: the
+  `dayType` edit plus a `change` to that block's times, so Reset to plan undoes it. It
+  refuses closed days, Convention days, confirmed weeks and weeks kept after an unlock.
+  Changes to the old day's periods would point at nothing, so they are dropped and
+  counted in the result; blocks the week added stay. The screen is the **Full day
+  assignable time…** quick action (also in the day's ⋯ menu), which asks first when
+  Instructional time would go down. A school-wide one is the `fullday` calendar word.
+- **Defaults added to a saved year have a marker.** `model.defaultsVersion` says which
+  built-in day types, time types and schedules a model has already been given
+  (`DEFAULTS_VERSION`, now 1). `migrate` → `upgradeDefaults` adds what a model from
+  before is missing and sets the marker, so a default the teacher then deleted is never
+  put back. To add another default later, bump `DEFAULTS_VERSION` and add a step.
 - **Layers, and each minute counted once.** A day is built from calendar status,
   day type, the timetable version in force, bells, required arrival/departure,
   duties, then that week's edits. The later layer takes the minutes it covers.

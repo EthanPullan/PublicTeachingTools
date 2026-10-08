@@ -157,6 +157,29 @@ let fails = 0; const ok = (c, msg) => { if (!c) fails++; console.log((c ? 'ok   
   await p.selectOption('dialog[open] select[name=scope]', '2026-10-09'); await dialogOk('ok');
   ok(!(await model()).edits['2026-10-09'], 'Reset to plan for one day clears just that day');
 
+  // ---- Full day assignable time: a field trip or sports day, start to finish
+  const dayTot = d => p.evaluate(d => { const r = TimeCounter.resolveDay(TimeCounterApp.state.model, d); return {dt: r.dayTypeId, t: r.totals, b: r.blocks.map(x => [x.start, x.end, x.typeId, x.name])}; }, d);
+  const tueBefore = await dayTot('2026-10-06');
+  await p.click('[data-act=qa-fullday]'); await p.waitForSelector('dialog[open]');
+  ok((await p.inputValue('dialog[open] input[name=start]')) === '08:05' && (await p.inputValue('dialog[open] input[name=end]')) === '14:45', 'Full day assignable time starts with the day type’s times, 08:05 to 14:45');
+  await p.selectOption('dialog[open] select[name=date]', '2026-10-06');
+  await p.fill('dialog[open] input[name=end]', '07:00'); await p.click('dialog[open] button[value=ok]');
+  ok((await text('dialog[open] .derr')).includes('end after it starts'), 'an end before the start is refused in the dialog');
+  await p.fill('dialog[open] input[name=start]', '07:30'); await p.fill('dialog[open] input[name=end]', '16:00'); await p.fill('dialog[open] input[name=name]', 'Zoo trip');
+  await p.click('dialog[open] button[value=ok]');
+  ok((await text('dialog[open]')).includes('lowers Instructional time'), 'it asks first, because the day had classes on it');
+  await dialogOk('ok');
+  const tueFull = await dayTot('2026-10-06');
+  ok(tueFull.dt === 'fullDay' && tueFull.b.length === 1 && tueFull.b[0][0] === T('7:30') && tueFull.b[0][1] === T('16:00') && tueFull.b[0][3] === 'Zoo trip' && tueFull.t.assignable === 510 && tueFull.t.instructional === 0 && tueFull.t.unassigned === 0,
+     'Tuesday becomes one block from 7:30 to 4:00, 8 h 30 min, all Assignable');
+  ok((await text('.wk-head:has-text("Tue Oct 6")')).includes('Full day assignable time') && (await p.locator('.blk[data-date="2026-10-06"]').count()) === 1, 'the week shows the day as Full day assignable time with its single block');
+  await p.click('#undo'); await settle();
+  ok(JSON.stringify(await dayTot('2026-10-06')) === JSON.stringify(tueBefore), 'Undo puts the day back exactly as it was');
+  await p.click('[data-act=day-menu][data-date="2026-10-06"]'); await p.waitForSelector('dialog[open]');
+  await p.click('dialog[open] button[value=fullday]'); await p.waitForSelector('dialog[open] select[name=date]');
+  ok((await p.inputValue('dialog[open] select[name=date]')) === '2026-10-06', 'the day menu opens it for that day');
+  await p.keyboard.press('Escape'); await settle();
+
   // ---- orphan edit flagged and deletable
   await p.evaluate(() => TimeCounterApp.commit(m => { TimeCounter.addEdit(m, '2026-10-05', {op:'change', ref:'p99', typeId:'prep'}); }));
   await settle(200);

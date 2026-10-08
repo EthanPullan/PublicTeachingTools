@@ -14,7 +14,7 @@ WHAT TO ASK THE TEACHER FOR
 A. About them: name, school, and FTE (1 for full time, 0.5 for half time, and so on). If the FTE is below 1, also the typical annual assigned hours for a full-time teacher at their school.
 B. The school year. If the teacher has no calendar for you, or says to use the usual one, LEAVE OUT the "calendar" key. Time Counter then keeps its built-in calendar: the CBE 2026–27 school year (first operational day 2026-08-26, students 2026-08-31 to 2027-06-25, last operational day 2027-06-29).
    Otherwise you need four dates: the first and last OPERATIONAL day (the days teachers work, usually a few days before and after students), and the first and last STUDENT day. Then list every date inside the year that is not an ordinary school day, one line each, as "DATE STATUS Name" or "DATE to DATE STATUS Name". STATUS is one of:
-     closed (a holiday or break: no work), nid (a non-instruction day teachers work), convention (Teachers’ Convention), early (a school day with early dismissal), conference (a non-instruction day used for conferences), school (a school day inside a break).
+     closed (a holiday or break: no work), nid (a non-instruction day teachers work), convention (Teachers’ Convention), early (a school day with early dismissal), conference (a non-instruction day used for conferences), fullday (a whole school day assigned from start to finish, such as a sports day: all of it Assignable), school (a school day inside a break).
    Days teachers work before the first or after the last student day are nid. Weekends are closed automatically, so do not list them. Every other weekday between the first and last student day is a school day. Dates are written like 2027-09-06.
 C. Bell times for each kind of day. If the teacher says their school uses the usual bell times, leave out the "bells" key; Time Counter then keeps its defaults, below. Otherwise ask for the start and end of every period, and of any lunch or other fixed block, on each kind of day. Convert all times to the 24-hour clock (1:45 pm is 13:45).
 D. The teacher’s timetable: for each kind of day, what each period is (a class and its name, prep, their own lunch, a supervision, and so on). Periods are counted from 1 at the start of the day, ignoring lunch blocks. Days that share the same bell times often share the same timetable, but the classes can differ by day, so ask.
@@ -23,10 +23,11 @@ F. Duties: supervision, recurring meetings and anything else the school assigns 
 G. Anything else: required arrival before the first bell or departure after the last bell, in minutes, if the school requires it.
 
 WHAT TIME COUNTER ALREADY KNOWS (do not repeat it)
-- Day types (use the id, or the exact name): mon = Monday; tue = Tuesday; wed = Wednesday; thu = Thursday; friA = Friday A; friB = Friday B; friC = Friday C; friD = Friday D; nid = Non-instruction day; convention = Teachers’ Convention; early = Early dismissal; conference = Conference day.
+- Day types (use the id, or the exact name): mon = Monday; tue = Tuesday; wed = Wednesday; thu = Thursday; friA = Friday A; friB = Friday B; friC = Friday C; friD = Friday D; nid = Non-instruction day; convention = Teachers’ Convention; early = Early dismissal; conference = Conference day; fullDay = Full day assignable time.
   By default Monday to Thursday run mon, tue, wed and thu. Fridays have no letter until fridayLetters sets one. A school with a different pattern can add day types with "dayTypes" and say which one each weekday runs with "defaultDayTypes".
 - Default bell times. Monday to Thursday (day types mon, tue, wed, thu), 8 periods: 08:05–08:56, 08:58–09:45, 09:53–10:40, 10:42–11:29, 11:31–12:18, 12:18–13:07, 13:09–13:56, 13:58–14:45. Friday (friA, friB, friC, friD), 5 periods: 08:05–08:56, 08:58–09:48, 09:56–10:26, 10:28–11:19, 11:21–12:10, then a lunch block 12:10–13:00. Early dismissal starts as a copy of the Friday periods.
 - A duty that is already there: the Friday meeting (named Meeting, 13:00–14:45, on Friday A to D). Do not add it again. If the school has no Friday meeting, or does not use Friday A to D, say in your note that the teacher can delete it under Plan, then Duties; it only counts on days that use Friday A to D.
+- A day assigned from start to finish (a field trip, a sports day) is the day type fullDay, Full day assignable time: one block, 08:05–14:45, all Assignable. A whole-school one goes in the calendar lines as fullday. A single teacher’s trip is set in the week view of Time Counter, so it is not part of this file.
 - Passing time between periods (gaps of 10 minutes or less) becomes Transition automatically. Never add it. Teachers’ Convention days count a fixed 6 hours on their own.
 - Time types. Every block has a time type, and each type is in one category. In the timetable and in duties, use the type’s name exactly (or its id):
   INSTRUCTIONAL (counts toward the instructional limit and the total):
@@ -45,6 +46,7 @@ WHAT TIME COUNTER ALREADY KNOWS (do not repeat it)
     Teachers’ Convention [convention]: Fixed at 6 h per full day.
     School event [event]: Parent-teacher and student-led conferences (evenings too), meet-the-teacher, open houses.
     Extra-curricular assigned [extraAssigned]: Clubs, coaching or teams admin assigns, with a set time and place.
+    Full day assignable time [fullDay]: A whole day assigned from start to finish: a field trip, a sports day and the like.
     Required arrival / departure [arrivalDeparture]: Before the first bell or after the last, when admin requires it.
     Field trip duties [fieldDuties]: Travel, bus rides, on-call evening supervision.
     Other assigned [other]: Anything else admin sets for a time and place; needs a description.
