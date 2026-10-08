@@ -177,6 +177,7 @@
   .stpill{font-size:12px;font-weight:700;border-radius:20px;padding:3px 11px;border:1px solid var(--line);background:var(--panel-2);}
   .stpill.st-edited{background:var(--warn-soft);border-color:var(--accent);color:#7a4d0e;}
   .stpill.st-confirmed{background:var(--ok-soft);border-color:var(--ok);}
+  .stpill.st-reopened{background:var(--panel);border-color:var(--ink);color:var(--ink);}
   .review{padding:10px 14px;} .review summary{cursor:pointer;font-size:13px;}
   .wkscroll{border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);}
   .wk-grid{display:grid;grid-template-rows:auto auto;min-width:640px;}
@@ -391,6 +392,8 @@ function statusOf(m, date){
   return {status:e.status, label:e.label || base.label, edited:true, original:{status:base.status, label:base.label}};
 }
 function setCalendarDate(m, date, status, label){
+  if(m.confirmed[weekStart(date)] || (m.edits[date] || []).some(e => e.op === 'hold'))
+    throw new Error('That date is in a week that was confirmed, so its status is kept as it was. Put the week back to plan first.');
   const base = baseStatus(m.calendar, date);
   if(status === base.status && (label == null || label === base.label)) delete m.calendarEdits[date];
   else m.calendarEdits[date] = {status, label: label || ''};
@@ -825,6 +828,11 @@ function setDutyOccurrence(duty, date, on){
 // op 'add'     {start, end, typeId, name, note}
 // op 'remove'  {ref}                 op 'change' {ref, typeId?, name?, start?, end?}
 // op 'dayType' {dayTypeId}           op 'leave'  {kind}   (a tag only: totals do not change)
+// Unlocking a confirmed week keeps it exactly as it was: its blocks are copied into the
+// week as 'hold' and base 'add' edits, which describe the whole day. Those are not
+// changes the teacher made, so they are not counted as edits until one is touched.
+const isBaseOp = e => e.op === 'hold' || (e.op === 'add' && e.base && !e.touched && !e.removed) || (e.op === 'leave' && e.base);
+const userEdits = (m, date) => (m.edits[date] || []).filter(e => !isBaseOp(e));
 function assertUnlocked(m, date){
   if(m.confirmed[weekStart(date)]) throw new Error('This week is confirmed. Unlock it to change it.');
 }
@@ -889,7 +897,9 @@ function editBlock(m, date, ref, props, meta){
   if(ref.indexOf('edit:') === 0){
     const e = list.find(x => x.op === 'add' && x.id === ref.slice(5));
     if(!e) throw new Error('That block is no longer in this day.');
-    e.start = next.start; e.end = next.end; e.typeId = next.typeId; e.name = next.name;
+    e.start = next.start; e.end = next.end; e.name = next.name;
+    if(e.typeId !== next.typeId){ e.typeId = next.typeId; delete e.cat; }
+    if(e.base){ e.edited = true; e.touched = true; }     // 'edited' is what shows; 'touched' says it was changed after the week was reopened
     if(props.note !== undefined) e.note = props.note;
     return e;
   }
@@ -912,7 +922,9 @@ function deleteBlock(m, date, ref, meta){
   const cur = liveBlock(m, date, ref);
   if(!cur) throw new Error('That block is no longer in this day.');
   let list = m.edits[date] || [];
-  if(ref.indexOf('edit:') === 0) list = list.filter(x => !(x.op === 'add' && x.id === ref.slice(5)));
+  const own = ref.indexOf('edit:') === 0 ? list.find(x => x.op === 'add' && x.id === ref.slice(5)) : null;
+  if(own && own.base) own.removed = true;                       // a block kept from a confirmed week: remember it was deleted
+  else if(own) list = list.filter(x => x !== own);
   else{
     list = list.filter(x => !(x.op === 'change' && x.ref === ref));
     list.push({id: 'e' + (++m.seq), op: 'remove', ref, note: (meta && meta.note) || '', entered: (meta && meta.entered) || null});
@@ -953,8 +965,9 @@ function afterSchoolMeeting(m, date, o, meta){
 // Move one duty occurrence to another time, or to another date; the occurrence is
 // removed from the first date and added to the second.
 function swapDuty(m, date, ref, o, meta){
-  if(ref.indexOf('duty:') !== 0) throw new Error('That is not a duty.');
   assertUnlocked(m, date);
+  const dut = liveBlock(m, date, ref);
+  if(!dut || dut.source !== 'duty') throw new Error('That is not a duty.');
   if(o.toDate && o.toDate !== date){
     assertUnlocked(m, o.toDate);
     const cur = liveBlock(m, date, ref);
@@ -975,6 +988,7 @@ function setLeave(m, date, kind, meta){
 // "This Friday was actually Friday C": a change to the plan's day type for one date.
 function setDayTypeEdit(m, date, dayTypeId, meta){
   assertUnlocked(m, date);
+  if((m.edits[date] || []).some(e => e.op === 'hold')) throw new Error('This week was kept as it was when it was confirmed, so its day types are fixed. Put the day back to plan first.');
   let list = (m.edits[date] || []).filter(x => x.op !== 'dayType');
   if(dayTypeId && dayTypeId !== dayTypeFor(m, date)) list.push({id: 'e' + (++m.seq), op: 'dayType', dayTypeId, note: (meta && meta.note) || '', entered: (meta && meta.entered) || null});
   if(list.length) m.edits[date] = list; else delete m.edits[date];
@@ -1013,19 +1027,20 @@ function describeChange(m, dates, fn){
 }
 function weekSummary(m, ws){
   const actual = {instructional:0, assignable:0, notCounted:0, unassigned:0}, plan = Object.assign({}, actual);
-  let edits = 0;
+  let edits = 0, held = false;
   for(let k = 0; k < 7; k++){
     const d = addDays(ws, k), a = resolveDay(m, d), p = resolveDay(m, d, {planOnly: true});
     for(const j in actual){ actual[j] += a.totals[j]; plan[j] += p.totals[j]; }
-    edits += (m.edits[d] || []).length;
+    edits += userEdits(m, d).length;
+    if((m.edits[d] || []).some(e => e.op === 'hold')) held = true;
   }
   const delta = {};
   for(const j in actual) delta[j] = actual[j] - plan[j];
   [actual, plan, delta].forEach(o => { o.totalAssignable = o.instructional + o.assignable; });
-  return {ws, status: weekStatus(m, ws), actual, plan, delta, edits};
+  return {ws, status: weekStatus(m, ws), actual, plan, delta, edits, held};
 }
 const weekRange = m => ({first: weekStart(m.calendar.start), last: weekStart(m.calendar.end)});
-// Past weeks with school that are not confirmed (they still count as planned).
+// Past weeks with school that are not confirmed (they still count, with their edits).
 function weeksToReview(m, today){
   const cur = weekStart(today), out = [];
   for(let ws = weekStart(m.calendar.start); ws < cur && ws <= m.calendar.end; ws = addDays(ws, 7)){
@@ -1037,23 +1052,6 @@ function weeksToReview(m, today){
   }
   return out;
 }
-// How a confirmed week would change if it were unlocked now (it is rebuilt from the
-// current plan and its edits), so that nothing shifts without anyone noticing.
-function confirmedDrift(m, ws){
-  const c = m.confirmed[ws];
-  if(!c) return null;
-  const delta = {instructional:0, assignable:0, notCounted:0, unassigned:0};
-  let dates = 0;
-  for(let k = 0; k < 7; k++){
-    const d = addDays(ws, k), now = resolveDay(m, d, {ignoreConfirmed: true}).totals;
-    const then = summarize(c.days[d] ? c.days[d].blocks : []).totals;
-    let changed = false;
-    for(const j in delta){ delta[j] += now[j] - then[j]; if(now[j] !== then[j]) changed = true; }
-    if(changed) dates++;
-  }
-  return {delta, dates};
-}
-
 /* ---------- confirming a week ---------- */
 function confirmWeek(m, ws, meta){
   const days = {};
@@ -1065,14 +1063,41 @@ function confirmWeek(m, ws, meta){
   m.confirmed[ws] = {at: (meta && meta.at) || null, days};
   m.log.push({kind: 'confirm', week: ws, at: (meta && meta.at) || null});
 }
+// Unlocking does not hand the week back to the plan. The blocks it was confirmed with
+// become the week's own starting point (a 'hold' that says "do not rebuild this day
+// from the plan", and one base 'add' per block), so nothing moves unless it is changed
+// by hand. Resetting the week to the plan is a separate, deliberate step.
 function unlockWeek(m, ws, meta){
+  const rec = m.confirmed[ws], at = (meta && meta.at) || null;
+  if(!rec) return;
+  const id = () => 'e' + (++m.seq);
+  for(let k = 0; k < 7; k++){
+    const d = addDays(ws, k), snap = rec.days[d];
+    if(!snap) continue;
+    const list = [{id: id(), op: 'hold', status: snap.status, label: snap.label || '', dayTypeId: snap.dayTypeId, versionStart: snap.versionStart, entered: at}];
+    (snap.blocks || []).forEach(b => {
+      if(b.source === 'gap' || b.start == null) return;            // transitions are worked out again, the fixed Convention block is not a block
+      list.push({id: id(), op: 'add', base: true, start: b.start, end: b.end, typeId: b.typeId, name: b.name, note: b.note || '',
+                 src: b.source, cat: b.category, edited: !!b.edited, entered: at});
+    });
+    if(snap.leave) list.push({id: id(), op: 'leave', base: true, kind: snap.leave.kind, note: snap.leave.note || '', entered: at});
+    m.edits[d] = list;
+  }
   delete m.confirmed[ws];
-  m.log.push({kind: 'unlock', week: ws, at: (meta && meta.at) || null});
+  m.log.push({kind: 'unlock', week: ws, at});
 }
+// planned: no edits · edited: changes made by hand · reopened: unlocked and kept as it
+// was, nothing changed yet · confirmed: locked
 function weekStatus(m, ws){
   if(m.confirmed[ws]) return 'confirmed';
-  for(let k = 0; k < 7; k++) if(m.edits[addDays(ws, k)]) return 'edited';
-  return 'planned';
+  let held = false;
+  for(let k = 0; k < 7; k++){
+    const list = m.edits[addDays(ws, k)];
+    if(!list) continue;
+    if(list.some(e => !isBaseOp(e))) return 'edited';
+    if(list.some(e => e.op === 'hold')) held = true;
+  }
+  return held ? 'reopened' : 'planned';
 }
 
 /* ---------- resolving one day ---------- */
@@ -1096,7 +1121,9 @@ function resolveDay(m, date, opts){
   opts = opts || {};
   const planOnly = !!opts.planOnly;
   const virt = opts.virtual || null;     // a typical day of one day type, not tied to a date
-  const st = virt ? {status:'instructional', label:''} : statusOf(m, date);
+  const dayEdits = (planOnly || virt) ? [] : (m.edits[date] || []);
+  const hold = dayEdits.find(e => e.op === 'hold') || null;   // an unlocked week kept as it was: do not rebuild this day from the plan
+  const st = virt ? {status:'instructional', label:''} : hold ? {status: hold.status, label: hold.label} : statusOf(m, date);
   const ws = virt ? null : weekStart(date);
   const types = typeMap(m);
   const dayTypeName = id => { const d = m.dayTypes.find(x => x.id === id); return d ? d.name : ''; };
@@ -1112,13 +1139,13 @@ function resolveDay(m, date, opts){
       effects: [], confirmed: true});
   }
 
-  const dayEdits = (planOnly || virt) ? [] : (m.edits[date] || []);
   const flags = [], effects = [];
   const leaveEdit = dayEdits.filter(e => e.op === 'leave').pop() || null;
   const leave = leaveEdit ? {kind: leaveEdit.kind || '', note: leaveEdit.note || ''} : null;
-  const ver = virt ? (m.versions.find(v => v.start === virt.versionStart) || m.versions[0]) : versionFor(m, date);
-  let dayTypeId = virt ? virt.dayTypeId : dayTypeFor(m, date, st);
-  const dtEdit = dayEdits.filter(e => e.op === 'dayType').pop();
+  const ver = virt ? (m.versions.find(v => v.start === virt.versionStart) || m.versions[0])
+            : hold ? (m.versions.find(v => v.start === hold.versionStart) || versionFor(m, date)) : versionFor(m, date);
+  let dayTypeId = virt ? virt.dayTypeId : hold ? hold.dayTypeId : dayTypeFor(m, date, st);
+  const dtEdit = hold ? null : dayEdits.filter(e => e.op === 'dayType').pop();
   if(dtEdit) dayTypeId = dtEdit.dayTypeId;
   const out = Object.assign(base, {dayTypeId, dayTypeName: dayTypeName(dayTypeId), versionStart: ver.start,
                                    flags, effects, leave, confirmed: false});
@@ -1143,7 +1170,7 @@ function resolveDay(m, date, opts){
     const s = Math.max(0, p.start), e = Math.min(1440, p.end);
     if(!(e > s)){ flags.push({code:'bad-block', ref:p.ref || null, msg:'A block has no length: ' + (p.name || p.label || p.ref || '?')}); return null; }
     p.start = s; p.end = e;
-    p.category = catOf(p.typeId);
+    p.category = ('catFixed' in p) ? p.catFixed : catOf(p.typeId);   // a block kept from a confirmed week keeps its category too
     if(p.typeId && !types[p.typeId]) flags.push({code:'unknown-type', typeId:p.typeId, msg:'Unknown time type: ' + p.typeId});
     const idx = pieces.length;
     pieces.push(p);
@@ -1161,9 +1188,9 @@ function resolveDay(m, date, opts){
     for(let i = p.start; i < p.end; i++) if(owner[i] === idx) owner[i] = -1;
   }
 
-  const working = st.status === 'instructional' || st.status === 'nid';
+  const working = !hold && (st.status === 'instructional' || st.status === 'nid');
 
-  if(st.status === 'instructional' && !dayTypeId){
+  if(st.status === 'instructional' && !dayTypeId && !hold){
     flags.push({code:'missing-day-type', msg:'No day type is set for this school day.'});
   }
   if(dayTypeId && !m.dayTypes.some(d => d.id === dayTypeId)){
@@ -1197,7 +1224,7 @@ function resolveDay(m, date, opts){
   }
 
   // 3. duties
-  for(const duty of m.duties){
+  for(const duty of (hold ? [] : m.duties)){
     // A typical day only carries duties that repeat by day type; the rest depend on the date.
     const ds = virt ? ((duty.rule.kind === 'weekly' && dayTypeId && duty.rule.dayTypes.indexOf(dayTypeId) >= 0) ? 'on' : null)
                     : dutyState(m, duty, date, st, dayTypeId);
@@ -1217,10 +1244,13 @@ function resolveDay(m, date, opts){
   // 4. this week's edits
   for(const e of dayEdits){
     if(e.op === 'add'){
+      if(e.removed) continue;
       const tn = types[e.typeId] ? types[e.typeId].name : '';
-      const r = place({start:e.start, end:e.end, typeId:e.typeId, label:e.name || tn, name:e.name || tn,
-                       source:'edit', ref:'edit:' + e.id, edited:true, note:e.note || ''});
-      if(r){
+      const pc = {start:e.start, end:e.end, typeId:e.typeId, label:e.name || tn, name:e.name || tn,
+                  source:e.src || 'edit', ref:'edit:' + e.id, edited:e.base ? !!e.edited : true, note:e.note || ''};
+      if(e.base && 'cat' in e) pc.catFixed = e.cat;
+      const r = place(pc);
+      if(r && !e.base){
         const rep = {instructional:0, assignable:0, notCounted:0, unassigned:0};
         Object.keys(r.replaced).forEach(k => { rep[pieces[k].category || 'unassigned'] += r.replaced[k]; });
         if(rep.instructional + rep.assignable + rep.notCounted + rep.unassigned) effects.push({editId:e.id, replaced:rep});
@@ -1234,7 +1264,7 @@ function resolveDay(m, date, opts){
       }
       const p = pieces[idx];
       if(e.op === 'remove'){ clear(idx); p.removed = true; continue; }
-      if(e.typeId !== undefined){ p.typeId = e.typeId; p.category = catOf(e.typeId); }
+      if(e.typeId !== undefined){ p.typeId = e.typeId; p.category = catOf(e.typeId); delete p.catFixed; }
       if(e.name !== undefined) p.name = e.name;
       if(e.start != null || e.end != null){
         clear(idx);
@@ -1400,10 +1430,10 @@ function trackYear(m, today, opts){
     for(let k = 0; k < 7; k++){
       const d = addDays(ws, k);
       if(d < cal.start || d > cal.end) continue;
-      const st = statusOf(m, d), p = resolveDay(m, d, {planOnly: true});
-      const a = (w.past && policy === 'plan' && !m.confirmed[ws]) ? p : resolveDay(m, d);
+      const p = resolveDay(m, d, {planOnly: true});
+      const a = (w.past && policy === 'plan' && !m.confirmed[ws]) ? p : resolveDay(m, d);     // a confirmed or kept week counts its own status, whatever the calendar says now
       const mk = d.slice(0, 7), mo = months[mk] || (months[mk] = {key: mk, operational: 0, totals: blank()});
-      if(st.status !== 'closed'){
+      if(a.status !== 'closed'){
         w.operational++; mo.operational++;
         if(!seen[mk]){ seen[mk] = 1; ticks.push({key: mk, x: opsTotal + w.operational - 1}); }
       }
@@ -1496,7 +1526,7 @@ window.TimeCounter = {
   splitPeriod, mergePeriods, moveTimetableEntry, deleteVersion, setDayTypeArrivalDeparture,
   trackYear, dashboard, typeRows,
   liveBlock, addBlock, editBlock, deleteBlock, resetBlock, splitBlock, ranOver, scheduledEnd, afterSchoolMeeting, swapDuty,
-  setLeave, setDayTypeEdit, resetDay, resetWeek, describeChange, weekSummary, weekRange, weeksToReview, confirmedDrift,
+  setLeave, setDayTypeEdit, resetDay, resetWeek, describeChange, weekSummary, weekRange, weeksToReview, userEdits,
   scheduleOf, bellsOf, dayTypesUsing, unlinkSchedule, linkSchedule, renameSchedule, updateBell, migrate,
   renameDayType, copyDayType, dayTypeUsage, deleteDayType, rotationPlan, applyRotation, planDay, dayTypeTotals, planSummary,
   dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
@@ -2197,7 +2227,8 @@ function weekFooterHtml(ws){
   return '<section class="card"><h2>This week’s totals</h2><div class="scroll"><table class="tbl"><thead><tr><th>Category</th><th class="num">This week</th><th class="num">Plan</th><th class="num">Difference</th></tr></thead><tbody>' +
     row('Instructional', 'instructional', 'instructional') + row('Assignable', 'assignable', 'assignable') + row('Total assignable', null, 'totalAssignable') + row('Not counted', 'notCounted', 'notCounted') +
     (a.unassigned || p.unassigned ? row('No time type yet', null, 'unassigned') : '') + '</tbody></table></div>' +
-    '<p class="hint">' + (w.edits ? w.edits + ' edit' + (w.edits === 1 ? '' : 's') + ' this week. ' : 'No edits: this week follows the plan. ') + 'Convention days count a fixed 6 h whatever is on them.</p></section>';
+    '<p class="hint">' + (w.held ? (w.edits ? w.edits + ' edit' + (w.edits === 1 ? '' : 's') + ' since it was unlocked. ' : 'No edits since it was unlocked. ') + 'Plan is today’s plan, so Difference shows how far this week sits from it. '
+      : w.edits ? w.edits + ' edit' + (w.edits === 1 ? '' : 's') + ' this week. ' : 'No edits: this week follows the plan. ') + 'Convention days count a fixed 6 h whatever is on them.</p></section>';
 }
 
 function weekHtml(){
@@ -2208,27 +2239,30 @@ function weekHtml(){
   const {lo, hi} = gridRange(cols);
   const H = (hi - lo) * PPM;
   const last = TC.addDays(ws, 6);
-  const stName = {planned: 'Planned', edited: 'Edited', confirmed: 'Confirmed'}[status];
+  const stName = {planned: 'Planned', edited: 'Edited', reopened: 'Unlocked', confirmed: 'Confirmed'}[status];
+  const held = TC.weekSummary(m, ws).held;
   let h = '<div class="wkbar"><button class="btn" data-act="wk-prev"' + (ws <= range.first ? ' disabled' : '') + '>‹ Previous</button><button class="btn" data-act="wk-today">Today</button><button class="btn" data-act="wk-next"' + (ws >= range.last ? ' disabled' : '') + '>Next ›</button>' +
     '<label class="inl">Go to <input type="date" value="' + ws + '" data-f="wkDate" data-key="wkDate" min="' + m.calendar.start + '" max="' + m.calendar.end + '" aria-label="Go to the week of this date"></label>' +
     '<strong class="wkt">' + fmtDay(ws) + ' – ' + fmtDay(last) + ', ' + last.slice(0, 4) + '</strong>' +
-    '<span class="stpill st-' + status + '">' + (locked ? '🔒 ' : status === 'edited' ? '✎ ' : '') + stName + '</span>' +
+    '<span class="stpill st-' + status + '">' + (locked ? '🔒 ' : status === 'edited' ? '✎ ' : status === 'reopened' ? '🔓 ' : '') + stName + '</span>' +
     '<label class="chk"><input type="checkbox" data-f="wkWeekend" data-key="wkWeekend"' + (S.showWeekend ? ' checked' : '') + '> Show weekends</label><span class="spacer"></span>' +
     (locked ? '<button class="btn" data-act="wk-unlock">Unlock…</button>' : '<button class="btn primary" data-act="wk-confirm">Confirm this week…</button>') + '</div>';
   if(locked){
     const c = m.confirmed[ws];
     h += '<div class="banner ok">🔒 This week is confirmed' + (c.at ? ' (' + fmtDate(c.at) + ')' : '') + ': <strong>this is what happened</strong>. It keeps these blocks even if the timetable or duties change later. Unlock it to change it; the unlock is logged.</div>';
+  }else if(held){
+    h += '<div class="banner">🔓 This week was confirmed and then unlocked. It shows <strong>exactly what it showed when it was confirmed</strong>, and stays that way: a change to the timetable, duties or calendar does not move it. Only what you edit here changes it. <em>Reset to plan</em> hands it back to the current plan.</div>';
   }
   const review = TC.weeksToReview(m, td);
   if(review.length){
-    h += '<details class="card review"><summary><strong>' + review.length + ' past week' + (review.length === 1 ? '' : 's') + ' not confirmed yet</strong> <span class="muted">— they count as planned until you confirm them</span></summary><div class="chips">' +
-      review.map(r => '<button class="chipbtn" data-act="wk-go" data-ws="' + r.ws + '">' + fmtShort(r.ws) + ' – ' + fmtShort(TC.addDays(r.ws, 4)) + ' · ' + (r.status === 'edited' ? 'Edited' : 'Planned') + '</button>').join('') + '</div></details>';
+    h += '<details class="card review"><summary><strong>' + review.length + ' past week' + (review.length === 1 ? '' : 's') + ' not confirmed yet</strong> <span class="muted">— they count with their edits until you confirm them</span></summary><div class="chips">' +
+      review.map(r => '<button class="chipbtn" data-act="wk-go" data-ws="' + r.ws + '">' + fmtShort(r.ws) + ' – ' + fmtShort(TC.addDays(r.ws, 4)) + ' · ' + ({edited: 'Edited', reopened: 'Unlocked'}[r.status] || 'Planned') + '</button>').join('') + '</div></details>';
   }
   h += '<div class="scroll wkscroll"><div class="wk-grid" data-rs="' + lo + '" data-ppm="' + PPM + '" style="grid-template-columns:58px repeat(' + cols.length + ',minmax(128px,1fr))">';
   // header row
   h += '<div class="wk-corner"></div>';
   cols.forEach(r => {
-    const edits = (m.edits[r.date] || []).length, fixed = !!r.fixed;
+    const edits = TC.userEdits(m, r.date).length, fixed = !!r.fixed;
     const label = r.status === 'closed' ? (r.statusLabel === 'Weekend' ? 'Weekend' : 'Closed' + (r.statusLabel ? ': ' + r.statusLabel : ''))
       : r.status === 'instructional' ? (r.statusLabel || 'School day') : STATUS_NAME[r.status] + (r.statusLabel && r.statusLabel !== STATUS_NAME[r.status] ? ': ' + r.statusLabel : '');
     h += '<div class="wk-head' + (r.date === td ? ' today' : '') + (r.status === 'closed' ? ' closed' : '') + '"><div class="d1">' + (r.date === td ? '<span class="tdy">Today</span> ' : '') + fmtDay(r.date) + '</div>' +
@@ -2251,7 +2285,7 @@ function weekHtml(){
     h += '</div>';
   });
   h += '</div></div><p class="hint legend">Colour shows the category, and the label says it too. <span class="pen">✎</span> means the block was changed or added this week. Drag a block to move it, drag its top or bottom edge to resize it, or press it to open its form.</p>';
-  h += weekFlagsHtml(ws, locked) + quickHtml(locked, status === 'edited') + paletteHtml(locked) + weekFooterHtml(ws);
+  h += weekFlagsHtml(ws, locked) + quickHtml(locked, status !== 'planned') + paletteHtml(locked) + weekFooterHtml(ws);
   return h;
 }
 
@@ -2451,10 +2485,12 @@ async function qaLeave(date){
 }
 async function qaReset(){
   if(lockedMsg()) return;
-  const m = S.model, dates = weekDays().filter(d => (m.edits[d] || []).length);
+  const m = S.model, dates = weekDays().filter(d => (m.edits[d] || []).length), held = TC.weekSummary(m, curWeek()).held;
   if(!dates.length) return void nothingToDo('Reset to plan', 'This week has no edits, so it already matches the plan.');
-  const r = await ask('Reset to plan', '<p>This clears the edits so the day or week follows the current plan again. You can undo it.</p><div class="dgrid">' +
-    fld('Reset', '<select name="scope"><option value="week">The whole week (' + dates.reduce((n, d) => n + m.edits[d].length, 0) + ' edits)</option>' + dates.map(d => '<option value="' + d + '">' + fmtDay(d) + ' only (' + m.edits[d].length + ' edit' + (m.edits[d].length === 1 ? '' : 's') + ')</option>').join('') + '</select>') + '</div>',
+  const cnt = d => TC.userEdits(m, d).length, plural = n => n + ' edit' + (n === 1 ? '' : 's');
+  const r = await ask('Reset to plan', '<p>This clears the edits so the day or week follows the current plan again. You can undo it.</p>' +
+    (held ? '<p class="warn-t">⚠ This week was unlocked and kept as it was. Resetting it hands it to <strong>today’s plan</strong>, so its blocks can change even where you made no edit.</p>' : '') + '<div class="dgrid">' +
+    fld('Reset', '<select name="scope"><option value="week">The whole week (' + plural(dates.reduce((n, d) => n + cnt(d), 0)) + ')</option>' + dates.map(d => '<option value="' + d + '">' + fmtDay(d) + ' only (' + plural(cnt(d)) + ')</option>').join('') + '</select>') + '</div>',
     [CANCEL, {label: 'Reset', value: 'ok', kind: 'danger'}]);
   if(r.value !== 'ok') return;
   const ws = curWeek(), scope = r.data.scope;
@@ -2466,8 +2502,9 @@ async function dayMenu(date){
   else if(r.value === 'dt') qaDayType(date);
   else if(r.value === 'leave') qaLeave(date);
   else if(r.value === 'reset'){
-    const n = (S.model.edits[date] || []).length;
-    const c = await ask('Reset ' + fmtDay(date) + '?', '<p>This clears ' + n + ' edit' + (n === 1 ? '' : 's') + ' on this day so it follows the plan again. You can undo it.</p>', [CANCEL, {label: 'Reset', value: 'ok', kind: 'danger'}]);
+    const n = TC.userEdits(S.model, date).length, kept = (S.model.edits[date] || []).some(e => e.op === 'hold');
+    const c = await ask('Reset ' + fmtDay(date) + '?', '<p>This clears ' + n + ' edit' + (n === 1 ? '' : 's') + ' on this day so it follows the plan again. You can undo it.</p>' +
+      (kept ? '<p class="warn-t">⚠ This day was unlocked and kept as it was. Resetting it hands it to <strong>today’s plan</strong>, so its blocks can change even where you made no edit.</p>' : ''), [CANCEL, {label: 'Reset', value: 'ok', kind: 'danger'}]);
     if(c.value === 'ok') guardedEdit([date], mm => TC.resetDay(mm, date), 'Back to plan.');
   }
 }
@@ -2483,11 +2520,11 @@ async function confirmWeekAct(){
   if(r.value === 'ok') commit(mm => { TC.confirmWeek(mm, ws, {at: localToday()}); }, 'Week confirmed.');
 }
 async function unlockWeekAct(){
-  const m = S.model, ws = curWeek(), dr = TC.confirmedDrift(m, ws);
-  const r = await ask('Unlock this week?', '<p>Unlocking rebuilds the week from the <strong>current plan and its edits</strong>. The unlock is logged.</p>' +
-    (dr && dr.dates ? '<p class="warn-t">⚠ The plan has changed since you confirmed it, so unlocking would change ' + dr.dates + ' day' + (dr.dates === 1 ? '' : 's') + ': ' + esc(deltaText(dr.delta)) + '.</p>' : '<p class="hint">The plan has not changed since you confirmed it, so the week will look the same.</p>'),
+  const ws = curWeek();
+  const r = await ask('Unlock this week?', '<p>Unlocking lets you change the week. <strong>It keeps exactly what it shows now.</strong> Nothing moves unless you change it by hand, even if the timetable, duties or calendar change later.</p>' +
+    '<p class="hint">The unlock is logged. If you want the week to follow the current plan again, use <em>Reset to plan</em> afterwards.</p>',
     [CANCEL, {label: 'Unlock week', value: 'ok', kind: 'primary'}]);
-  if(r.value === 'ok') commit(mm => { TC.unlockWeek(mm, ws, {at: localToday()}); }, 'Week unlocked.');
+  if(r.value === 'ok') commit(mm => { TC.unlockWeek(mm, ws, {at: localToday()}); }, 'Week unlocked. It still shows exactly what it did.');
 }
 
 /* ---------- dragging: blocks, their edges, and time types from the palette ---------- */
@@ -2778,7 +2815,7 @@ function weekTable(c){
   let ci = 0, ct = 0;
   const rows = c.ty.weeks.map(w => {
     ci += w.totals.instructional; ct += w.totals.totalAssignable;
-    const st = w.status === 'confirmed' ? 'Confirmed' : w.status === 'edited' ? 'Edited' : 'Planned';
+    const st = {confirmed: 'Confirmed', edited: 'Edited', reopened: 'Unlocked'}[w.status] || 'Planned';
     const review = w.past && w.operational && w.status !== 'confirmed';
     return '<tr' + (w.current ? ' class="cur"' : '') + '><th scope="row">' + wkLabel(w.ws) + (w.current ? ' <span class="chip c-u">this week</span>' : '') + '</th><td>' + st + (review ? ' · <span class="warn-t">to review</span>' : '') + '</td><td class="num">' + hrs(w.totals.instructional) + '</td><td class="num">' + hrs(w.totals.assignable) + '</td><td class="num">' + hrs(w.totals.totalAssignable) + '</td><td class="num">' + hrs(w.totals.notCounted) + '</td><td class="num">' + hrs(ci) + '</td><td class="num">' + hrs(ct) + '</td></tr>';
   }).join('');
@@ -3719,26 +3756,55 @@ check('E12', 'Extra: what a change does, and a week against its plan', t => {
   t.eq(w.actual.assignable - w.plan.assignable, 45, 'actual minus plan is the difference');
 });
 
-check('E13', 'Extra: a confirmed week is locked', t => {
+check('E13', 'Extra: a confirmed week never shifts', t => {
   const m = withClasses(), d = '2026-09-08', ws = '2026-09-07';
-  TC.afterSchoolMeeting(m, d, {name:'Grad', minutes:45});
-  TC.confirmWeek(m, ws, {at:'2026-09-11'});
-  t.eq(TC.weekSummary(m, ws).status, 'confirmed', 'confirming marks the week Confirmed');
   const thrown = fn => { try{ fn(); return ''; }catch(x){ return x.message; } };
+  TC.setLeave(m, d, 'sick');
+  TC.afterSchoolMeeting(m, d, {name:'Grad', minutes:45, note:'Admin asked'});
+  TC.setTimetable(m.versions[0], 'tue', 'p5', {type:'prep', name:''});               // a Prep, so the day has some of every kind
+  TC.confirmWeek(m, ws, {at:'2026-09-11'});
+  const days = () => [0, 1, 2, 3, 4, 5, 6].map(k => TC.resolveDay(m, TC.addDays(ws, k)));
+  const shape = () => JSON.stringify(days().map(r => [r.status, r.dayTypeId, r.totals, r.byType, r.blocks.map(b => [b.start, b.end, b.typeId, b.name, b.category, b.edited, b.note, b.source]), r.leave]));
+  const kept = shape(), wk = () => TC.resolveDay(m, d).totals;
+  t.eq(TC.weekSummary(m, ws).status, 'confirmed', 'confirming marks the week Confirmed');
   t.ok(thrown(() => TC.addBlock(m, d, {start:T('10:00'), end:T('11:00'), typeId:'meeting'})).includes('confirmed'), 'a confirmed week takes no new blocks');
-  t.ok(thrown(() => TC.resetWeek(m, ws)).includes('confirmed') && thrown(() => TC.setLeave(m, d, 'sick')).includes('confirmed'), 'no resets or leave tags either');
-  t.eq(TC.confirmedDrift(m, ws).dates, 0, 'nothing has drifted yet');
-  TC.setTimetable(m.versions[0], 'tue', 'p1', {type:'prep', name:''});         // the plan changes later
-  const wk = () => TC.resolveDay(m, d).totals.instructional;
-  t.eq(wk(), 145, 'the confirmed week keeps its blocks (Tuesday Instructional 145 min)');
-  const drift = TC.confirmedDrift(m, ws);
-  t.eq([drift.dates, drift.delta.instructional], [1, -51], 'but unlocking now would change it by −51 min on 1 day, and that is reported first');
+  t.ok(thrown(() => TC.resetWeek(m, ws)).includes('confirmed') && thrown(() => TC.setLeave(m, d, 'other')).includes('confirmed'), 'no resets or leave tags either');
+  t.ok(thrown(() => TC.setCalendarDate(m, d, 'nid', 'x')).includes('confirmed'), 'its dates cannot be edited in the calendar');
+  // everything that could move it
+  TC.setTimetable(m.versions[0], 'tue', 'p1', {type:'prep', name:''});                 // the plan changes
+  TC.ensureVersion(m, '2026-09-01'); TC.deleteDayType(m, 'friB');                      // versions and day types change
+  m.timeTypes.find(x => x.id === 'class').category = 'notCounted';                     // a time type changes category
+  t.eq(shape(), kept, 'a confirmed week does not move when the plan, the day types or the time types change');
+  m.timeTypes.find(x => x.id === 'class').category = 'instructional';
+  // unlocking keeps it exactly as it was
+  t.eq(wk().instructional, 145, '(Tuesday still has 145 min of Class)');
   TC.unlockWeek(m, ws, {at:'2026-09-12'});
-  t.eq([wk(), TC.weekSummary(m, ws).status], [94, 'edited'], 'unlocking rebuilds it from the current plan and its edits');
+  t.eq([TC.weekSummary(m, ws).status, shape()], ['reopened', kept], 'unlocking does not change a single block, total, note or leave tag; the week is Reopened, not Edited');
+  t.eq(TC.weekSummary(m, ws).edits, 0, 'and it has no edits of its own yet');
   t.eq(m.log.map(x => x.kind), ['confirm', 'unlock'], 'both are logged');
-  t.eq(TC.confirmedDrift(m, ws), null, '(an unlocked week has no drift to report)');
+  m.timeTypes.find(x => x.id === 'class').category = 'notCounted';
+  t.eq(wk().instructional, 145, 'even a time type that changes category later does not move a kept block');
+  m.timeTypes.find(x => x.id === 'class').category = 'instructional';
+  TC.setTimetable(m.versions[0], 'tue', 'p2', {type:'prep', name:''});
+  t.ok(thrown(() => TC.setCalendarDate(m, d, 'nid', 'x')).includes('confirmed'), 'a kept week’s dates still cannot be edited in the calendar');
+  t.eq(shape(), kept, 'a later plan change still does not reach it');
+  // changes go on top
+  const p3 = TC.resolveDay(m, d).blocks.find(b => b.ref && b.name === 'Class' && b.start === T('9:53')), before = wk();
+  TC.ranOver(m, d, p3.ref, 5);
+  t.eq([TC.weekSummary(m, ws).status, TC.weekSummary(m, ws).edits, wk().instructional - before.instructional], ['edited', 1, 2], 'a change made by hand goes on top (5 min over, 3 of them taken from the next class: +2) and the week becomes Edited');
+  const grad = TC.resolveDay(m, d).blocks.find(b => b.name === 'Grad');
+  t.eq([grad.note, grad.edited], ['Admin asked', true], 'a block that was an edit when confirmed is still marked as one, with its note');
+  TC.deleteBlock(m, d, grad.ref);
+  t.ok(!TC.resolveDay(m, d).blocks.some(b => b.name === 'Grad') && TC.weekSummary(m, ws).edits === 2, 'deleting a kept block works, and counts as an edit');
+  t.eq(TC.resolveDay(m, '2026-09-09').blocks.find(b => b.typeId === 'class' && b.start === T('8:58')).end, T('9:45'), '(the Wednesday is untouched)');
+  t.ok(thrown(() => TC.setDayTypeEdit(m, d, 'wed')).includes('fixed'), 'a kept day’s day type is fixed (put the day back to plan to change it)');
+  // confirm it again, unlock it again: nothing is lost
+  const second = shape();
+  TC.confirmWeek(m, ws, {at:'2026-09-13'}); TC.unlockWeek(m, ws, {at:'2026-09-14'});
+  t.eq(shape(), second, 'confirming and unlocking again changes nothing');
+  // putting it back to the plan is a separate, deliberate step
   TC.resetWeek(m, ws);
-  t.eq(TC.weekSummary(m, ws).status, 'planned', 'and it can be edited and reset again');
+  t.eq([TC.weekSummary(m, ws).status, wk().instructional], ['planned', 94], 'Reset to plan makes the week follow today’s plan again (Tuesday Class now 94 min)');
 });
 
 check('E14', 'Extra: the weeks to review', t => {
@@ -3751,6 +3817,8 @@ check('E14', 'Extra: the weeks to review', t => {
   list = TC.weeksToReview(m, '2027-04-05').map(x => x.ws);
   t.ok(!list.includes('2026-12-21') && !list.includes('2026-12-28') && !list.includes('2027-03-22'), 'break weeks with no school are not listed');
   t.ok(list.includes('2026-11-09') && list.includes('2027-03-29'), 'weeks with some school either side of a break are');
+  TC.confirmWeek(m, '2026-09-21'); TC.unlockWeek(m, '2026-09-21');
+  t.eq(TC.weeksToReview(m, '2026-10-08').find(x => x.ws === '2026-09-21').status, 'reopened', 'a reopened week is back in the list to review, as Reopened');
   t.eq(TC.weeksToReview(m, '2026-08-20'), [], 'before the year starts there is nothing to review');
   t.ok(TC.weeksToReview(m, '2027-09-01').every(x => x.ws <= '2027-06-28'), 'and nothing past the end of the year is listed');
 });

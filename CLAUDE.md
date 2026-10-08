@@ -147,10 +147,17 @@ and port it upstream by hand.
 - **Ask before lowering Instructional time.** `guardedEdit()` runs a change on a copy
   with `TC.describeChange()`; if Instructional would go down it asks first, then
   reports what changed with an Undo.
-- **A confirmed week is locked.** `confirmWeek` snapshots the week's blocks and every
-  edit helper refuses to touch it. Unlocking **rebuilds it from the current plan and
-  its edits** (a deliberate choice), so the unlock dialog first shows what would
-  change (`TC.confirmedDrift`). Both are logged in `model.log`.
+- **A confirmed week is locked, and a week that was ever confirmed never shifts.**
+  `confirmWeek` snapshots the week's blocks and every edit helper refuses to touch it.
+  `unlockWeek` does not hand the week back to the plan: it turns the snapshot into
+  ordinary edit ops (one `hold` per day, which pins the status, day type and version,
+  plus a base `add` per block and a base `leave`), so the week shows exactly what it
+  showed and nothing moves unless the teacher edits it (a deliberate choice). Base ops
+  are not user edits (`TC.userEdits` leaves them out), so the status is *reopened*
+  until something is changed by hand, then *edited*. Calendar changes inside a
+  confirmed or held week are refused. Reset to plan (`resetDay` / `resetWeek`) removes
+  the holds and is the only way back to the current plan, and it says so. Confirm and
+  unlock are both logged in `model.log`.
 - **The week grid is plain pointer events** (no drag-and-drop API). Mouse: drag a
   block, its top or bottom edge, or a time type from the palette. Touch and keyboard:
   press a block, an empty slot or a palette item to open the same form. Anything a
