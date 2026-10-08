@@ -19,7 +19,7 @@ Those files change upstream; this one only records what is different **here**.
 ## What's different here
 
 - **Scope is a curated subset.** Upstream carries ~20 tools; this site carries
-  only the EAL Benchmark tool and Graph Paper.
+  only the EAL Benchmark tool, Graph Paper and Time Counter.
 - **No shared Class Lists.** The shared roster panel (localStorage
   `teachingtools:rosters`) is not on this homepage, and the EAL tool no
   longer reads it. The tool has its own class list instead (see below).
@@ -34,6 +34,9 @@ Those files change upstream; this one only records what is different **here**.
   source of truth for the tool; it has diverged and is no longer a copy.
 - `tools/graph-paper/index.html` — **native to this repo** (not from upstream).
   Printable blank grids of every common kind.
+- `tools/time-counter/index.html` — **native to this repo.** Plans and records a
+  school year of work time against the instructional and assignable limits. Being
+  built in stages; not yet linked from the homepage.
 - `.nojekyll` — serve files as-is on GitHub Pages.
 
 ## The EAL tool has forked from upstream
@@ -105,6 +108,22 @@ and port it upstream by hand.
   is Flate-compressed via `CompressionStream` where the browser has it.
 - Settings persist under `teachingtools:graphPaper:settings`; a "Copy link"
   button encodes the non-default settings in the URL hash (`#s=…`).
+
+## Time Counter — how it's built
+
+- **Engine first, screens later.** The first `<script>` is a DOM-free engine
+  exposed as `window.TimeCounter`; the second is the self-test. Opening the page
+  with `?test` runs every check and shows pass or fail for each.
+- **Minutes and local dates only.** Dates are `YYYY-MM-DD` strings, times are
+  minutes after midnight, totals are whole minutes (hours are for display). No
+  `Date` with a time zone anywhere, so daylight-saving changes can't move a block.
+- **Layers, and each minute counted once.** A day is built from calendar status,
+  day type, the timetable version in force, bells, required arrival/departure,
+  duties, then that week's edits. The later layer takes the minutes it covers.
+  Every time type belongs to one category: Instructional, Assignable or Not counted.
+- **The calendar and limits are data**, not code, so another year can be swapped in.
+- **The saved model is plain JSON** (no Maps, Sets or Dates), so it can be embedded
+  in a PDF later and reloaded without loss.
 
 ## Commit / PR rules — IMPORTANT
 

@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Plan and record a school year of work time, and see how it tracks against the assignable and instructional time limits. Runs in your browser, works offline.">
+<meta name="theme-color" content="#1f3d35">
+<title>Time Counter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23e0982e'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --app-bg:#e9edf0; --panel:#fff; --panel-2:#f4f6f8; --room-bg:#f7f8f6;
+    --ink:#16241f; --muted:#67756f; --line:#d8dee2; --grid-line:rgba(31,61,53,.07);
+    --board:#1f3d35; --board-2:#173029; --board-line:#2c5247;
+    --accent:#e0982e; --accent-soft:#fbe6c8; --accent-deep:#b9781f;
+    --danger:#c43d35; --danger-soft:#f7e0de; --together:#2f6f9f; --together-soft:#dde9f3;
+    --ok:#3f9e6b; --ok-soft:#dcefe4;
+    --shadow:0 1px 2px rgba(20,40,33,.06),0 6px 18px rgba(20,40,33,.06);
+    --shadow-sm:0 1px 2px rgba(20,40,33,.10); --radius:12px;
+    --sans:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--app-bg);
+    -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45;}
+  a{color:inherit;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+
+  .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:11px 20px;
+    background:var(--panel);border-bottom:1px solid var(--line);}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;font-size:13px;color:var(--ink);white-space:nowrap;text-decoration:none;}
+  .brand .mark{width:16px;height:16px;border-radius:4px;background:var(--accent);
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.06);flex:none;}
+  .brand small{font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--muted);font-size:11px;}
+  .spacer{flex:1;}
+  .pill{font-family:var(--mono);font-size:11px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--muted);}
+  .pill.ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ink);}
+  .pill.bad{background:var(--danger-soft);border-color:var(--danger);color:var(--ink);}
+
+  .wrap{max-width:860px;margin:0 auto;padding:34px 20px 60px;}
+  .hero{margin:0 0 22px;}
+  .hero h1{margin:0 0 8px;font-size:26px;letter-spacing:-.01em;}
+  .hero p{margin:0 0 8px;max-width:64ch;color:var(--muted);font-size:14.5px;line-height:1.6;}
+  .hero a{color:var(--board);font-weight:600;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px;box-shadow:var(--shadow);margin:0 0 12px;}
+  .card h2{margin:0;font-size:14.5px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .card h2 .n{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:2.2em;}
+  .card h2 .t{flex:1;min-width:12em;}
+  .card ul{margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--muted);}
+  .card li{padding:2px 0 2px 20px;position:relative;}
+  .card li::before{content:"\2713";position:absolute;left:0;color:var(--ok);font-weight:700;}
+  .card li.fail{color:var(--ink);}
+  .card li.fail::before{content:"\2717";color:var(--danger);}
+  .card details summary{cursor:pointer;font-size:12px;color:var(--muted);margin-top:8px;}
+  .card.pending{background:var(--panel-2);border-style:dashed;box-shadow:none;color:var(--muted);}
+  .card.pending h2{color:var(--muted);}
+  .card p{margin:8px 0 0;font-size:13px;color:var(--muted);}
+
+  footer{margin-top:34px;border-top:1px solid var(--line);padding-top:18px;
+    color:var(--muted);font-size:12.5px;line-height:1.6;}
+  footer a{color:var(--board);}
+  @media (max-width:620px){ .hero h1{font-size:22px;} .wrap{padding:24px 16px 48px;} }
+</style>
+</head>
+<body>
+
+  <header class="toolbar">
+    <a class="brand" href="../../index.html" title="All tools"><span class="mark"></span>Time Counter <small>plan and record work time</small></a>
+    <div class="spacer"></div>
+    <span class="pill" id="summary"></span>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Time Counter</h1>
+      <p>Plan and record a school year of work time, and see how it tracks against the
+         instructional and assignable time limits in the ATA/CBE collective agreement.</p>
+      <p id="stageNote">This tool is being built in stages. The counting engine (calendar, day
+         types, bell times and the counting rules) is in place; the screens come next.
+         <a href="?test">Run the engine self-test</a>.</p>
+    </section>
+    <div id="out"></div>
+    <footer>
+      Time Counter gives an <strong>estimate</strong> against clause 8.1 of the ATA/CBE
+      collective agreement. It is a reference, not an official ruling. See the
+      <a href="https://local38.teachers.ab.ca/About%20the%20Local/Salaries%20and%20Benefits/Pages/CBA_Benefits.aspx" rel="noopener">collective agreement</a>
+      and the <a href="https://teachers.ab.ca/pay-and-benefits/assignable-and-instructional-time-calculators" rel="noopener">ATA assignable and instructional time calculators</a>.
+      Questions: ATA Local 38, 403-262-6616, <a href="mailto:info@ata38.ab.ca">info@ata38.ab.ca</a>.
+    </footer>
+  </main>
+
+<script>
+/* =====================================================================
+   Time Counter — engine (stage 1)
+   Everything is plain data in, plain data out: no DOM, no clock, no
+   time zones. Dates are 'YYYY-MM-DD' strings, times are minutes after
+   midnight, and every total is whole minutes. Hours (two decimals) are for
+   display only.
+   ===================================================================== */
+(function(){
+'use strict';
+
+/* ---------- local dates (calendar arithmetic, no Date-with-time-zone) ---------- */
+const MS_DAY = 86400000;
+const pad2 = n => (n < 10 ? '0' : '') + n;
+const clone = x => JSON.parse(JSON.stringify(x));
+
+function dayNum(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if(!m) throw new Error('Bad date: ' + iso);
+  return Math.round(Date.UTC(+m[1], +m[2] - 1, +m[3]) / MS_DAY);
+}
+function isoOf(n){
+  const d = new Date(n * MS_DAY);
+  return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+}
+const addDays   = (iso, k) => isoOf(dayNum(iso) + k);
+const weekday   = iso => ((dayNum(iso) + 4) % 7 + 7) % 7;          // 0 = Sunday … 6 = Saturday
+const weekStart = iso => addDays(iso, -((weekday(iso) + 6) % 7));  // the Monday of that week
+function dateRange(from, to){
+  const out = [];
+  for(let n = dayNum(from), e = dayNum(to); n <= e; n++) out.push(isoOf(n));
+  return out;
+}
+
+/* ---------- clock times, as minutes after midnight ---------- */
+function T(s){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if(!m) throw new Error('Bad time: ' + s);
+  return +m[1] * 60 + +m[2];
+}
+function fmtTime(min, clock12){
+  const h = Math.floor(min / 60), mm = pad2(min % 60);
+  if(clock12 === false) return pad2(h) + ':' + mm;
+  return ((h % 12) || 12) + ':' + mm + (h < 12 ? ' am' : ' pm');
+}
+const hours = min => Math.round(min / 60 * 100) / 100;   // display only
+
+/* ---------- calendar: data, not code ---------- */
+// Every weekday between firstStudentDay and lastStudentDay is instructional
+// unless an exception says otherwise. Everything else is closed. An exception
+// may also name the day type that date runs by default.
+const CAL_2026_27 = {
+  format: 'time-counter-calendar', version: 1, id: 'cbe-2026-27',
+  name: 'CBE 2026–27 Instructional Calendar', source: 'Amended April 6, 2026',
+  start: '2026-08-26', end: '2027-06-29',
+  firstStudentDay: '2026-08-31', lastStudentDay: '2027-06-25',
+  exceptions: [
+    {from:'2026-08-26', to:'2026-08-28', status:'nid',          label:'Before students start'},
+    {from:'2026-09-07',                  status:'closed',       label:'Labour Day'},
+    {from:'2026-09-25',                  status:'nid',          label:'Non-instruction day'},
+    {from:'2026-09-30',                  status:'closed',       label:'National Day for Truth and Reconciliation'},
+    {from:'2026-10-12',                  status:'closed',       label:'Thanksgiving Day'},
+    {from:'2026-10-19',                  status:'nid',          label:'Non-instruction day'},
+    {from:'2026-11-11', to:'2026-11-13', status:'closed',       label:'Fall Break (Nov 11 is Remembrance Day)'},
+    {from:'2026-11-27',                  status:'nid',          label:'Non-instruction day'},
+    {from:'2026-12-21', to:'2027-01-01', status:'closed',       label:'Winter Break (Dec 19 – Jan 3)'},
+    {from:'2027-01-29',                  status:'nid',          label:'System Professional Learning'},
+    {from:'2027-02-11', to:'2027-02-12', status:'convention',   label:'Teachers’ Convention'},
+    {from:'2027-02-15',                  status:'closed',       label:'Family Day'},
+    {from:'2027-02-26',                  status:'nid',          label:'Non-instruction day'},
+    {from:'2027-03-19',                  status:'nid',          label:'Non-instruction day'},
+    {from:'2027-03-22', to:'2027-03-29', status:'closed',       label:'Spring Break (Mar 20 – 29, includes Good Friday)'},
+    {from:'2027-04-30',                  status:'nid',          label:'Maatoomsii’Pookaiks, System Professional Learning'},
+    {from:'2027-05-21',                  status:'nid',          label:'Non-instruction day'},
+    {from:'2027-05-24',                  status:'closed',       label:'Victoria Day'},
+    {from:'2027-06-25',                  status:'instructional',label:'Last day for students; system-wide early dismissal', dayType:'early'},
+    {from:'2027-06-28', to:'2027-06-29', status:'nid',          label:'Last operational days'}
+  ]
+};
+
+function baseStatus(cal, date){
+  if(date < cal.start || date > cal.end) return {status:'closed', label:''};
+  const wd = weekday(date), weekend = wd === 0 || wd === 6;
+  for(const x of cal.exceptions){
+    if(date >= x.from && date <= (x.to || x.from)){
+      if(weekend && x.status !== 'closed') continue;   // a weekend inside a range stays closed
+      return {status:x.status, label:x.label || '', dayType:x.dayType};
+    }
+  }
+  if(weekend) return {status:'closed', label:'Weekend'};
+  if(date >= cal.firstStudentDay && date <= cal.lastStudentDay) return {status:'instructional', label:''};
+  return {status:'closed', label:''};
+}
+// An edited date keeps its original status for reference.
+function statusOf(m, date){
+  const base = baseStatus(m.calendar, date), e = m.calendarEdits[date];
+  if(!e) return base;
+  return {status:e.status, label:e.label || base.label, edited:true, original:{status:base.status, label:base.label}};
+}
+function setCalendarDate(m, date, status, label){
+  const base = baseStatus(m.calendar, date);
+  if(status === base.status && (label == null || label === base.label)) delete m.calendarEdits[date];
+  else m.calendarEdits[date] = {status, label: label || ''};
+  touch(m);
+}
+function datesWhere(m, pred){
+  return dateRange(m.calendar.start, m.calendar.end).filter(d => pred(d, statusOf(m, d)));
+}
+function countDays(m){
+  const out = {operational:0, instructional:0, nid:0, convention:0,
+               byWeekday:{1:0, 2:0, 3:0, 4:0, 5:0}, byMonth:{}};
+  for(const d of dateRange(m.calendar.start, m.calendar.end)){
+    const st = statusOf(m, d).status;
+    if(st === 'closed') continue;
+    const mo = d.slice(0, 7);
+    const row = out.byMonth[mo] || (out.byMonth[mo] = {operational:0, instructional:0});
+    out.operational++; out[st]++; row.operational++;
+    if(st === 'instructional'){ out.byWeekday[weekday(d)]++; row.instructional++; }
+  }
+  return out;
+}
+
+/* ---------- time types: each belongs to exactly one category ---------- */
+// instructional -> Instructional total and Total assignable
+// assignable    -> Total assignable only
+// notCounted    -> its own log; neither limit
+const TIME_TYPES = [
+  {id:'class',            name:'Class',                        category:'instructional', includes:'Timetabled classes'},
+  {id:'coverage',         name:'Coverage',                     category:'instructional', includes:'Covering a colleague’s class when there is no substitute'},
+  {id:'tutorial',         name:'Mandatory tutorial',           category:'instructional', includes:'Tutorial time the school requires'},
+  {id:'exam',             name:'Exam invigilation',            category:'instructional', includes:'PATs, finals'},
+  {id:'fieldInstruction', name:'Field trip instruction',       category:'instructional', includes:'Teaching, or supervising someone teaching, on a curricular trip'},
+  {id:'supervision',      name:'Supervision',                  category:'assignable',    includes:'Before and after classes, recess, nutrition breaks, lunch'},
+  {id:'transition',       name:'Transition',                   category:'assignable',    includes:'Passing time between classes'},
+  {id:'meeting',          name:'Meeting',                      category:'assignable',    includes:'Staff meetings and other mandatory meetings'},
+  {id:'committee',        name:'Committee',                    category:'assignable',    includes:'Mandatory school committee meetings and work'},
+  {id:'pd',               name:'PD / in-service',              category:'assignable',    includes:'Board- or school-directed training'},
+  {id:'nid',              name:'Non-instruction day',          category:'assignable',    includes:'Required attendance on non-instruction days, breaks excluded'},
+  {id:'convention',       name:'Teachers’ Convention',    category:'assignable',    includes:'Fixed at 6 h per full day', fixedMinutesPerDay:360},
+  {id:'event',            name:'School event',                 category:'assignable',    includes:'Conferences, meet-the-teacher, open houses'},
+  {id:'arrivalDeparture', name:'Required arrival / departure', category:'assignable',    includes:'Before the first bell or after the last, when admin requires it'},
+  {id:'fieldDuties',      name:'Field trip duties',            category:'assignable',    includes:'Travel, bus rides, on-call evening supervision'},
+  {id:'other',            name:'Other assigned',               category:'assignable',    includes:'Anything else admin sets for a time and place; needs a description'},
+  {id:'prep',             name:'Prep',                         category:'notCounted',    includes:'Planning and preparing'},
+  {id:'marking',          name:'Marking',                      category:'notCounted',    includes:'Assessment outside instructional time'},
+  {id:'reporting',        name:'Reporting',                    category:'notCounted',    includes:'Report cards and IPPs'},
+  {id:'parentContact',    name:'Parent contact',               category:'notCounted',    includes:'Contact not prescribed by admin'},
+  {id:'lunch',            name:'Lunch / break',                category:'notCounted',    includes:'The teacher’s own break'},
+  {id:'voluntary',        name:'Voluntary',                    category:'notCounted',    includes:'Clubs, coaching, robotics, unless admin assigns them'}
+];
+
+/* ---------- day types and the bell-time template ---------- */
+const DAY_TYPES = [
+  {id:'mon', name:'Monday'}, {id:'tue', name:'Tuesday'}, {id:'wed', name:'Wednesday'}, {id:'thu', name:'Thursday'},
+  {id:'friA', name:'Friday A'}, {id:'friB', name:'Friday B'}, {id:'friC', name:'Friday C'}, {id:'friD', name:'Friday D'},
+  {id:'nid', name:'Non-instruction day'}, {id:'convention', name:'Teachers’ Convention'},
+  {id:'early', name:'Early dismissal'}, {id:'conference', name:'Conference day'}
+];
+const MON_THU_BELLS = [['p1','8:05','8:56'], ['p2','8:58','9:45'], ['p3','9:53','10:40'], ['p4','10:42','11:29'],
+                       ['p5','11:31','12:18'], ['p6','12:18','13:07'], ['p7','13:09','13:56'], ['p8','13:58','14:45']];
+const FRIDAY_BELLS  = [['p1','8:05','8:56'], ['p2','8:58','9:48'], ['p3','9:56','10:26'], ['p4','10:28','11:19'],
+                       ['p5','11:21','12:10']];
+const periods = rows => rows.map(r => ({id:r[0], kind:'period', name:'', start:T(r[1]), end:T(r[2])}));
+const FRIDAY_LUNCH = () => ({id:'lunch', kind:'block', name:'Lunch', start:T('12:10'), end:T('13:00'), type:'lunch'});
+
+// A version is a complete copy of the generic week from its start date until
+// the next version starts. `days` is school setup (the bells); `timetable` is
+// personal (what each period is), so a colleague can import one without the other.
+function templateVersion(start){
+  const days = {};
+  DAY_TYPES.forEach(d => { days[d.id] = {bells: [], arrival: null, departure: null}; });
+  ['mon','tue','wed','thu'].forEach(id => { days[id].bells = periods(MON_THU_BELLS); });
+  ['friA','friB','friC','friD'].forEach(id => { days[id].bells = periods(FRIDAY_BELLS).concat([FRIDAY_LUNCH()]); });
+  // Placeholder: the real Early dismissal bell times are not known yet, so it
+  // starts as a copy of the Friday periods. Edit it like any other schedule.
+  days.early.bells = periods(FRIDAY_BELLS);
+  days.early.placeholder = 'Copy of the Friday periods until the real Early dismissal times are entered.';
+  return {start, arrival: 0, departure: 0, days, timetable: {}};
+}
+
+function newModel(){
+  const cal = clone(CAL_2026_27);
+  return {
+    format: 'time-counter', version: 1, seq: 0,
+    calendar: cal, calendarEdits: {},
+    settings: {
+      fte: 1, typicalAssignedHours: null,
+      limits: {instructionalHours: 916, totalAssignableHours: 1200},
+      gapMaxMinutes: 10, warnPercent: 95, clock12: true, teacher: '', school: ''
+    },
+    timeTypes: clone(TIME_TYPES),
+    dayTypes: clone(DAY_TYPES),
+    dayTypeDefaults: {weekday: {1:'mon', 2:'tue', 3:'wed', 4:'thu'}, status: {nid:'nid', convention:'convention'}},
+    dayTypeOverrides: {},
+    versions: [templateVersion(cal.start)],
+    // The one shared duty the school template ships: the Friday meeting.
+    duties: [{id:'friMeeting', name:'Meeting', typeId:'meeting', start:T('13:00'), end:T('14:45'),
+              from:null, to:null, off:[], shared:true,
+              rule:{kind:'weekly', dayTypes:['friA','friB','friC','friD']}}],
+    edits: {}, confirmed: {}, log: []
+  };
+}
+
+/* ---------- internal caches (not saved) ---------- */
+function touch(m){ Object.defineProperty(m, '_sw', {value:null, writable:true, configurable:true, enumerable:false}); }
+function schoolWeeks(m){
+  if(!m._sw){
+    const list = [];
+    for(let ws = weekStart(m.calendar.start); ws <= m.calendar.end; ws = addDays(ws, 7)){
+      for(let k = 0; k < 7; k++){
+        if(statusOf(m, addDays(ws, k)).status !== 'closed'){ list.push(ws); break; }
+      }
+    }
+    Object.defineProperty(m, '_sw', {value:list, writable:true, configurable:true, enumerable:false});
+  }
+  return m._sw;
+}
+
+/* ---------- day types and versions ---------- */
+function dayTypeFor(m, date, st){
+  st = st || statusOf(m, date);
+  if(m.dayTypeOverrides[date]) return m.dayTypeOverrides[date];
+  if(st.dayType) return st.dayType;
+  const d = m.dayTypeDefaults;
+  if(st.status === 'nid') return d.status.nid || null;
+  if(st.status === 'convention') return d.status.convention || null;
+  if(st.status === 'instructional') return d.weekday[weekday(date)] || null;
+  return null;
+}
+function setDayType(m, date, dayTypeId){
+  if(dayTypeId) m.dayTypeOverrides[date] = dayTypeId; else delete m.dayTypeOverrides[date];
+}
+function addDayType(m, dt){
+  if(m.dayTypes.some(d => d.id === dt.id)) throw new Error('Day type exists: ' + dt.id);
+  m.dayTypes.push({id: dt.id, name: dt.name});
+  m.versions.forEach(v => { v.days[dt.id] = {bells: [], arrival: null, departure: null}; });
+}
+function versionFor(m, date){
+  let v = m.versions[0];
+  for(const x of m.versions) if(x.start <= date) v = x;
+  return v;
+}
+function ensureVersion(m, start){
+  let v = m.versions.find(x => x.start === start);
+  if(v) return v;
+  v = clone(versionFor(m, start));
+  v.start = start;
+  m.versions.push(v);
+  m.versions.sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
+  return v;
+}
+function nextBellId(bells){
+  let n = 0;
+  bells.forEach(b => { const x = /^p(\d+)$/.exec(b.id); if(x) n = Math.max(n, +x[1]); });
+  return 'p' + (n + 1);
+}
+function addPeriod(version, dayTypeId, p){
+  const d = version.days[dayTypeId];
+  const bell = {id: p.id || nextBellId(d.bells), kind: p.kind || 'period', name: p.name || '', start: p.start, end: p.end};
+  if(p.type) bell.type = p.type;
+  d.bells.push(bell);
+  d.bells.sort((a, b) => a.start - b.start || a.end - b.end);
+  return bell.id;
+}
+function removePeriod(version, dayTypeId, bellId){
+  const d = version.days[dayTypeId];
+  d.bells = d.bells.filter(b => b.id !== bellId);
+  if(version.timetable[dayTypeId]) delete version.timetable[dayTypeId][bellId];
+}
+function setTimetable(version, dayTypeId, bellId, entry){
+  (version.timetable[dayTypeId] || (version.timetable[dayTypeId] = {}))[bellId] = {type: entry.type, name: entry.name || ''};
+}
+// Arrival and departure belong to the generic week, so a change applies from a
+// chosen date forward: the version that starts on that date and every later one.
+function setArrivalDeparture(m, fromDate, arrival, departure){
+  ensureVersion(m, fromDate);
+  m.versions.forEach(v => { if(v.start >= fromDate){ v.arrival = arrival; v.departure = departure; } });
+}
+
+/* ---------- duties: their own layer, with repeat rules ---------- */
+// rule kinds: weekly {dayTypes} · everyNWeeks {n, startDate, weekdays?} ·
+//             nthWeekday {n, weekday} · dates {dates}
+function dutyState(m, duty, date, st, dayTypeId){
+  if(duty.from && date < duty.from) return null;
+  if(duty.to && date > duty.to) return null;
+  const r = duty.rule;
+  let cand = false;
+  if(r.kind === 'weekly'){
+    cand = !!dayTypeId && r.dayTypes.indexOf(dayTypeId) >= 0;
+  }else if(r.kind === 'nthWeekday'){
+    cand = weekday(date) === r.weekday && Math.floor((+date.slice(8) - 1) / 7) + 1 === r.n;
+  }else if(r.kind === 'dates'){
+    cand = r.dates.indexOf(date) >= 0;
+  }else if(r.kind === 'everyNWeeks'){
+    // Counts school weeks: a break week with no school days does not shift the rotation.
+    const sw = schoolWeeks(m), i = sw.indexOf(weekStart(date));
+    let i0 = sw.indexOf(weekStart(r.startDate));
+    if(i0 < 0) i0 = sw.findIndex(w => w >= weekStart(r.startDate));
+    const wds = r.weekdays || [weekday(r.startDate)];
+    cand = i >= 0 && i0 >= 0 && i >= i0 && (i - i0) % r.n === 0 && date >= r.startDate && wds.indexOf(weekday(date)) >= 0;
+  }
+  if(!cand) return null;
+  if(st.status === 'closed') return 'skipped';
+  if((duty.off || []).indexOf(date) >= 0) return 'off';
+  return 'on';
+}
+// The visible list of dates a duty's rule produces, each 'on', 'off' or 'skipped'.
+function dutyDates(m, duty){
+  const out = [], seen = {};
+  const scan = d => {
+    if(seen[d]) return; seen[d] = 1;
+    const st = statusOf(m, d), s = dutyState(m, duty, d, st, dayTypeFor(m, d, st));
+    if(s) out.push({date: d, state: s});
+  };
+  dateRange(m.calendar.start, m.calendar.end).forEach(scan);
+  if(duty.rule.kind === 'dates') duty.rule.dates.forEach(scan);
+  return out.sort((a, b) => a.date < b.date ? -1 : 1);
+}
+function setDutyOccurrence(duty, date, on){
+  duty.off = (duty.off || []).filter(d => d !== date);
+  if(!on) duty.off.push(date);
+}
+
+/* ---------- edits (what actually happened), kept as changes to the plan ---------- */
+// op 'add'     {start, end, typeId, name, note}
+// op 'remove'  {ref}                 op 'change' {ref, typeId?, name?, start?, end?}
+// op 'dayType' {dayTypeId}           op 'leave'  {kind}   (a tag only: totals do not change)
+function addEdit(m, date, edit, meta){
+  const e = Object.assign({id: 'e' + (++m.seq)}, edit, {entered: (meta && meta.entered) || null});
+  (m.edits[date] || (m.edits[date] = [])).push(e);
+  return e;
+}
+function removeEdit(m, date, id){
+  m.edits[date] = (m.edits[date] || []).filter(e => e.id !== id);
+  if(!m.edits[date].length) delete m.edits[date];
+}
+// "Covered a class": turn all or part of a block (normally Prep) into Coverage,
+// using the same minutes.
+function coverClass(m, date, ref, o){
+  o = o || {};
+  const bs = resolveDay(m, date).blocks.filter(b => b.ref === ref);
+  if(!bs.length) throw new Error('No block ' + ref + ' on ' + date);
+  const lo = Math.min.apply(null, bs.map(b => b.start)), hi = Math.max.apply(null, bs.map(b => b.end));
+  const s = o.start != null ? o.start : lo, e = o.end != null ? o.end : hi;
+  if(s < lo || e > hi || e <= s) throw new Error('Cover range is outside the block');
+  return addEdit(m, date, {op:'add', start:s, end:e, typeId:'coverage',
+                           name: o.whose ? 'Coverage: ' + o.whose : 'Coverage', note: o.note || ''}, o);
+}
+
+/* ---------- confirming a week ---------- */
+function confirmWeek(m, ws, meta){
+  const days = {};
+  for(let k = 0; k < 7; k++){
+    const d = addDays(ws, k), r = resolveDay(m, d, {ignoreConfirmed: true});
+    days[d] = {status: r.status, label: r.statusLabel, dayTypeId: r.dayTypeId, versionStart: r.versionStart,
+               blocks: clone(r.blocks), flags: clone(r.flags), leave: r.leave};
+  }
+  m.confirmed[ws] = {at: (meta && meta.at) || null, days};
+  m.log.push({kind: 'confirm', week: ws, at: (meta && meta.at) || null});
+}
+function unlockWeek(m, ws, meta){
+  delete m.confirmed[ws];
+  m.log.push({kind: 'unlock', week: ws, at: (meta && meta.at) || null});
+}
+function weekStatus(m, ws){
+  if(m.confirmed[ws]) return 'confirmed';
+  for(let k = 0; k < 7; k++) if(m.edits[addDays(ws, k)]) return 'edited';
+  return 'planned';
+}
+
+/* ---------- resolving one day ---------- */
+function typeMap(m){ const o = Object.create(null); m.timeTypes.forEach(t => { o[t.id] = t; }); return o; }
+
+function summarize(blocks){
+  const t = {instructional:0, assignable:0, notCounted:0, unassigned:0}, byType = {};
+  for(const b of blocks){
+    t[b.category || 'unassigned'] += b.minutes;
+    if(b.typeId) byType[b.typeId] = (byType[b.typeId] || 0) + b.minutes;
+  }
+  t.totalAssignable = t.instructional + t.assignable;
+  t.total = t.instructional + t.assignable + t.notCounted + t.unassigned;
+  return {totals: t, byType};
+}
+
+// Layers, lowest to highest; the later layer takes the minutes it covers:
+//   bells + timetable  <  required arrival / departure  <  duties  <  this week's edits
+// Every minute is owned by at most one block, so nothing is ever counted twice.
+function resolveDay(m, date, opts){
+  opts = opts || {};
+  const planOnly = !!opts.planOnly;
+  const st = statusOf(m, date);
+  const ws = weekStart(date);
+  const types = typeMap(m);
+  const dayTypeName = id => { const d = m.dayTypes.find(x => x.id === id); return d ? d.name : ''; };
+  const base = {date, weekday: weekday(date), weekStart: ws, status: st.status, statusLabel: st.label || '',
+                calendarEdited: !!st.edited};
+
+  const conf = !planOnly && !opts.ignoreConfirmed && m.confirmed[ws];
+  if(conf && conf.days[date]){
+    const s = conf.days[date], sum = summarize(s.blocks);
+    return Object.assign(base, {status: s.status, statusLabel: s.label, dayTypeId: s.dayTypeId,
+      dayTypeName: dayTypeName(s.dayTypeId), versionStart: s.versionStart, blocks: clone(s.blocks),
+      flags: clone(s.flags), totals: sum.totals, byType: sum.byType, leave: s.leave || null,
+      effects: [], confirmed: true});
+  }
+
+  const dayEdits = planOnly ? [] : (m.edits[date] || []);
+  const flags = [], effects = [];
+  const leaveEdit = dayEdits.filter(e => e.op === 'leave').pop() || null;
+  const leave = leaveEdit ? {kind: leaveEdit.kind || '', note: leaveEdit.note || ''} : null;
+  const ver = versionFor(m, date);
+  let dayTypeId = dayTypeFor(m, date, st);
+  const dtEdit = dayEdits.filter(e => e.op === 'dayType').pop();
+  if(dtEdit) dayTypeId = dtEdit.dayTypeId;
+  const out = Object.assign(base, {dayTypeId, dayTypeName: dayTypeName(dayTypeId), versionStart: ver.start,
+                                   flags, effects, leave, confirmed: false});
+
+  // Teachers' Convention: a fixed 6 h Assignable per day, whatever blocks are on it.
+  if(st.status === 'convention'){
+    const ct = types.convention, mins = (ct && ct.fixedMinutesPerDay) || 360;
+    out.blocks = [{start:null, end:null, minutes:mins, typeId:'convention', typeName:ct ? ct.name : '',
+                   category:'assignable', name:ct ? ct.name : 'Convention', label:'', source:'fixed', ref:'convention',
+                   edited:false, note:'', planned:null}];
+    out.fixed = true;
+    const s = summarize(out.blocks);
+    out.totals = s.totals; out.byType = s.byType;
+    return out;
+  }
+
+  const owner = new Int16Array(1440).fill(-1);
+  const pieces = [], byRef = Object.create(null);
+  const catOf = id => (id && types[id]) ? types[id].category : null;
+
+  function place(p){
+    const s = Math.max(0, p.start), e = Math.min(1440, p.end);
+    if(!(e > s)){ flags.push({code:'bad-block', ref:p.ref || null, msg:'A block has no length: ' + (p.name || p.label || p.ref || '?')}); return null; }
+    p.start = s; p.end = e;
+    p.category = catOf(p.typeId);
+    if(p.typeId && !types[p.typeId]) flags.push({code:'unknown-type', typeId:p.typeId, msg:'Unknown time type: ' + p.typeId});
+    const idx = pieces.length;
+    pieces.push(p);
+    if(p.ref) byRef[p.ref] = idx;
+    const replaced = {};
+    for(let i = s; i < e; i++){
+      const o = owner[i];
+      if(o >= 0 && o !== idx) replaced[o] = (replaced[o] || 0) + 1;
+      owner[i] = idx;
+    }
+    return {idx, replaced};
+  }
+  function clear(idx){
+    const p = pieces[idx];
+    for(let i = p.start; i < p.end; i++) if(owner[i] === idx) owner[i] = -1;
+  }
+
+  const working = st.status === 'instructional' || st.status === 'nid';
+
+  if(st.status === 'instructional' && !dayTypeId){
+    flags.push({code:'missing-day-type', msg:'No day type is set for this school day.'});
+  }
+  if(dayTypeId && !m.dayTypes.some(d => d.id === dayTypeId)){
+    flags.push({code:'unknown-day-type', dayTypeId, msg:'Unknown day type: ' + dayTypeId});
+  }
+
+  // 1. bells + timetable
+  const vd = (working && dayTypeId) ? ver.days[dayTypeId] : null;
+  if(working && dayTypeId && !vd && m.dayTypes.some(d => d.id === dayTypeId)){
+    flags.push({code:'day-type-not-in-version', dayTypeId, msg:'This day type has no schedule in the timetable version in force.'});
+  }
+  if(vd){
+    let n = 0;
+    for(const b of vd.bells){
+      const isPeriod = b.kind !== 'block';
+      if(isPeriod) n++;
+      const tt = ver.timetable[dayTypeId] && ver.timetable[dayTypeId][b.id];
+      const label = b.name || (isPeriod ? 'Period ' + n : 'Block');
+      place({start:b.start, end:b.end, typeId:b.type || (tt && tt.type) || null, label,
+             name:(tt && tt.name) || label, source:'bell', ref:b.id});
+    }
+    // 2. required arrival and departure, on instructional days only
+    const ps = vd.bells.filter(b => b.kind !== 'block');
+    if(st.status === 'instructional' && ps.length){
+      const first = Math.min.apply(null, ps.map(b => b.start)), last = Math.max.apply(null, ps.map(b => b.end));
+      const arr = vd.arrival != null ? vd.arrival : ver.arrival, dep = vd.departure != null ? vd.departure : ver.departure;
+      if(arr > 0) place({start:first - arr, end:first, typeId:'arrivalDeparture', label:'Required arrival', name:'Required arrival', source:'arrival', ref:'arrival'});
+      if(dep > 0) place({start:last, end:last + dep, typeId:'arrivalDeparture', label:'Required departure', name:'Required departure', source:'departure', ref:'departure'});
+    }
+  }
+
+  // 3. duties
+  for(const duty of m.duties){
+    if(dutyState(m, duty, date, st, dayTypeId) !== 'on') continue;
+    const r = place({start:duty.start, end:duty.end, typeId:duty.typeId, label:duty.name, name:duty.name,
+                     source:'duty', ref:'duty:' + duty.id});
+    if(!r) continue;
+    Object.keys(r.replaced).forEach(k => {
+      const q = pieces[k];
+      if(q.category === 'instructional'){
+        flags.push({code:'duty-conflict', duty:duty.name, with:q.name, minutes:r.replaced[k],
+                    msg:duty.name + ' overlaps ' + q.name + ' (' + r.replaced[k] + ' min). A teacher cannot do both.'});
+      }
+    });
+  }
+
+  // 4. this week's edits
+  for(const e of dayEdits){
+    if(e.op === 'add'){
+      const tn = types[e.typeId] ? types[e.typeId].name : '';
+      const r = place({start:e.start, end:e.end, typeId:e.typeId, label:e.name || tn, name:e.name || tn,
+                       source:'edit', ref:'edit:' + e.id, edited:true, note:e.note || ''});
+      if(r){
+        const rep = {instructional:0, assignable:0, notCounted:0, unassigned:0};
+        Object.keys(r.replaced).forEach(k => { rep[pieces[k].category || 'unassigned'] += r.replaced[k]; });
+        if(rep.instructional + rep.assignable + rep.notCounted + rep.unassigned) effects.push({editId:e.id, replaced:rep});
+      }
+    }else if(e.op === 'remove' || e.op === 'change'){
+      const idx = byRef[e.ref];
+      if(idx === undefined || pieces[idx].removed){
+        flags.push({code:'edit-orphan', editId:e.id, ref:e.ref, note:e.note || '',
+                    msg:'An edit points at ' + e.ref + ', which is no longer in the plan. Review it.'});
+        continue;
+      }
+      const p = pieces[idx];
+      if(e.op === 'remove'){ clear(idx); p.removed = true; continue; }
+      if(e.typeId !== undefined){ p.typeId = e.typeId; p.category = catOf(e.typeId); }
+      if(e.name !== undefined) p.name = e.name;
+      if(e.start != null || e.end != null){
+        clear(idx);
+        p.start = Math.max(0, e.start != null ? e.start : p.start);
+        p.end = Math.min(1440, e.end != null ? e.end : p.end);
+        for(let i = p.start; i < p.end; i++) owner[i] = idx;
+      }
+      p.edited = true; if(e.note) p.note = e.note;
+    }
+  }
+
+  // 5. gaps inside the school day: short ones are Transition, long ones are flagged
+  let lo = -1, hi = -1;
+  for(let i = 0; i < 1440; i++){
+    if(owner[i] >= 0){
+      const s = pieces[owner[i]].source;
+      if(s === 'bell' || s === 'arrival' || s === 'departure'){ if(lo < 0) lo = i; hi = i; }
+    }
+  }
+  if(lo >= 0){
+    const gapMax = m.settings.gapMaxMinutes;
+    for(let i = lo; i <= hi;){
+      if(owner[i] >= 0){ i++; continue; }
+      let j = i;
+      while(j <= hi && owner[j] < 0) j++;
+      if(j - i <= gapMax) place({start:i, end:j, typeId:'transition', label:'Transition', name:'Transition', source:'gap'});
+      else flags.push({code:'long-gap', start:i, end:j, minutes:j - i,
+                       msg:'Unaccounted gap of ' + (j - i) + ' min (' + fmtTime(i) + '–' + fmtTime(j) + ').'});
+      i = j;
+    }
+  }
+
+  // 6. read the blocks back off the minute map
+  const blocks = [];
+  for(let i = 0; i < 1440;){
+    const o = owner[i];
+    if(o < 0){ i++; continue; }
+    let j = i;
+    while(j < 1440 && owner[j] === o) j++;
+    const p = pieces[o];
+    blocks.push({start:i, end:j, minutes:j - i, typeId:p.typeId || null,
+                 typeName:(p.typeId && types[p.typeId]) ? types[p.typeId].name : '', category:p.category,
+                 name:p.name, label:p.label, source:p.source, ref:p.ref || null, edited:!!p.edited,
+                 note:p.note || '', planned:{start:p.start, end:p.end}});
+    i = j;
+  }
+  out.blocks = blocks;
+  const s = summarize(blocks);
+  out.totals = s.totals; out.byType = s.byType;
+  if(s.totals.unassigned > 0){
+    flags.push({code:'unassigned-minutes', minutes:s.totals.unassigned,
+                msg:s.totals.unassigned + ' min have no time type yet and are not counted.'});
+  }
+  return out;
+}
+
+/* ---------- totals and limits ---------- */
+function sumRange(m, from, to, opts){
+  const acc = {instructional:0, assignable:0, notCounted:0, unassigned:0, totalAssignable:0, total:0, byType:{}};
+  for(const d of dateRange(from, to)){
+    const r = resolveDay(m, d, opts);
+    acc.instructional += r.totals.instructional; acc.assignable += r.totals.assignable;
+    acc.notCounted += r.totals.notCounted;       acc.unassigned += r.totals.unassigned;
+    for(const k in r.byType) acc.byType[k] = (acc.byType[k] || 0) + r.byType[k];
+  }
+  acc.totalAssignable = acc.instructional + acc.assignable;
+  acc.total = acc.totalAssignable + acc.notCounted + acc.unassigned;
+  return acc;
+}
+const yearTotals = (m, opts) => sumRange(m, m.calendar.start, m.calendar.end, opts);
+
+// Both limits scale with FTE. Below 1.0 FTE the total assignable limit needs the
+// school's typical full-time figure; until it is entered it is null.
+function limits(m){
+  const s = m.settings, fte = s.fte;
+  if(!(fte > 0 && fte <= 1)) return {error:'FTE must be above 0 and at most 1.', fte};
+  const instructionalHours = s.limits.instructionalHours * fte;
+  let totalAssignableHours, needsTypicalHours = false;
+  if(fte === 1) totalAssignableHours = s.limits.totalAssignableHours;
+  else if(s.typicalAssignedHours > 0) totalAssignableHours = s.typicalAssignedHours * fte;
+  else { totalAssignableHours = null; needsTypicalHours = true; }
+  return {fte, instructionalHours, totalAssignableHours, needsTypicalHours,
+          instructionalMinutes: instructionalHours * 60,
+          totalAssignableMinutes: totalAssignableHours == null ? null : totalAssignableHours * 60};
+}
+
+/* ---------- flags ---------- */
+function weekFlags(m, ws, opts){
+  const out = [];
+  for(let k = 0; k < 7; k++){
+    const d = addDays(ws, k);
+    resolveDay(m, d, opts).flags.forEach(f => out.push(Object.assign({date:d}, f)));
+  }
+  return out;
+}
+function flagsByDate(m, opts){
+  const out = {};
+  dateRange(m.calendar.start, m.calendar.end).forEach(d => {
+    const f = resolveDay(m, d, opts).flags;
+    if(f.length) out[d] = f;
+  });
+  return out;
+}
+// School days that have no day type yet (for Fridays: no letter).
+const missingDayTypeDates = (m, wd) =>
+  datesWhere(m, (d, st) => st.status === 'instructional' && !dayTypeFor(m, d, st) && (wd == null || weekday(d) === wd));
+
+window.TimeCounter = {
+  CAL_2026_27, TIME_TYPES, DAY_TYPES,
+  dayNum, isoOf, addDays, weekday, weekStart, dateRange, T, fmtTime, hours, clone,
+  newModel, touch, statusOf, setCalendarDate, datesWhere, countDays,
+  dayTypeFor, setDayType, addDayType, versionFor, ensureVersion, addPeriod, removePeriod, setTimetable, setArrivalDeparture,
+  dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
+  resolveDay, sumRange, yearTotals, limits, weekFlags, flagsByDate, missingDayTypeDates
+};
+})();
+</script>
+
+<script>
+/* =====================================================================
+   Self-test: open this page with ?test at the end of the address.
+   Checks are numbered as in the design brief. Stage 1 owns 1–13, 15–17 and 21.
+   ===================================================================== */
+(function(){
+'use strict';
+const TC = window.TimeCounter, T = TC.T;
+const out = document.getElementById('out'), summary = document.getElementById('summary');
+const params = new URLSearchParams(location.search);
+if(!params.has('test')){ summary.textContent = 'engine only'; return; }
+document.getElementById('stageNote').innerHTML = 'Engine self-test, stage 1 of 6. Checks are numbered as in the design brief.';
+
+const FRI = ['friA', 'friB', 'friC', 'friD'];
+const results = [];
+
+function check(n, title, fn){
+  const a = [];
+  const t = {
+    ok(c, msg){ a.push({pass: !!c, msg}); },
+    eq(got, want, msg){
+      const pass = JSON.stringify(got) === JSON.stringify(want);
+      a.push({pass, msg: msg + (pass ? '' : ' — got ' + JSON.stringify(got) + ', expected ' + JSON.stringify(want))});
+    }
+  };
+  try{ fn(t); }catch(e){ a.push({pass:false, msg:'Threw: ' + e.message}); }
+  results.push({n, title, asserts:a, pass: a.length > 0 && a.every(x => x.pass)});
+}
+function pending(n, title, stage){ results.push({n, title, pending:stage}); }
+
+// Give every school Friday that has no day type a letter, A to D in turn.
+function lettered(m){
+  TC.missingDayTypeDates(m, 5).forEach((d, i) => TC.setDayType(m, d, FRI[i % 4]));
+}
+// A starting timetable: the periods each day type teaches a class in.
+const CLASS_PLAN = {mon:['p1','p2','p3','p4'], tue:['p1','p2','p3'], wed:['p2','p3','p4','p5','p6'], thu:['p1','p8'],
+                    friA:['p1','p2'], friB:['p1','p2'], friC:['p1','p2'], friD:['p1','p2'], early:['p1','p2']};
+function withClasses(){
+  const m = TC.newModel(); lettered(m);
+  const v = m.versions[0];
+  Object.keys(CLASS_PLAN).forEach(dt => CLASS_PLAN[dt].forEach(id => TC.setTimetable(v, dt, id, {type:'class', name:'Class'})));
+  return m;
+}
+const blockSig = d => d.blocks.map(b => [b.start, b.end, b.typeId, b.name, b.ref]);
+const diff = (a, b, k) => b.totals[k] - a.totals[k];
+
+check(1, 'Load the 2026–27 calendar', t => {
+  const m = TC.newModel(), c = TC.countDays(m);
+  t.eq(c.operational, 196, 'operational days');
+  t.eq(c.instructional, 181, 'instructional days');
+  t.eq([c.nid, c.convention], [13, 2], 'non-instruction days and Convention days');
+  t.eq([1,2,3,4,5].map(w => c.byWeekday[w]), [34, 40, 38, 38, 31], 'instructional days Mon–Fri (matches the Excel)');
+  const pdf = {'2026-08':[4,1],'2026-09':[20,19],'2026-10':[21,20],'2026-11':[18,17],'2026-12':[14,14],'2027-01':[20,19],
+               '2027-02':[19,16],'2027-03':[17,16],'2027-04':[22,21],'2027-05':[20,19],'2027-06':[21,19]};
+  Object.keys(pdf).forEach(mo => t.eq([c.byMonth[mo].operational, c.byMonth[mo].instructional], pdf[mo], 'month ' + mo + ' (operational, instructional) matches the CBE table'));
+  t.eq(TC.datesWhere(m, (d, st) => TC.weekday(d) === 5 && st.status === 'instructional').length, 31, 'instructional Fridays');
+  const m2 = TC.newModel();
+  TC.setCalendarDate(m2, '2026-10-20', 'nid', 'Student Learning Conferences');
+  const e = TC.statusOf(m2, '2026-10-20');
+  t.ok(e.edited && e.original.status === 'instructional' && e.status === 'nid', 'an edited date is marked and keeps its original status');
+  t.eq(TC.countDays(m2).instructional, 180, 'editing one date to a non-instruction day updates the counts');
+});
+
+check(2, 'Same minutes per weekday as the Excel', t => {
+  // The Excel's minutes-per-day cells are empty, so this test types its own: the
+  // minutes below are the sums of the Class periods in CLASS_PLAN, added by hand.
+  const m = withClasses();
+  const mins = {1:192, 2:145, 3:237, 4:98, 5:101};
+  const days = {1:34, 2:40, 3:38, 4:38, 5:31};                // Excel B15:B19
+  const want = [1,2,3,4,5].reduce((s, w) => s + days[w] * mins[w], 0);   // days × minutes
+  const y = TC.yearTotals(m, {planOnly:true});
+  t.eq(y.instructional, want, 'instructional minutes = days × minutes per day, summed');
+  t.eq(TC.hours(y.instructional), TC.hours(want), 'and in hours (' + TC.hours(want) + ' h)');
+});
+
+check(3, 'Mark a 50-minute Prep as “Covered a class”', t => {
+  const m = TC.newModel(), v = m.versions[0], d = '2026-09-04';
+  TC.setDayType(m, d, 'friA');
+  TC.setTimetable(v, 'friA', 'p2', {type:'prep', name:'Prep'});
+  const a = TC.resolveDay(m, d);
+  t.eq(a.blocks.find(b => b.ref === 'p2').minutes, 50, 'Friday Period 2 is the 50-minute Prep');
+  TC.coverClass(m, d, 'p2', {whose:'a colleague'});
+  const b = TC.resolveDay(m, d);
+  t.eq(diff(a, b, 'instructional'), 50, 'Instructional +50 min');
+  t.eq(diff(a, b, 'notCounted'), -50, 'Not counted −50 min');
+  t.eq(b.totals.total, a.totals.total, 'the day’s total minutes are unchanged');
+  const d2 = '2026-09-11';
+  TC.setDayType(m, d2, 'friA');
+  const a2 = TC.resolveDay(m, d2);
+  TC.coverClass(m, d2, 'p2', {start:T('8:58'), end:T('9:18')});
+  const b2 = TC.resolveDay(m, d2);
+  t.eq([diff(a2, b2, 'instructional'), diff(a2, b2, 'notCounted'), b2.totals.total - a2.totals.total], [20, -20, 0], 'covering part of a Prep moves only those minutes');
+});
+
+check(4, 'Add a 45-minute meeting after the last bell', t => {
+  const m = withClasses(), d = '2026-09-08';       // a Tuesday; last bell 2:45 pm
+  const a = TC.yearTotals(m);
+  TC.addEdit(m, d, {op:'add', start:T('14:45'), end:T('15:30'), typeId:'meeting', name:'Meeting about grad', note:'Admin asked'});
+  const b = TC.yearTotals(m);
+  t.eq(b.assignable - a.assignable, 45, 'Assignable +45 min (0.75 h)');
+  t.eq(b.totalAssignable - a.totalAssignable, 45, 'Total assignable +45 min');
+  t.eq(b.instructional, a.instructional, 'Instructional unchanged');
+  t.eq(TC.hours(45), 0.75, '45 min displays as 0.75 h');
+});
+
+check(5, 'Mark a day as sick leave', t => {
+  const m = withClasses(), d = '2026-09-08';
+  const a = TC.yearTotals(m);
+  TC.addEdit(m, d, {op:'leave', kind:'sick'});
+  const b = TC.yearTotals(m), day = TC.resolveDay(m, d);
+  t.eq(b, a, 'no total changes');
+  t.eq(day.leave && day.leave.kind, 'sick', 'the day carries the leave tag');
+});
+
+check(6, 'Open Feb 11 and 12', t => {
+  const m = withClasses();
+  TC.addEdit(m, '2027-02-11', {op:'add', start:T('9:00'), end:T('10:00'), typeId:'class', name:'Class'});
+  m.duties.push({id:'x', name:'Meeting', typeId:'meeting', start:T('13:00'), end:T('14:00'), off:[], rule:{kind:'dates', dates:['2027-02-11','2027-02-12']}});
+  const a = TC.resolveDay(m, '2027-02-11'), b = TC.resolveDay(m, '2027-02-12');
+  t.eq([a.status, b.status], ['convention', 'convention'], 'both dates are Teachers’ Convention');
+  t.eq([a.totals.assignable, b.totals.assignable], [360, 360], '6 h Assignable each, whatever blocks are on them');
+  t.eq([a.totals.instructional + b.totals.instructional, a.totals.notCounted + b.totals.notCounted], [0, 0], 'nothing else is counted');
+  t.eq(TC.hours(a.totals.assignable + b.totals.assignable), 12, '12 h in all');
+  t.ok(!a.flags.some(f => f.code === 'missing-day-type'), 'no missing-day-type flag on a Convention day');
+});
+
+check(7, 'Start a new timetable version on Jan 4', t => {
+  const m = withClasses(), start = m.calendar.start;
+  const sum = (a, b) => TC.sumRange(m, a, b);
+  TC.confirmWeek(m, '2027-01-11');
+  const before = sum(start, '2027-01-03'), conf = sum('2027-01-11', '2027-01-17'), open = sum('2027-01-18', '2027-01-24');
+  const v = TC.ensureVersion(m, '2027-01-04');
+  ['mon','tue','wed','thu'].forEach(dt => TC.setTimetable(v, dt, 'p1', {type:'prep', name:''}));
+  t.eq(m.versions.map(x => x.start), [start, '2027-01-04'], 'the plan now has two versions');
+  t.eq(sum(start, '2027-01-03'), before, 'nothing before Jan 4 changes');
+  t.eq(sum('2027-01-11', '2027-01-17'), conf, 'the confirmed week does not change');
+  t.ok(sum('2027-01-18', '2027-01-24').instructional < open.instructional, 'an unconfirmed week from Jan 4 does pick up the change');
+});
+
+check(8, 'Lunch supervision over a Lunch block', t => {
+  const m = TC.newModel(), d = '2026-09-04';
+  TC.setDayType(m, d, 'friA');
+  const a = TC.resolveDay(m, d);
+  m.duties.push({id:'ls', name:'Lunch supervision', typeId:'supervision', start:T('12:10'), end:T('12:35'), off:[],
+                 rule:{kind:'weekly', dayTypes:FRI}});
+  const b = TC.resolveDay(m, d);
+  t.eq(diff(a, b, 'assignable'), 25, 'Assignable +25 min as Supervision');
+  t.eq(diff(a, b, 'notCounted'), -25, 'Lunch loses the same 25 min');
+  t.eq(b.totals.total, a.totals.total, 'the overlap is counted once (day total unchanged)');
+  const inside = b.blocks.filter(x => x.start >= T('12:10') && x.end <= T('12:35'));
+  t.eq(inside.map(x => x.typeId), ['supervision'], '12:10–12:35 is one Supervision block');
+  // Monday to Thursday: no period is pre-typed as Lunch, so the teacher types one.
+  const tu = '2026-09-08', v = m.versions[0];
+  TC.setTimetable(v, 'tue', 'p6', {type:'lunch', name:'Lunch'});
+  const c = TC.resolveDay(m, tu);
+  m.duties.push({id:'ls2', name:'Lunch supervision', typeId:'supervision', start:T('12:30'), end:T('12:55'), off:[],
+                 rule:{kind:'weekly', dayTypes:['tue']}});
+  const e = TC.resolveDay(m, tu);
+  t.eq([diff(c, e, 'assignable'), diff(c, e, 'notCounted'), e.totals.total - c.totals.total], [25, -25, 0], 'same result on a Tuesday');
+});
+
+check(9, 'A planned duty overlaps a Class', t => {
+  const m = TC.newModel(), d = '2026-09-04';
+  TC.setDayType(m, d, 'friA');
+  TC.setTimetable(m.versions[0], 'friA', 'p2', {type:'class', name:'Math 8'});
+  const a = TC.resolveDay(m, d);
+  m.duties.push({id:'hall', name:'Hall duty', typeId:'supervision', start:T('9:00'), end:T('9:20'), off:[],
+                 rule:{kind:'weekly', dayTypes:['friA']}});
+  const b = TC.resolveDay(m, d);
+  const f = b.flags.find(x => x.code === 'duty-conflict');
+  t.ok(f && f.minutes === 20, 'flagged as a conflict (20 min)');
+  t.eq(b.totals.total, a.totals.total, 'the minutes are counted once (day total unchanged)');
+  t.eq([diff(a, b, 'instructional'), diff(a, b, 'assignable')], [-20, 20], 'the duty, as the later layer, takes the 20 minutes');
+});
+
+check(10, 'A 4-minute gap between two classes', t => {
+  const m = TC.newModel(), v = m.versions[0], d = '2026-09-14';   // a Monday
+  TC.addDayType(m, {id:'x', name:'Test day'});
+  [['9:00','9:50'], ['9:54','10:40'], ['10:50','11:30'], ['11:41','12:20']].forEach(p => {
+    const id = TC.addPeriod(v, 'x', {start:T(p[0]), end:T(p[1])});
+    TC.setTimetable(v, 'x', id, {type:'class', name:'Class'});
+  });
+  TC.setDayType(m, d, 'x');
+  const day = TC.resolveDay(m, d);
+  const tr = day.blocks.filter(b => b.typeId === 'transition');
+  t.eq(tr.map(b => [b.start, b.end]), [[T('9:50'), T('9:54')], [T('10:40'), T('10:50')]], 'the 4-minute gap and the 10-minute gap are shown as Transition blocks');
+  t.eq(day.totals.assignable, 14, 'and counted as Assignable (4 + 10 min)');
+  const lg = day.flags.filter(f => f.code === 'long-gap');
+  t.eq(lg.map(f => f.minutes), [11], 'an 11-minute gap stays empty and is flagged');
+  t.ok(!day.blocks.some(b => b.start >= T('11:30') && b.end <= T('11:41')), 'and nothing is counted in it');
+});
+
+check(11, 'An instructional Friday has no letter', t => {
+  const m = TC.newModel();
+  const list = TC.datesWhere(m, (d, st) => TC.weekday(d) === 5 && st.status === 'instructional');
+  const missing = TC.missingDayTypeDates(m, 5);
+  t.eq([list.length, missing.length], [31, 30], '31 instructional Fridays in the list; 30 flagged (June 25 already runs Early dismissal)');
+  t.ok(!missing.includes('2027-06-25'), 'June 25 is not flagged');
+  t.ok(TC.resolveDay(m, '2026-09-04').flags.some(f => f.code === 'missing-day-type'), 'flagged on the day');
+  t.ok(TC.weekFlags(m, '2026-08-31').some(f => f.date === '2026-09-04' && f.code === 'missing-day-type'), 'flagged in its week');
+  t.ok((TC.flagsByDate(m)['2026-09-04'] || []).some(f => f.code === 'missing-day-type'), 'flagged for the year view');
+  TC.setDayType(m, '2026-09-04', 'friB');
+  t.eq(TC.missingDayTypeDates(m, 5).length, 29, 'setting a letter clears the flag');
+  t.eq(TC.dayTypeFor(m, '2026-09-04'), 'friB', 'and the date now runs Friday B');
+});
+
+check(12, 'A staff meeting on the first Tuesday of each month', t => {
+  const m = TC.newModel();
+  const duty = {id:'staff', name:'Staff meeting', typeId:'meeting', start:T('15:00'), end:T('16:00'), off:[], rule:{kind:'nthWeekday', n:1, weekday:2}};
+  m.duties.push(duty);
+  const want = ['2026-09-01','2026-10-06','2026-11-03','2026-12-01','2027-01-05','2027-02-02','2027-03-02','2027-04-06','2027-05-04','2027-06-01'];
+  t.eq(TC.dutyDates(m, duty).map(x => x.date), want, 'appears on each month’s first Tuesday');
+  t.ok(TC.dutyDates(m, duty).every(x => x.state === 'on'), 'all on (no first Tuesday falls on a closed day this year)');
+  t.ok(TC.resolveDay(m, '2027-01-05').blocks.some(b => b.ref === 'duty:staff'), 'it is on the day, Jan 5');
+  t.ok(!TC.resolveDay(m, '2027-01-12').blocks.some(b => b.ref === 'duty:staff'), 'and not on the second Tuesday');
+  const mon = {id:'mon1', name:'Monday meeting', typeId:'meeting', start:T('15:00'), end:T('16:00'), off:[], rule:{kind:'nthWeekday', n:1, weekday:1}};
+  m.duties.push(mon);
+  const md = TC.dutyDates(m, mon);
+  t.eq(md.find(x => x.date === '2026-09-07').state, 'skipped', 'a first Monday with no school (Labour Day, Sep 7) is skipped');
+  t.ok(!TC.resolveDay(m, '2026-09-07').blocks.length, 'and puts nothing on that day');
+  t.eq(md.find(x => x.date === '2026-10-05').state, 'on', 'the next one is on');
+  TC.setDutyOccurrence(mon, '2026-10-05', false);
+  t.eq(TC.dutyDates(m, mon).find(x => x.date === '2026-10-05').state, 'off', 'one occurrence can be switched off');
+  t.ok(!TC.resolveDay(m, '2026-10-05').blocks.some(b => b.ref === 'duty:mon1'), 'and then it is not on the day');
+  const rot = {id:'rot', name:'Rotation', typeId:'supervision', start:T('8:00'), end:T('8:05'), off:[], rule:{kind:'everyNWeeks', n:2, startDate:'2026-11-03'}};
+  const rd = TC.dutyDates(m, rot).filter(x => x.date >= '2026-11-03').slice(0, 3).map(x => x.date);
+  t.eq(rd, ['2026-11-03', '2026-11-17', '2026-12-01'], 'every 2nd week counts school weeks: the Nov 11–13 break week is skipped (Nov 3, Nov 17, Dec 1)');
+});
+
+check(13, 'Set FTE to 0.5', t => {
+  const m = TC.newModel();
+  let l = TC.limits(m);
+  t.eq([l.instructionalHours, l.totalAssignableHours], [916, 1200], 'at 1.0 FTE: 916 h and 1,200 h');
+  m.settings.fte = 0.5;
+  l = TC.limits(m);
+  t.eq(l.instructionalHours, 458, 'instructional limit 458 h');
+  t.ok(l.needsTypicalHours && l.totalAssignableHours === null, 'asks for the school’s typical full-time assigned hours');
+  m.settings.typicalAssignedHours = 1190;
+  l = TC.limits(m);
+  t.eq([l.needsTypicalHours, l.totalAssignableHours], [false, 595], 'with 1,190 h entered the total limit is 595 h');
+  m.settings.fte = 1.5;
+  t.ok(!!TC.limits(m).error, 'an FTE above 1.0 is an error');
+});
+
+check(15, 'View weeks either side of a daylight-saving change', t => {
+  const m = withClasses();
+  // Alberta changes on Nov 1, 2026 and Mar 14, 2027.
+  [['2026-10-26', '2026-11-02'], ['2027-03-08', '2027-03-15']].forEach(p => {
+    t.eq(blockSig(TC.resolveDay(m, p[1])), blockSig(TC.resolveDay(m, p[0])), 'Monday ' + p[1] + ' has the same blocks as Monday ' + p[0]);
+  });
+  let ok = true, prev = null;
+  TC.dateRange(m.calendar.start, m.calendar.end).forEach(d => {
+    const n = TC.dayNum(d);
+    if(TC.isoOf(n) !== d || (prev !== null && n !== prev + 1)) ok = false;
+    if(prev !== null && TC.weekday(d) !== (TC.weekday(TC.isoOf(prev)) + 1) % 7) ok = false;
+    prev = n;
+  });
+  t.ok(ok, 'every date in the year is exactly one day after the last, with the weekday cycling normally');
+  t.eq(TC.weekStart('2026-11-01'), '2026-10-26', 'the week of Nov 1 starts Monday Oct 26');
+});
+
+check(16, 'Change arrival and departure from 0 to 15 min each', t => {
+  const m = withClasses();
+  const a = TC.yearTotals(m, {planOnly:true});
+  TC.setArrivalDeparture(m, m.calendar.start, 15, 15);
+  const b = TC.yearTotals(m, {planOnly:true});
+  t.eq(b.assignable - a.assignable, 181 * 30, 'Assignable +30 min on each of 181 instructional days');
+  t.eq(TC.hours(b.totalAssignable - a.totalAssignable), 90.5, 'the year projection rises 90.5 h');
+  t.eq(b.instructional, a.instructional, 'Instructional unchanged');
+  const gain = d => TC.resolveDay(m, d).totals.assignable - TC.resolveDay(withClasses(), d).totals.assignable;
+  t.eq(gain('2026-09-08'), 30, 'a Tuesday gains 30 min');
+  t.eq(gain('2027-06-25'), 30, 'Jun 25 (Early dismissal) gains 30 min too');
+  t.eq([TC.resolveDay(m, '2026-09-25').totals.assignable, TC.resolveDay(m, '2027-02-11').totals.assignable], [0, 360], 'non-instruction days are unaffected; Convention stays 6 h');
+  // Departure starts at the last bell (12:10 on Fridays), so on Friday it takes minutes from Lunch.
+  t.eq(a.notCounted - b.notCounted, 30 * 15, 'side effect to know about: Friday Lunch shrinks by 15 min on the 30 lettered Fridays (7.5 h)');
+});
+
+check(17, 'Load the bell-time template', t => {
+  const m = TC.newModel(), tue = TC.resolveDay(m, '2026-09-08');
+  const per = d => d.blocks.filter(b => b.source === 'bell' && b.ref !== 'lunch');
+  t.eq(per(tue).length, 8, 'Mon–Thu: 8 periods');
+  t.eq(per(tue).map(b => b.minutes), [51, 47, 47, 47, 47, 49, 47, 47], 'period lengths, 382 min in all');
+  t.eq([per(tue)[0].start, per(tue)[7].end], [T('8:05'), T('14:45')], 'running 8:05 to 2:45');
+  t.eq(tue.totals.assignable, 18, '18 min of Transition');
+  t.ok(tue.blocks.filter(b => b.typeId === 'transition').every(b => b.category === 'assignable'), 'Transition is Assignable');
+  t.eq(tue.totals.unassigned, 382, 'no period is pre-typed, so the 382 min are unassigned (flagged, not counted)');
+  t.ok(tue.flags.some(f => f.code === 'unassigned-minutes'), 'and flagged');
+  FRI.forEach(dt => {
+    const d = '2026-09-04'; TC.setDayType(m, d, dt);
+    const fr = TC.resolveDay(m, d);
+    t.eq(per(fr).length, 5, dt + ': 5 periods');
+    t.eq([per(fr)[0].start, per(fr)[4].end], [T('8:05'), T('12:10')], dt + ': 8:05 to 12:10');
+    t.eq(fr.blocks.filter(b => b.typeId === 'transition').reduce((s, b) => s + b.minutes, 0), 14, dt + ': 14 min of Transition');
+    t.eq(fr.blocks.filter(b => b.typeId === 'lunch').reduce((s, b) => s + b.minutes, 0), 50, dt + ': 50 min of Lunch');
+    const mt = fr.blocks.find(b => b.typeId === 'meeting');
+    t.eq([mt && mt.start, mt && mt.end, mt && mt.minutes, mt && mt.category], [T('13:00'), T('14:45'), 105, 'assignable'], dt + ': 1:00–2:45 Meeting, 105 min Assignable');
+  });
+  t.eq(per(TC.resolveDay(m, '2026-09-04')).map(b => b.minutes), [51, 50, 30, 51, 49], 'Friday period lengths, 231 min in all');
+});
+
+check(21, 'From Jan 4, remove Period 8 on Mondays and add a Period 9 on Tuesdays', t => {
+  const m = withClasses();
+  const has = (d, ref) => TC.resolveDay(m, d).blocks.some(b => b.ref === ref);
+  const stale = TC.addEdit(m, '2027-01-11', {op:'change', ref:'p8', typeId:'prep', note:'Prep moved'});   // Mon, before the change
+  TC.confirmWeek(m, '2027-01-18');
+  const v = TC.ensureVersion(m, '2027-01-04');
+  TC.removePeriod(v, 'mon', 'p8');
+  const id = TC.addPeriod(v, 'tue', {start:T('14:47'), end:T('15:30')});
+  t.eq(id, 'p9', 'the new period on Tuesdays is Period 9');
+  t.ok(!has('2027-01-25', 'p8') && !has('2027-01-11', 'p8'), 'Mondays from Jan 4 have no Period 8');
+  t.ok(has('2027-01-05', 'p9') && has('2027-01-26', 'p9'), 'Tuesdays from Jan 4 have a Period 9');
+  t.eq(TC.resolveDay(m, '2027-01-05').blocks.find(b => b.ref === 'p9').label, 'Period 9', 'and it is labelled Period 9');
+  t.ok(has('2026-12-07', 'p8') && !has('2026-12-08', 'p9'), 'earlier weeks keep their periods');
+  t.ok(has('2027-01-18', 'p8') && !has('2027-01-19', 'p9'), 'the confirmed week keeps its periods');
+  const f = TC.resolveDay(m, '2027-01-11').flags.filter(x => x.code === 'edit-orphan');
+  t.ok(f.length === 1 && f[0].editId === stale.id, 'the edit that pointed at the removed Period 8 is flagged');
+  t.ok((m.edits['2027-01-11'] || []).some(e => e.id === stale.id), 'and it is kept, not dropped');
+});
+
+check('E1', 'Extra: the saved model survives a JSON round trip', t => {
+  const m = withClasses();
+  TC.addEdit(m, '2026-09-08', {op:'add', start:T('14:45'), end:T('15:30'), typeId:'meeting', name:'Meeting'});
+  TC.confirmWeek(m, '2026-09-14');
+  TC.ensureVersion(m, '2027-01-04');
+  const m2 = JSON.parse(JSON.stringify(m));
+  t.eq(TC.yearTotals(m2), TC.yearTotals(m), 'identical year totals after save and reload');
+});
+
+pending(14, 'Import a colleague’s TimeTracker.pdf as School setup only', 'stage 5');
+pending(18, 'Save as PDF, then open that PDF in a fresh browser', 'stage 5');
+pending(19, 'Import a PDF that was printed to a new PDF', 'stage 5');
+pending(20, 'Save as PDF with a note containing “→” or an emoji', 'stage 5');
+
+results.sort((a, b) => (typeof a.n === 'number' ? a.n : 99) - (typeof b.n === 'number' ? b.n : 99));
+
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const ran = results.filter(r => !r.pending), passed = ran.filter(r => r.pass);
+let html = '';
+results.forEach(r => {
+  if(r.pending){
+    html += '<section class="card pending"><h2><span class="n">' + r.n + '</span><span class="t">' + esc(r.title) +
+            '</span><span class="pill">not yet — ' + r.pending + '</span></h2></section>';
+    return;
+  }
+  const bad = r.asserts.filter(a => !a.pass);
+  html += '<section class="card" data-check="' + r.n + '"><h2><span class="n">' + r.n + '</span><span class="t">' + esc(r.title) +
+          '</span><span class="pill ' + (r.pass ? 'ok' : 'bad') + '">' + (r.pass ? '✓ pass' : '✗ fail') + ' · ' +
+          (r.asserts.length - bad.length) + '/' + r.asserts.length + '</span></h2>';
+  if(bad.length) html += '<ul>' + bad.map(a => '<li class="fail">' + esc(a.msg) + '</li>').join('') + '</ul>';
+  html += '<details><summary>What was checked</summary><ul>' + r.asserts.filter(a => a.pass).map(a => '<li>' + esc(a.msg) + '</li>').join('') + '</ul></details></section>';
+});
+out.innerHTML = html;
+summary.textContent = passed.length + ' / ' + ran.length + ' checks pass';
+summary.className = 'pill ' + (passed.length === ran.length ? 'ok' : 'bad');
+window.TimeCounterTest = {results: results.map(r => ({n:r.n, title:r.title, pending:r.pending || null, pass:r.pending ? null : r.pass,
+  failures:(r.asserts || []).filter(a => !a.pass).map(a => a.msg), asserts:(r.asserts || []).length})),
+  passed: passed.length, ran: ran.length};
+})();
+</script>
+</body>
+</html>
