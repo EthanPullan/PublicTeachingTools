@@ -190,7 +190,10 @@ and port it upstream by hand.
   itself (edited in place), plus `dayType` and `leave` tags. Screens go through
   `TC.editBlock` / `addBlock` / `deleteBlock` / `splitBlock` and the quick-action
   helpers, never straight into `model.edits`. A change that points at a block that is
-  no longer in the plan is **flagged, never dropped**.
+  no longer in the plan is **flagged, never dropped**. A note is part of a change: a
+  `change` that holds only a note (the reason) is kept, not pruned as "back to plan", and
+  the week grid shows the note under the time when the block is tall enough (always in its
+  tooltip).
 - **Ask before lowering Instructional time.** `guardedEdit()` runs a change on a copy
   with `TC.describeChange()`; if Instructional would go down it asks first, then
   reports what changed with an Undo.

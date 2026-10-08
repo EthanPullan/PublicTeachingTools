@@ -1224,6 +1224,26 @@ check('E27', 'Extra: Full day assignable time (a field trip or sports day, start
   t.ok(/fullday \(/.test(ins) && /fullDay = Full day assignable time/.test(ins) && ins.indexOf('Full day assignable time [fullDay]') >= 0, 'the setup instructions name the calendar word, the day type and the time type');
 });
 
+check('E28', 'Extra: a note on its own is kept, and shown with the block', t => {
+  const m = TC.newModel(), d = '2026-10-07', ver = m.versions[0];
+  for(let p = 1; p <= 8; p++) TC.setTimetable(ver, 'wed', 'p' + p, {type: p === 4 ? 'prep' : 'class', name: p === 4 ? '' : 'Class'});
+  const plan = JSON.stringify(TC.resolveDay(m, d).totals);
+  TC.editBlock(m, d, 'p4', {note: 'coverage for Ms. K'}, {entered: d});
+  const b = TC.resolveDay(m, d).blocks.find(x => x.ref === 'p4');
+  t.eq([b.note, b.edited, b.name, b.typeId, JSON.stringify(TC.resolveDay(m, d).totals) === plan], ['coverage for Ms. K', true, 'Period 4', 'prep', true], 'a note typed on a planned block is kept, marks the block as edited, and changes no minutes');
+  t.eq([TC.userEdits(m, d).length, m.edits[d][0].op], [1, 'change'], 'it is one small change to the plan, so it appears in the change log and the week’s edit count');
+  const log = TC.changeLog(m).filter(x => x.date === d);
+  t.eq([log.length, log[0].note, /note added/.test(log[0].what)], [1, 'coverage for Ms. K', true], 'the change log says a note was added, and gives the note');
+  TC.editBlock(m, d, 'p4', {note: ''}, {});
+  t.eq([m.edits[d], TC.resolveDay(m, d).blocks.find(x => x.ref === 'p4').edited], [undefined, false], 'clearing the note again leaves no edit behind');
+  TC.editBlock(m, d, 'p4', {name: 'Coverage', note: 'why'}, {}); TC.editBlock(m, d, 'p4', {name: 'Period 4'}, {});
+  t.eq([m.edits[d].length, m.edits[d][0].note, 'name' in m.edits[d][0]], [1, 'why', false], 'a block put back as planned keeps its note, and loses only the changed name');
+  TC.resetBlock(m, d, 'p4');
+  t.eq(m.edits[d], undefined, 'putting the block back as planned removes the note too');
+  TC.editBlock(m, d, 'p4', {note: 'x'}, {}); TC.confirmWeek(m, TC.weekStart(d), {at: d});
+  t.eq(TC.resolveDay(m, d).blocks.find(x => x.ref === 'p4').note, 'x', 'a note survives confirming the week');
+});
+
 await Promise.all(jobs);
 results.sort((a, b) => (typeof a.n === 'number' ? a.n : 99) - (typeof b.n === 'number' ? b.n : 99));
 

@@ -234,6 +234,7 @@
   .fixedlbl{background:var(--c-a-soft);border:1px solid var(--c-a);border-radius:8px;padding:8px;color:#7a4d0e;}
   .blk{position:absolute;left:3px;right:3px;box-sizing:border-box;border-radius:6px;border:1px solid;border-left-width:4px;padding:2px 5px;margin:0;font:inherit;font-size:11.5px;line-height:1.25;text-align:left;overflow:hidden;cursor:grab;touch-action:pan-y;color:var(--ink);display:block;}
   .blk .bn{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .blk .bt{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .blk .bnote{color:var(--ink);font-style:italic;}
   .blk.tiny{padding:0 5px;line-height:1.1;font-size:10.5px;}
   .blk.k-i{background:var(--c-i-soft);border-color:var(--c-i);} .blk.k-a{background:var(--c-a-soft);border-color:var(--c-a);} .blk.k-n{background:var(--c-n-soft);border-color:var(--c-n);}
   .blk.k-u{background:repeating-linear-gradient(135deg,#fff,#fff 5px,#f6efd9 5px,#f6efd9 10px);border-color:var(--k-u);border-style:dashed;border-left-style:solid;}
@@ -979,12 +980,12 @@ function editBlock(m, date, ref, props, meta){
   if(!e){ e = {id: 'e' + (++m.seq), op: 'change', ref, entered: (meta && meta.entered) || null}; list.push(e); }
   ['start', 'end', 'typeId', 'name'].forEach(k => { if(props[k] !== undefined && props[k] !== null) e[k] = props[k]; });
   if(props.note !== undefined) e.note = props.note;
-  // a change that puts the block back where the plan has it is no change at all
+  // a change that puts the block back where the plan has it, with nothing to say about it, is no change at all
   const plan = resolveDay(m, date, {planOnly: true}).blocks.filter(b => b.ref === ref);
   if(plan.length){
     const pp = plan[0], pr = {start: pp.planned.start, end: pp.planned.end, typeId: pp.typeId, name: pp.name};
     ['start', 'end', 'typeId', 'name'].forEach(k => { if(k in e && e[k] === pr[k]) delete e[k]; });
-    if(!['start', 'end', 'typeId', 'name'].some(k => k in e)) m.edits[date] = list.filter(x => x !== e);
+    if(!['start', 'end', 'typeId', 'name'].some(k => k in e) && !e.note) m.edits[date] = list.filter(x => x !== e);   // a note on its own is still a change: it is the reason
   }
   if(!m.edits[date].length) delete m.edits[date];
   return e;
@@ -1732,7 +1733,7 @@ function changeLog(m, filter){
         if(e.typeId !== undefined && e.typeId !== p.typeId) bits.push('time type ' + tn(p.typeId) + ' → ' + tn(e.typeId));
         if(e.name !== undefined && e.name !== p.name) bits.push('renamed “' + e.name + '”');
         out.push(Object.assign(base, {kind: 'change', typeId: e.typeId !== undefined ? e.typeId : p.typeId, minutes: (e1 - s1) - (e0 - s0),
-          what: p.name + ': ' + (bits.join('; ') || 'changed')}));
+          what: p.name + ': ' + (bits.join('; ') || (e.note ? 'note added' : 'changed'))}));
       }else if(e.op === 'dayType'){
         out.push(Object.assign(base, {kind: 'dayType', typeId: null, what: 'Day type ' + dtn(planDay_.dayTypeId) + ' → ' + dtn(e.dayTypeId)}));
       }else if(e.op === 'leave'){
@@ -3508,12 +3509,13 @@ function blockHtml(b, date, lo, locked){
   }
   const piece = b.planned, ownTop = b.start === piece.start, ownBottom = b.end === piece.end;
   const tiny = h < 30;
-  const label = b.name + (b.typeName && b.typeName !== b.name ? ', ' + b.typeName : '') + ', ' + (b.category ? CAT[b.category].name : 'no time type yet') + ', ' + rng(b.start, b.end) + ', ' + b.minutes + ' minutes' + (b.edited ? ', edited from the plan' : '');
+  const label = b.name + (b.typeName && b.typeName !== b.name ? ', ' + b.typeName : '') + ', ' + (b.category ? CAT[b.category].name : 'no time type yet') + ', ' + rng(b.start, b.end) + ', ' + b.minutes + ' minutes' + (b.edited ? ', edited from the plan' : '') + (b.note ? '. Note: ' + b.note : '');
   return '<button class="blk ' + (b.category ? KCLS[b.category] : 'k-u') + (b.edited ? ' edited' : '') + (tiny ? ' tiny' : '') + '" style="top:' + top + 'px;height:' + h + 'px"' +
     ' data-ref="' + esc(b.ref) + '" data-date="' + date + '" data-s="' + b.start + '" data-e="' + b.end + '" data-ps="' + piece.start + '" data-pe="' + piece.end + '" data-locked="' + (locked ? 1 : 0) + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
     (!locked && ownTop ? '<i class="rz t"></i>' : '') +
     '<span class="bn">' + (b.edited ? '<span class="pen" aria-hidden="true">✎</span> ' : '') + esc(b.name) + '</span>' +
     (tiny ? '' : '<span class="bt">' + rng(b.start, b.end) + ' · ' + b.minutes + ' min</span>') +
+    (b.note && h >= 48 ? '<span class="bt bnote">' + esc(b.note) + '</span>' : '') +        // the reason, when the block is tall enough; the title has it either way
     (!locked && ownBottom ? '<i class="rz b"></i>' : '') + '</button>';
 }
 

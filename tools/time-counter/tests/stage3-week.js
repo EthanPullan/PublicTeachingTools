@@ -180,6 +180,14 @@ let fails = 0; const ok = (c, msg) => { if (!c) fails++; console.log((c ? 'ok   
   ok((await p.inputValue('dialog[open] select[name=date]')) === '2026-10-06', 'the day menu opens it for that day');
   await p.keyboard.press('Escape'); await settle();
 
+  // ---- a note typed on a block is kept and shown on the block
+  await blk('2026-10-06', 'p1').click(); await p.waitForSelector('dialog[open]');
+  await p.fill('dialog[open] input[name=note]', 'Covered for Ms. K'); await dialogOk('ok');
+  ok((await text('.blk[data-date="2026-10-06"][data-ref="p1"]')).includes('Covered for Ms. K') && (await blk('2026-10-06', 'p1').getAttribute('title')).includes('Note: Covered for Ms. K'), 'a note typed on a block, with nothing else changed, is kept and shown on the block');
+  ok(((await model()).edits['2026-10-06'] || []).some(e => e.ref === 'p1' && e.note === 'Covered for Ms. K'), 'and it is saved as an edit');
+  await p.click('#undo'); await settle();
+  ok(!(await text('.blk[data-date="2026-10-06"][data-ref="p1"]')).includes('Covered for Ms. K'), 'Undo takes it off again');
+
   // ---- orphan edit flagged and deletable
   await p.evaluate(() => TimeCounterApp.commit(m => { TimeCounter.addEdit(m, '2026-10-05', {op:'change', ref:'p99', typeId:'prep'}); }));
   await settle(200);
