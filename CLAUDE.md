@@ -124,6 +124,12 @@ and port it upstream by hand.
 - **The calendar and limits are data**, not code, so another year can be swapped in.
 - **The saved model is plain JSON** (no Maps, Sets or Dates), so it can be embedded
   in a PDF later and reloaded without loss.
+- **Screens only change the model through `commit()`** (third script). It snapshots
+  the model for undo/redo, saves it to `teachingtools:timeCounter:model`, and rolls
+  back if the change throws. Screens re-render from the model, and keep keyboard
+  focus by control name or position, so keep new controls in the same DOM order.
+- **Plan changes apply from a date forward.** A timetable version is a full copy of
+  the generic week; edits go to the version in force, never to earlier ones.
 
 ## Commit / PR rules — IMPORTANT
 
