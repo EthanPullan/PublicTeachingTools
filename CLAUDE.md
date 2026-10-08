@@ -184,7 +184,10 @@ and port it upstream by hand.
 - The calendar year view opens a date's week; its **Edit dates** switch changes a
   date's status instead.
 - **TimeTracker.pdf is the only export, and the only import.** `TimeCounterPdf.build`
-  draws a short report with pdf-lib's built-in fonts and attaches `timetracker-data.json`:
+  draws the report with pdf-lib's built-in fonts (an opening page, the year summary,
+  the change log, a page for every week so far with the current one, and the weeks
+  ahead on one page; every page carries the estimate notice, the links and Local 38's
+  contact) and attaches `timetracker-data.json`:
   an envelope (`format: 'time-counter-save'`, `version`, a CRC-32 `checksum`) whose
   `payload` is the whole model as text (`TC.pack`). The page swaps characters the fonts
   cannot draw (arrows, emoji, many accents) through `printable()`; the attachment keeps
@@ -215,6 +218,27 @@ and port it upstream by hand.
   Opening a file restores the file's own stamp, so it is not treated as unsaved work.
   The backup reminder (a week since the last save, and changes since) uses it; the last
   save time is a device fact, kept in the UI storage and not in the model.
+- **Reports share one set of figures** (`TC.yearSummary`, `TC.weekSheet`,
+  `TC.changeLog`), so the Totals screens, the printed pages and the PDF cannot disagree.
+  The year summary follows the Local 38 calculator. Plan lines are days × planned
+  minutes, one line per kind of day *and* per distinct day (a duty on certain dates
+  makes its own line), so they add up to the plan exactly; the by-time-type tables show
+  plan, net edits and total. The week sheet folds the Transition that gaps make into one
+  line a day. The change log reads the edit ops, the confirm/unlock/import events in
+  `model.log`, and blocks kept from a confirmed week; a block carries the day it was
+  entered (`entered`) through confirming and unlocking so that survives. Reports live
+  under Totals (Dashboard, Year summary, Week sheet, Change log).
+- **Printing is plain CSS.** `.noprint`, the toolbar, navigation and banners are hidden,
+  `#app.isreport` hides the page footer, and `.rfoot` (the estimate notice and links) is
+  fixed to the bottom so it repeats on every printed page. The fixed bottom margin in
+  `@page` leaves it room.
+- **First-run setup** (`SETUP_STEPS`, seven steps in the brief's order) reuses the Plan
+  panels rather than copying them. It opens once on a device with no data and no
+  `setupSeen` flag in the UI storage; tests that want the normal screens set that flag.
+  Keyboard focus moves to the step title on each step (`S.focusSel`).
+- **The phone shows one day at a time** with CSS alone: every day is still rendered, and
+  below 640 px only the `.sel` day's header and column are shown, with a `.daybar` of day
+  buttons to switch. `selectedDay()` keeps the weekday when the week changes.
 - **Settings & data** is its own view: Your TimeTracker.pdf, About you, Limits,
   Counting and display, Time types (rename or add; each stays in one category), a new
   year, and Start over. It used to be a Plan tab.

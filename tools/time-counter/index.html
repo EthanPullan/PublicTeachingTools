@@ -180,6 +180,40 @@
   .stpill.st-edited{background:var(--warn-soft);border-color:var(--accent);color:#7a4d0e;}
   .stpill.st-confirmed{background:var(--ok-soft);border-color:var(--ok);}
   .stpill.st-reopened{background:var(--panel);border-color:var(--ink);color:var(--ink);}
+
+  /* phone: one day at a time */
+  .daybar{display:none;gap:6px;align-items:center;margin:0 0 8px;overflow-x:auto;padding-bottom:2px;} .daybar .chipbtn{flex:none;} .daybar .chipbtn.on{background:var(--board);border-color:var(--board);color:#fff;}
+  @media (max-width:640px){
+    .daybar{display:flex;}
+    .wk-grid{grid-template-columns:56px minmax(0,1fr) !important;min-width:0 !important;}
+    .wk-head:not(.sel),.wk-body:not(.sel){display:none;}
+  }
+  /* first-run setup */
+  .setup .rtop{margin-bottom:6px;} .steps{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px;padding:0;}
+  .step{display:flex;align-items:center;gap:7px;font:inherit;font-size:12.5px;font-weight:600;padding:5px 11px 5px 6px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;}
+  .step:hover{border-color:var(--accent);color:var(--ink);} .step.on{background:var(--board);border-color:var(--board);color:#fff;}
+  .step .sn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--panel-2);color:var(--ink);font-size:11px;} .step.on .sn{background:#fff;}
+  .sttitle{margin:4px 0 4px;font-size:15px;} .setupnav{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;}
+  @media (max-width:620px){ .step .sl{display:none;} .step.on .sl{display:inline;} }
+  /* reports and printing */
+  .rtop{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;} .rtop h2{margin:0;}
+  .report .card{margin:0 0 12px;} .report h3{margin:0 0 6px;font-size:14px;}
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 18px;margin:10px 0 0;} .kv dt{font-size:11.5px;color:var(--muted);} .kv dd{margin:0;font-weight:600;}
+  .tbl tr.ev td,.tbl tr.ev th{color:var(--muted);}
+  .rfoot{display:none;font-size:11.5px;color:var(--muted);line-height:1.5;margin:14px 0 0;padding-top:8px;border-top:1px solid var(--line);overflow-wrap:anywhere;}   /* shown when printed: the page footer covers the screen */
+  .whatcounts{margin-top:14px;} .whatcounts summary{cursor:pointer;} .whatcounts .plain li{margin:8px 0;}
+  @media print{
+    @page{margin:14mm 14mm 24mm;}
+    body{background:#fff !important;color:#000;}
+    .noprint,header.toolbar,nav.views,.banner,.tabs,dialog,#tip,.tip,.dghost{display:none !important;}
+    .wrap{max-width:none;padding:0;}
+    .card{box-shadow:none !important;border:0 !important;padding:0 !important;margin:0 0 10px !important;background:#fff !important;}
+    #app.isreport ~ footer{display:none;}
+    .rfoot{display:block;position:fixed;left:0;right:0;bottom:0;margin:0;background:#fff;font-size:8.5px;}
+    .rsec{break-inside:avoid;} .tbl tr{break-inside:avoid;} .scroll{overflow:visible;}
+    .tbl th,.tbl td{padding:3px 6px;}
+    .stpill{border:1px solid #999;background:#fff;}
+  }
   .review{padding:10px 14px;} .review summary{cursor:pointer;font-size:13px;}
   .wkscroll{border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);}
   .wk-grid{display:grid;grid-template-rows:auto auto;min-width:640px;}
@@ -1080,7 +1114,7 @@ function unlockWeek(m, ws, meta){
     (snap.blocks || []).forEach(b => {
       if(b.source === 'gap' || b.start == null) return;            // transitions are worked out again, the fixed Convention block is not a block
       list.push({id: id(), op: 'add', base: true, start: b.start, end: b.end, typeId: b.typeId, name: b.name, note: b.note || '',
-                 src: b.source, cat: b.category, edited: !!b.edited, entered: at});
+                 src: b.source, cat: b.category, edited: !!b.edited, entered: b.entered != null ? b.entered : at});
     });
     if(snap.leave) list.push({id: id(), op: 'leave', base: true, kind: snap.leave.kind, note: snap.leave.note || '', entered: at});
     m.edits[d] = list;
@@ -1249,7 +1283,7 @@ function resolveDay(m, date, opts){
       if(e.removed) continue;
       const tn = types[e.typeId] ? types[e.typeId].name : '';
       const pc = {start:e.start, end:e.end, typeId:e.typeId, label:e.name || tn, name:e.name || tn,
-                  source:e.src || 'edit', ref:'edit:' + e.id, edited:e.base ? !!e.edited : true, note:e.note || ''};
+                  source:e.src || 'edit', ref:'edit:' + e.id, edited:e.base ? !!e.edited : true, note:e.note || '', entered:e.entered || null};
       if(e.base && 'cat' in e) pc.catFixed = e.cat;
       const r = place(pc);
       if(r && !e.base){
@@ -1275,6 +1309,7 @@ function resolveDay(m, date, opts){
         for(let i = p.start; i < p.end; i++) owner[i] = idx;
       }
       p.edited = true; if(e.note) p.note = e.note;
+      if(e.entered) p.entered = e.entered;
     }
   }
 
@@ -1310,7 +1345,7 @@ function resolveDay(m, date, opts){
     blocks.push({start:i, end:j, minutes:j - i, typeId:p.typeId || null,
                  typeName:(p.typeId && types[p.typeId]) ? types[p.typeId].name : '', category:p.category,
                  name:p.name, label:p.label, source:p.source, ref:p.ref || null, edited:!!p.edited,
-                 note:p.note || '', planned:{start:p.start, end:p.end}});
+                 note:p.note || '', entered:p.entered || null, planned:{start:p.start, end:p.end}});
     i = j;
   }
   out.blocks = blocks;
@@ -1519,6 +1554,158 @@ function flagsByDate(m, opts){
 // School days that have no day type yet (for Fridays: no letter).
 const missingDayTypeDates = (m, wd) =>
   datesWhere(m, (d, st) => st.status === 'instructional' && !dayTypeFor(m, d, st) && (wd == null || weekday(d) === wd));
+
+/* ---------- reports: one set of figures behind the screens, the print pages and the PDF ---------- */
+// The year laid out like the Local 38 calculator. Plan lines are days x planned minutes
+// for each kind of day (the plan alone); adjustment lines are what edits, confirmed weeks
+// and later plan changes have added or taken away, by time type. Instructional is plan
+// lines plus adjustments; the assigned and not-counted lines are totals by time type.
+function yearSummary(m, today){
+  const ty = trackYear(m, today), lim = limits(m), types = typeMap(m), dash = dashboard(m, ty);
+  const A = k => dash.find(d => d.key === k);
+  // plan lines: every date's planned day, grouped by day type (and version) and by what the day holds
+  const groups = {};
+  dateRange(m.calendar.start, m.calendar.end).forEach(d => {
+    const st = statusOf(m, d), r = resolveDay(m, d, {planOnly: true});
+    if(st.status === 'closed' && !(r.totals.instructional + r.totals.assignable + r.totals.notCounted + r.totals.unassigned)) return;
+    const key = (m.versions.length > 1 ? r.versionStart : '') + '|' + (r.dayTypeId || '') + '|' + (st.status === 'instructional' ? '' : st.status) + '|' + JSON.stringify(r.byType);
+    const g = groups[key] || (groups[key] = {dayTypeId: r.dayTypeId || null, status: st.status, versionStart: m.versions.length > 1 ? r.versionStart : null,
+                                             days: 0, byType: r.byType, totals: r.totals});
+    g.days++;
+  });
+  const nameOf = g => {
+    const dt = m.dayTypes.find(x => x.id === g.dayTypeId);
+    return dt ? dt.name : g.status === 'instructional' ? 'School days with no day type' : g.status === 'convention' ? 'Teachers’ Convention' : g.status === 'nid' ? 'Non-instruction day' : 'Other days';
+  };
+  const lines = Object.keys(groups).map(k => groups[k]);
+  // when one day type holds a few different days (a duty on certain dates), the most common keeps the plain name
+  const byName = {};
+  lines.forEach(g => { (byName[nameOf(g) + '|' + g.versionStart] || (byName[nameOf(g) + '|' + g.versionStart] = [])).push(g); });
+  Object.keys(byName).forEach(k => {
+    const list = byName[k].sort((a, b) => b.days - a.days);
+    list.forEach((g, i) => { g.name = nameOf(g) + (i ? ' with a duty on that date' : '') + (g.versionStart ? ' (from ' + g.versionStart + ')' : ''); });
+  });
+  const order = g => { const i = m.dayTypes.findIndex(x => x.id === g.dayTypeId); return i < 0 ? 999 : i; };
+  const planLines = lines.sort((a, b) => order(a) - order(b) || ((a.versionStart || '') < (b.versionStart || '') ? -1 : (a.versionStart || '') > (b.versionStart || '') ? 1 : 0) || b.days - a.days).map(g => ({name: g.name, dayTypeId: g.dayTypeId, status: g.status, versionStart: g.versionStart, days: g.days,
+    perDay: {instructional: g.totals.instructional, assignable: g.totals.assignable, notCounted: g.totals.notCounted},
+    minutes: {instructional: g.days * g.totals.instructional, assignable: g.days * g.totals.assignable, notCounted: g.days * g.totals.notCounted}}));
+  const typeLines = cat => {
+    const ids = {};
+    [ty.projected.byType, ty.plan.byType].forEach(o => Object.keys(o).forEach(id => { ids[id] = 1; }));
+    return m.timeTypes.filter(t => t.category === cat && ids[t.id]).map(t => {
+      const plan = ty.plan.byType[t.id] || 0, total = ty.projected.byType[t.id] || 0;
+      return {typeId: t.id, name: t.name, plan, adjust: total - plan, total, toDate: ty.toDate.byType[t.id] || 0};
+    });
+  };
+  const sumLines = list => list.reduce((a, l) => ({plan: a.plan + l.plan, adjust: a.adjust + l.adjust, total: a.total + l.total}), {plan: 0, adjust: 0, total: 0});
+  const inst = typeLines('instructional'), asg = typeLines('assignable'), nc = typeLines('notCounted');
+  const counts = countDays(m);
+  const level = d => ({level: d.level, reason: d.reason || null, headroom: d.headroom == null ? null : d.headroom, limit: d.limit, needsTypical: !!d.needsTypical});
+  return {
+    today, header: {teacher: m.settings.teacher || '', school: m.settings.school || '', year: m.calendar.name || '', fte: m.settings.fte, typicalAssignedHours: m.settings.typicalAssignedHours, limitsError: lim.error || null},
+    days: {operational: counts.operational, instructional: counts.instructional, nid: counts.nid, convention: counts.convention, byWeekday: counts.byWeekday},
+    missing: missingDayTypeDates(m).length,
+    standing: {toDate: ty.toDate, projected: ty.projected, plan: ty.plan},
+    planLines,
+    planMinutes: {instructional: ty.plan.instructional, assignable: ty.plan.assignable, notCounted: ty.plan.notCounted, unassigned: ty.plan.unassigned},
+    instructional: {adjustments: inst.filter(l => l.adjust), lines: inst, sum: sumLines(inst), total: ty.projected.instructional, limit: A('instructional').limit, status: level(A('instructional'))},
+    assigned: {lines: asg, sum: sumLines(asg), total: ty.projected.assignable},
+    totalAssigned: {total: ty.projected.totalAssignable, limit: A('totalAssignable').limit, status: level(A('totalAssignable'))},
+    notCounted: {lines: nc, sum: sumLines(nc), total: ty.projected.notCounted},
+    unassigned: {plan: ty.plan.unassigned, total: ty.projected.unassigned, adjust: ty.projected.unassigned - ty.plan.unassigned}
+  };
+}
+
+// One week as a sheet: every block of every day with its times, type and note. The gaps
+// that count as Transition are one line a day, because they are worked out, not entered.
+function weekSheet(m, ws){
+  const s = weekSummary(m, ws), days = [];
+  for(let k = 0; k < 7; k++){
+    const d = addDays(ws, k), r = resolveDay(m, d);
+    if(r.status === 'closed' && !r.blocks.length && k >= 5) continue;       // a quiet weekend is not shown
+    const rows = [];
+    let gapMin = 0;
+    r.blocks.forEach(b => {
+      if(b.start == null) return;
+      if(b.source === 'gap'){ gapMin += b.minutes; return; }
+      rows.push({start: b.start, end: b.end, minutes: b.minutes, name: b.name, typeName: b.typeName, category: b.category, edited: !!b.edited, note: b.note || '', source: b.source});
+    });
+    days.push({date: d, weekday: weekday(d), status: r.status, statusLabel: r.statusLabel || '', dayTypeName: r.dayTypeName || '', fixed: !!r.fixed,
+               blocks: rows, transitionMinutes: gapMin, totals: r.totals, leave: r.leave || null, flags: r.flags.length});
+  }
+  return {ws, status: s.status, held: s.held, edits: s.edits, actual: s.actual, plan: s.plan, delta: s.delta, days};
+}
+
+// Every change away from the plan, with the day it was entered and its note, oldest date
+// first. `filter` may hold {from, to, type}: type is a time type id, 'dayType', 'leave'
+// or 'event' (confirming, unlocking, importing).
+function changeLog(m, filter){
+  const out = [], types = typeMap(m), c12 = m.settings.clock12 !== false;
+  const rng = (a, b) => fmtTime(a, c12) + '–' + fmtTime(b, c12);
+  const tn = id => (types[id] ? types[id].name : id || 'no time type');
+  const dtn = id => { const d = m.dayTypes.find(x => x.id === id); return d ? d.name : id || 'none'; };
+  Object.keys(m.edits).sort().forEach(date => {
+    const planDay_ = resolveDay(m, date, {planOnly: true}), plan = {};
+    planDay_.blocks.forEach(b => { if(b.ref && !plan[b.ref]) plan[b.ref] = b; });
+    (m.edits[date] || []).forEach(e => {
+      const base = {date, id: e.id, entered: e.entered || null, note: e.note || '', op: e.op};
+      if(e.op === 'hold') return;
+      if(e.op === 'add' && e.base){
+        if(!(e.edited || e.touched || e.removed)) return;
+        const nm = e.name || tn(e.typeId);
+        out.push(Object.assign(base, {kind: 'kept', typeId: e.typeId,
+          what: 'Kept from the confirmed week: ' + nm + ', ' + rng(e.start, e.end) + (e.removed ? ', then removed' : e.touched ? ', then changed' : '')}));
+      }else if(e.op === 'leave' && e.base){
+        out.push(Object.assign(base, {kind: 'leave', typeId: null, what: (e.kind === 'sick' ? 'Sick leave' : e.kind === 'personal' ? 'Personal leave' : 'Leave') + ' tag kept from the confirmed week'}));
+      }else if(e.op === 'add'){
+        out.push(Object.assign(base, {kind: 'add', typeId: e.typeId, minutes: e.end - e.start,
+          what: 'Added ' + (e.name || tn(e.typeId)) + ', ' + rng(e.start, e.end) + ' (' + tn(e.typeId) + ', ' + (e.end - e.start) + ' min)'}));
+      }else if(e.op === 'remove'){
+        const p = plan[e.ref];
+        out.push(Object.assign(base, {kind: 'remove', typeId: p ? p.typeId : null, minutes: p ? -(p.planned.end - p.planned.start) : 0,
+          what: p ? 'Removed ' + p.name + ', ' + rng(p.planned.start, p.planned.end) : 'Removed a block that is no longer in the plan (' + e.ref + ')'}));
+      }else if(e.op === 'change'){
+        const p = plan[e.ref];
+        if(!p){ out.push(Object.assign(base, {kind: 'change', typeId: e.typeId || null, what: 'A change to a block that is no longer in the plan (' + e.ref + ')'})); return; }
+        const bits = [];
+        const s0 = p.planned.start, e0 = p.planned.end, s1 = e.start != null ? e.start : s0, e1 = e.end != null ? e.end : e0;
+        if(s1 !== s0 || e1 !== e0) bits.push('moved from ' + rng(s0, e0) + ' to ' + rng(s1, e1));
+        if(e.typeId !== undefined && e.typeId !== p.typeId) bits.push('time type ' + tn(p.typeId) + ' → ' + tn(e.typeId));
+        if(e.name !== undefined && e.name !== p.name) bits.push('renamed “' + e.name + '”');
+        out.push(Object.assign(base, {kind: 'change', typeId: e.typeId !== undefined ? e.typeId : p.typeId, minutes: (e1 - s1) - (e0 - s0),
+          what: p.name + ': ' + (bits.join('; ') || 'changed')}));
+      }else if(e.op === 'dayType'){
+        out.push(Object.assign(base, {kind: 'dayType', typeId: null, what: 'Day type ' + dtn(planDay_.dayTypeId) + ' → ' + dtn(e.dayTypeId)}));
+      }else if(e.op === 'leave'){
+        out.push(Object.assign(base, {kind: 'leave', typeId: null, what: (e.kind === 'sick' ? 'Sick leave' : e.kind === 'personal' ? 'Personal leave' : 'Leave') + ' tagged'}));
+      }
+    });
+  });
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const wk = d => 'week of ' + (d ? MON[+d.slice(5, 7) - 1] + ' ' + (+d.slice(8)) : '');
+  (m.log || []).forEach(e => {
+    const base = {date: e.week || e.at || null, id: null, entered: e.at || null, note: '', op: e.kind, typeId: null};
+    if(e.kind === 'confirm') out.push(Object.assign(base, {kind: 'event', what: 'Confirmed the ' + wk(e.week)}));
+    else if(e.kind === 'unlock') out.push(Object.assign(base, {kind: 'event', what: 'Unlocked the ' + wk(e.week) + ' (kept exactly as it was)'}));
+    else if(e.kind === 'import') out.push(Object.assign(base, {kind: 'event', what: 'Opened a TimeTracker.pdf and replaced everything'}));
+    else if(e.kind === 'import-setup') out.push(Object.assign(base, {kind: 'event', what: 'Brought in school setup' + (e.from ? ' from ' + e.from : '') + (e.changes && e.changes.length ? ': ' + e.changes.join('; ') : '')}));
+    else if(e.kind === 'new-year') out.push(Object.assign(base, {kind: 'event', what: 'Started ' + (e.to || 'a new year') + (e.from ? ' (after ' + e.from + ')' : '')}));
+  });
+  out.sort((a, b) => (a.date || '') < (b.date || '') ? -1 : (a.date || '') > (b.date || '') ? 1 : ((a.entered || '') < (b.entered || '') ? -1 : 1));
+  return filterLog(out, filter);
+}
+function filterLog(list, f){
+  f = f || {};
+  return list.filter(x => {
+    if(f.from && (x.date || '') < f.from) return false;
+    if(f.to && (x.date || '') > f.to) return false;
+    if(f.type && f.type !== 'all'){
+      if(f.type === 'event' || f.type === 'dayType' || f.type === 'leave') return x.kind === f.type;
+      return x.typeId === f.type;
+    }
+    return true;
+  });
+}
 
 /* ---------- files: the save envelope, opening one safely, school setup, a new year ---------- */
 // A TimeTracker.pdf carries one attachment: a small JSON envelope (format name, version,
@@ -1841,7 +2028,7 @@ window.TimeCounter = {
   scheduleOf, bellsOf, dayTypesUsing, unlinkSchedule, linkSchedule, renameSchedule, updateBell, migrate,
   renameDayType, copyDayType, dayTypeUsage, deleteDayType, rotationPlan, applyRotation, planDay, dayTypeTotals, planSummary,
   dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
-  resolveDay, sumRange, yearTotals, limits, weekFlags, flagsByDate, missingDayTypeDates,
+  resolveDay, sumRange, yearTotals, limits, weekFlags, flagsByDate, missingDayTypeDates, yearSummary, weekSheet, changeLog, filterLog,
   FILE_FORMAT, FILE_VERSION, crc32, pack, unpack, checkModel, notesList, fileSummary, replaceModel, applySetup, previewSetup,
   parseCalendar, newYear, addTimeType, renameTimeType
 };
@@ -1889,18 +2076,25 @@ function printable(str){
 /* ---------- the report ---------- */
 const nf2 = new Intl.NumberFormat('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const hrs = min => nf2.format(Math.round(min / 60 * 100) / 100) + ' h';
+const sgn = min => min === 0 ? '0.00 h' : (min > 0 ? '+' : '-') + nf2.format(Math.round(Math.abs(min) / 60 * 100) / 100) + ' h';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const longDate = d => { const p = d.split('-'); return MONTHS[+p[1] - 1] + ' ' + (+p[2]) + ', ' + p[0]; };
 const WD3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON3 = MONTHS.map(x => x.slice(0, 3));
 const shortDate = d => WD3[TC.weekday(d)] + ', ' + MON3[+d.slice(5, 7) - 1] + ' ' + (+d.slice(8));
+const FOOT = [
+  'An estimate against clause 8.1 of the ATA/CBE collective agreement, not an official ruling.',
+  'Collective agreement: https://local38.teachers.ab.ca/About%20the%20Local/Salaries%20and%20Benefits/Pages/CBA_Benefits.aspx',
+  'ATA assignable and instructional time calculators: https://teachers.ab.ca/pay-and-benefits/assignable-and-instructional-time-calculators',
+  'ATA Local 38: 403-262-6616, info@ata38.ab.ca'
+];
 
 function writer(doc, font, bold){
   const L = lib(), rgb = L.rgb;
-  const W = 612, H = 792, M = 54, pages = [];
-  const INK = rgb(0.13, 0.15, 0.17), MUTED = rgb(0.42, 0.45, 0.48), LINE = rgb(0.80, 0.82, 0.84);
+  const W = 612, H = 792, M = 54, FLOOR = 96, pages = [];
+  const INK = rgb(0.13, 0.15, 0.17), MUTED = rgb(0.42, 0.45, 0.48), LINE = rgb(0.80, 0.82, 0.84), SHADE = rgb(0.94, 0.95, 0.96);
   const w = {pages, M, W, H, INK, MUTED, LINE, y: 0, page: null};
   w.newPage = () => { w.page = doc.addPage([W, H]); pages.push(w.page); w.y = H - M; };
-  w.need = h => { if(!w.page || w.y - h < M + 20) w.newPage(); };
+  w.need = h => { if(!w.page || w.y - h < FLOOR) w.newPage(); };
   const wrapLine = (s, f, size, width) => {
     const out = [];
     String(s).split('\n').forEach(par => {
@@ -1920,7 +2114,7 @@ function writer(doc, font, bold){
     });
     return out;
   };
-  // Draw wrapped text from the cursor down; returns nothing, moves the cursor.
+  // Draw wrapped text from the cursor down; moves the cursor.
   w.text = (s, o) => {
     o = o || {};
     const f = o.bold ? bold : font, size = o.size || 10, lead = o.lead || size * 1.35, x = o.x == null ? M : o.x, width = o.width || (W - M - x);
@@ -1931,23 +2125,59 @@ function writer(doc, font, bold){
     });
     if(o.after) w.y -= o.after;
   };
+  w.heading = (s, o) => { o = o || {}; w.need((o.size || 14) * 2.6 + 60); w.text(s, {size: o.size || 14, bold: true, after: o.after == null ? 6 : o.after}); };
   w.rule = () => { w.need(8); w.page.drawLine({start: {x: M, y: w.y - 3}, end: {x: W - M, y: w.y - 3}, thickness: 0.6, color: LINE}); w.y -= 8; };
-  // One table row: cells are [text, {right, bold, color}] at fixed x positions.
-  w.row = (cells, cols, o) => {
+  // A table: cols [{w, right, head}], rows of cells (a string, or {t, bold, color}). Long cells
+  // wrap, a row never splits across pages, and the heading row repeats on a new page. A row
+  // with `span` is one cell across the whole width (a day's heading); `keep` starts a table
+  // that would be split by a page break on a new page, if it fits on one.
+  w.table = (cols, rows, o) => {
     o = o || {};
-    const size = o.size || 10, lead = size * 1.7;
-    w.need(lead);
-    cells.forEach((c, i) => {
-      const f = (o.bold || (c[1] && c[1].bold)) ? bold : font, s = printable(c[0]), right = cols[i].right;
-      const x = right ? cols[i].x - f.widthOfTextAtSize(s, size) : cols[i].x;
-      w.page.drawText(s, {x, y: w.y - size - 1, size, font: f, color: (c[1] && c[1].color) || o.color || INK});
+    const size = o.size || 8.5, lead = size * (o.tight ? 1.25 : 1.35), pad = 4, rowPad = o.tight ? 1.5 : 2;
+    let x = M;
+    const xs = cols.map(c => { const cx = x; x += c.w; return cx; });
+    const put = (s, i, f, y, color) => {
+      const tx = cols[i].right ? xs[i] + cols[i].w - pad - f.widthOfTextAtSize(s, size) : xs[i] + (i ? pad : 0);
+      w.page.drawText(s, {x: tx, y: y - size, size, font: f, color: color || INK});
+    };
+    const headH = o.head ? lead + 5 : 0;
+    const head = () => {
+      if(!o.head) return;
+      cols.forEach((c, i) => put(printable(c.head || ''), i, bold, w.y, MUTED));
+      w.y -= lead + 3;
+      w.page.drawLine({start: {x: M, y: w.y + 1}, end: {x: W - M, y: w.y + 1}, thickness: 0.6, color: LINE});
+      w.y -= 2;
+    };
+    const laid = rows.map(r => {
+      const cells = r.cells || r;
+      const wrapped = cells.map((c, i) => {
+        const cell = typeof c === 'string' ? {t: c} : c, f = (cell.bold || r.bold) ? bold : font;
+        const width = r.span ? W - 2 * M - pad : cols[i].w - pad * (i ? 2 : 1);
+        return {f, color: cell.color || r.color, lines: wrapLine(printable(cell.t), f, size, width)};
+      });
+      return {r, wrapped, h: Math.max(1, Math.max.apply(null, wrapped.map(c => c.lines.length))) * lead + rowPad};
     });
-    w.y -= lead;
-    if(o.line !== false) w.page.drawLine({start: {x: M, y: w.y + 2}, end: {x: W - M, y: w.y + 2}, thickness: 0.4, color: LINE});
+    const total = headH + laid.reduce((n, l) => n + l.h, 0), room = H - M - FLOOR;
+    if(!w.page || (o.keep && total <= room && w.y - total < FLOOR)) w.newPage();
+    else w.need(headH + (laid[0] ? laid[0].h : 0));
+    head();
+    laid.forEach(l => {
+      if(w.y - l.h < FLOOR){ w.newPage(); head(); }
+      if(l.r.shade) w.page.drawRectangle({x: M, y: w.y - l.h + 1, width: W - 2 * M, height: l.h, color: SHADE});
+      if(l.r.span) l.wrapped[0].lines.forEach((ln, j) => w.page.drawText(ln, {x: M + 2, y: w.y - j * lead - size, size, font: l.wrapped[0].f, color: l.wrapped[0].color || INK}));
+      else l.wrapped.forEach((c, i) => c.lines.forEach((ln, j) => put(ln, i, c.f, w.y - j * lead, c.color)));
+      w.y -= l.h;
+      if(o.lines !== false) w.page.drawLine({start: {x: M, y: w.y + 1}, end: {x: W - M, y: w.y + 1}, thickness: 0.3, color: LINE});
+    });
+    w.y -= 4;
   };
-  w.footers = (saved) => pages.forEach((p, i) => {
-    const s = printable('Time Counter · saved ' + saved + ' · page ' + (i + 1) + ' of ' + pages.length), size = 8;
-    p.drawText(s, {x: (W - font.widthOfTextAtSize(s, size)) / 2, y: 30, size, font, color: MUTED});
+  // The same footer on every page: the estimate notice, the links, the contact, the page number.
+  w.footers = saved => pages.forEach((p, i) => {
+    const size = 7, lines = FOOT.map(printable);
+    p.drawLine({start: {x: M, y: 78}, end: {x: W - M, y: 78}, thickness: 0.4, color: LINE});
+    lines.forEach((s, k) => p.drawText(s, {x: M, y: 68 - k * 8.5, size, font, color: MUTED}));
+    const s = printable('Time Counter · saved ' + saved + ' · page ' + (i + 1) + ' of ' + pages.length);
+    p.drawText(s, {x: W - M - font.widthOfTextAtSize(s, size), y: 68 - lines.length * 8.5 - 2, size, font, color: MUTED});
   });
   return w;
 }
@@ -1958,6 +2188,102 @@ function levelSentence(d, what){
   if(d.level === 'over') return what + ': ' + (d.reason === 'actual' ? 'already over' : 'projected over') + ' the ' + hrs(d.limit) + ' limit (' + hrs(d.projected) + ' projected, ' + pct + '%).';
   if(d.level === 'near') return what + ': close to the limit, ' + hrs(d.projected) + ' projected of ' + hrs(d.limit) + ' (' + pct + '%).';
   return what + ': within the limit, ' + hrs(d.projected) + ' projected of ' + hrs(d.limit) + ' (' + pct + '%).';
+}
+const within = (s, limit) => limit == null ? 'no limit known yet' : s.level === 'over' ? 'OVER the limit' : s.level === 'near' ? 'close to the limit' : 'within the limit';
+
+/* ---------- the year summary, in the order of the Local 38 calculator ---------- */
+function yearSummaryPages(w, y){
+  w.newPage();
+  w.heading('Year summary', {size: 18, after: 2});
+  w.text('Laid out like the Local 38 calculator, so it can be checked against the official tool. It is the whole year: time so far plus the plan for the rest.', {size: 9, color: w.MUTED, after: 8});
+  const h = y.header;
+  w.table([{w: 150}, {w: 130}, {w: 224}], [
+    [{t: 'Teacher', color: w.MUTED}, {t: 'FTE', color: w.MUTED}, {t: 'School', color: w.MUTED}],
+    [h.teacher || '(not entered)', String(h.fte), h.school || '(not entered)'],
+  ], {lines: false, size: 10});
+  if(h.fte < 1) w.text('Typical annual assigned time for a 1.0 FTE teacher at this school: ' + (h.typicalAssignedHours ? h.typicalAssignedHours + ' h' : '(not entered yet)') + '.', {size: 9, color: w.MUTED, after: 4});
+  w.text(h.year, {size: 9, color: w.MUTED, after: 8});
+
+  w.heading('Time summary', {size: 12});
+  w.table([{w: 250, head: ''}, {w: 80, right: true, head: 'Time (h)'}, {w: 80, right: true, head: 'Limit (h)'}, {w: 94, head: '  Status'}], [
+    ['Total instructional time', hrs(y.instructional.total), y.instructional.limit == null ? '-' : hrs(y.instructional.limit), '  ' + within(y.instructional.status, y.instructional.limit)],
+    ['Total assigned non-instructional duties', hrs(y.assigned.total), '-', ''],
+    {cells: ['Total assigned time', hrs(y.totalAssigned.total), y.totalAssigned.limit == null ? '-' : hrs(y.totalAssigned.limit), '  ' + within(y.totalAssigned.status, y.totalAssigned.limit)], bold: true}
+  ], {head: true, size: 9.5});
+  const d = y.days;
+  w.text('Operational days ' + d.operational + ', instructional days ' + d.instructional + ' (Mon ' + d.byWeekday[1] + ', Tue ' + d.byWeekday[2] + ', Wed ' + d.byWeekday[3] + ', Thu ' + d.byWeekday[4] + ', Fri ' + d.byWeekday[5] + '), non-instruction days ' + d.nid + ', Teachers’ Convention days ' + d.convention + '.', {size: 8.5, color: w.MUTED, after: 3});
+  if(y.missing) w.text(y.missing + ' school day' + (y.missing === 1 ? ' has' : 's have') + ' no day type yet, so ' + (y.missing === 1 ? 'it is' : 'they are') + ' left out of every figure here.', {size: 8.5, bold: true, after: 3});
+  if(y.unassigned.total) w.text(hrs(y.unassigned.total) + ' of time has no time type yet and is not counted.', {size: 8.5, bold: true, after: 3});
+  w.y -= 6;
+
+  w.heading('Instructional time: plan lines', {size: 12});
+  const lines = y.planLines.filter(l => l.minutes.instructional > 0 || l.status === 'instructional');
+  w.table([{w: 224, head: 'Kind of day'}, {w: 50, right: true, head: 'Days'}, {w: 70, right: true, head: 'Min / day'}, {w: 80, right: true, head: 'Min / year'}, {w: 80, right: true, head: 'Hours / year'}],
+    lines.map(l => [l.name, String(l.days), String(l.perDay.instructional), String(l.minutes.instructional), hrs(l.minutes.instructional)])
+      .concat([{cells: ['Subtotal: the plan', String(lines.reduce((n, l) => n + l.days, 0)), '', String(y.instructional.sum.plan), hrs(y.instructional.sum.plan)], bold: true, shade: true}]),
+    {head: true, size: 9, keep: true});
+  w.heading('Instructional time: by time type', {size: 12});
+  w.table([{w: 254, head: 'Time type'}, {w: 80, right: true, head: 'Plan'}, {w: 90, right: true, head: 'Edits (net)'}, {w: 80, right: true, head: 'Total'}],
+    y.instructional.lines.map(l => [l.name, hrs(l.plan), sgn(l.adjust), hrs(l.total)])
+      .concat([{cells: ['TOTAL ANNUAL INSTRUCTIONAL TIME', hrs(y.instructional.sum.plan), sgn(y.instructional.sum.adjust), hrs(y.instructional.total)], bold: true, shade: true}]),
+    {head: true, size: 9, keep: true});
+  if(y.instructional.limit != null) w.text('Maximum annual instructional time at this FTE: ' + hrs(y.instructional.limit) + '. Projected ' + hrs(y.instructional.total) + ', ' + within(y.instructional.status, y.instructional.limit) + (y.instructional.status.headroom != null ? ' (' + (y.instructional.status.headroom >= 0 ? hrs(y.instructional.status.headroom) + ' to spare' : hrs(-y.instructional.status.headroom) + ' over') + ')' : '') + '.', {size: 9, after: 8});
+
+  w.heading('Assigned non-instructional duties', {size: 12});
+  w.table([{w: 254, head: 'Time type'}, {w: 80, right: true, head: 'Plan'}, {w: 90, right: true, head: 'Edits (net)'}, {w: 80, right: true, head: 'Total'}],
+    (y.assigned.lines.length ? y.assigned.lines.map(l => [l.name, hrs(l.plan), sgn(l.adjust), hrs(l.total)]) : [[{t: 'None yet', color: w.MUTED}, '', '', '']])
+      .concat([{cells: ['TOTAL ANNUAL ASSIGNED NON-INSTRUCTIONAL TIME', hrs(y.assigned.sum.plan), sgn(y.assigned.sum.adjust), hrs(y.assigned.total)], bold: true, shade: true}]),
+    {head: true, size: 9, keep: true});
+  w.text('Total assigned time, instructional plus assigned: ' + hrs(y.totalAssigned.total) + (y.totalAssigned.limit != null ? ' of ' + hrs(y.totalAssigned.limit) + ', ' + within(y.totalAssigned.status, y.totalAssigned.limit) + (y.totalAssigned.status.headroom != null ? ' (' + (y.totalAssigned.status.headroom >= 0 ? hrs(y.totalAssigned.status.headroom) + ' to spare' : hrs(-y.totalAssigned.status.headroom) + ' over') + ')' : '') : ' (the limit needs the school’s typical full-time hours)') + '.', {size: 9, after: 8});
+
+  w.heading('Not counted: the record', {size: 12});
+  w.text('Prep, marking, reporting and the like count toward neither limit. This is a record of how much of it there is.', {size: 8.5, color: w.MUTED, after: 4});
+  w.table([{w: 254, head: 'Time type'}, {w: 80, right: true, head: 'Plan'}, {w: 90, right: true, head: 'Edits (net)'}, {w: 80, right: true, head: 'Total'}],
+    (y.notCounted.lines.length ? y.notCounted.lines.map(l => [l.name, hrs(l.plan), sgn(l.adjust), hrs(l.total)]) : [[{t: 'None yet', color: w.MUTED}, '', '', '']])
+      .concat([{cells: ['All not-counted time', hrs(y.notCounted.sum.plan), sgn(y.notCounted.sum.adjust), hrs(y.notCounted.total)], bold: true, shade: true}]),
+    {head: true, size: 9, keep: true});
+}
+
+/* ---------- the change log ---------- */
+function changeLogPages(w, model){
+  const log = TC.changeLog(model);
+  w.newPage();
+  w.heading('Change log', {size: 18, after: 2});
+  w.text('Every change away from the plan, with the day it was entered and its note.', {size: 9, color: w.MUTED, after: 8});
+  if(!log.length){ w.text('Nothing has been changed from the plan yet.', {size: 10}); return; }
+  w.table([{w: 62, head: 'Date'}, {w: 232, head: 'What changed'}, {w: 60, head: 'Entered'}, {w: 150, head: 'Note'}],
+    log.map(x => [x.date ? shortDate(x.date) : '', {t: x.what, color: x.kind === 'event' ? w.MUTED : undefined}, x.entered || '', x.note || '']), {head: true, size: 8});
+}
+
+/* ---------- week pages: every block of every week so far; the weeks ahead on one page ---------- */
+const DAYTAG = {instructional: '', nid: 'Non-instruction day', convention: 'Teachers’ Convention', closed: 'No school'};
+function weekPage(w, sheet, model){
+  const c12 = model.settings.clock12 !== false, st = {planned: 'Planned', edited: 'Edited', reopened: 'Unlocked', confirmed: 'Confirmed'}[sheet.status] || sheet.status;
+  const first = sheet.days[0].date, last = sheet.days[sheet.days.length - 1].date;
+  w.newPage();
+  w.heading('Week of ' + shortDate(first) + ' \u2013 ' + shortDate(last) + ', ' + last.slice(0, 4), {size: 14, after: 2});
+  const a = sheet.actual, dl = sheet.delta;
+  w.text(st + ' \u00B7 Instructional ' + hrs(a.instructional) + ' \u00B7 Assignable ' + hrs(a.assignable) + ' \u00B7 Not counted ' + hrs(a.notCounted) +
+    (dl.instructional || dl.assignable || dl.notCounted ? '   (against the plan: ' + sgn(dl.instructional) + ' instructional, ' + sgn(dl.assignable) + ' assignable, ' + sgn(dl.notCounted) + ' not counted)' : ''), {size: 8.5, color: w.MUTED, after: 6});
+  const rows = [];
+  sheet.days.forEach(d => {
+    const tag = [d.dayTypeName, d.statusLabel && d.statusLabel !== d.dayTypeName ? d.statusLabel : (DAYTAG[d.status] || ''), d.leave ? (d.leave.kind === 'sick' ? 'Sick leave' : d.leave.kind === 'personal' ? 'Personal leave' : 'Leave') + (d.leave.note ? ': ' + d.leave.note : '') : ''].filter(Boolean).join(' \u00B7 ');
+    const sum = d.status === 'closed' && !d.blocks.length ? '' : '   \u2014   Instructional ' + hrs(d.totals.instructional) + ' \u00B7 Assignable ' + hrs(d.totals.assignable) + ' \u00B7 Not counted ' + hrs(d.totals.notCounted) + (d.transitionMinutes ? ' \u00B7 Transition ' + d.transitionMinutes + ' min' : '');
+    rows.push({cells: [{t: shortDate(d.date) + (tag ? '  \u00B7  ' + tag : '') + sum, bold: true}], span: true, shade: true});
+    if(d.fixed) rows.push({cells: [{t: 'Counts a fixed ' + hrs(d.totals.assignable) + ' of Assignable time, whatever is on the day.', color: w.MUTED}, '', '', '', ''], lines: false});
+    else if(!d.blocks.length) rows.push({cells: [{t: d.status === 'closed' ? 'No school.' : 'Nothing on this day.', color: w.MUTED}, '', '', '', ''], lines: false});
+    d.blocks.forEach(b => rows.push([TC.fmtTime(b.start, c12) + '\u2013' + TC.fmtTime(b.end, c12), b.name + (b.edited ? ' *' : ''), b.typeName || '(no time type)', String(b.minutes), b.note]));
+  });
+  w.table([{w: 84, head: 'Time'}, {w: 150, head: 'Block'}, {w: 90, head: 'Time type'}, {w: 30, right: true, head: 'Min'}, {w: 150, head: 'Note'}], rows, {head: true, size: 7.5, tight: true, lines: false});
+  w.text('* changed from the plan', {size: 7.5, color: w.MUTED});
+}
+function weeksAheadPage(w, ty, rows){
+  w.newPage();
+  w.heading('Weeks ahead', {size: 18, after: 2});
+  w.text('The plan for the weeks still to come, one line each: school days and planned hours. A week gets its own page here once it has started.', {size: 9, color: w.MUTED, after: 8});
+  const stName = {planned: 'Planned', edited: 'Edited', reopened: 'Unlocked', confirmed: 'Confirmed'};
+  w.table([{w: 130, head: 'Week of'}, {w: 70, head: 'Status'}, {w: 50, right: true, head: 'School days'}, {w: 85, right: true, head: 'Instructional'}, {w: 85, right: true, head: 'Assignable'}, {w: 84, right: true, head: 'Not counted'}],
+    rows.map(x => [shortDate(x.ws), stName[x.status] || x.status, String(x.operational), hrs(x.totals.instructional), hrs(x.totals.assignable), hrs(x.totals.notCounted)]), {head: true, size: 8.5});
 }
 
 // Build TimeTracker.pdf. opts: {today: 'YYYY-MM-DD', saved: ISO time}. Resolves to a Uint8Array.
@@ -1970,43 +2296,41 @@ async function build(model, opts){
   doc.setCreationDate(saved); doc.setModificationDate(saved);
   const font = await doc.embedFont(L.StandardFonts.Helvetica), bold = await doc.embedFont(L.StandardFonts.HelveticaBold);
   const w = writer(doc, font, bold);
-  const s = model.settings, ty = TC.trackYear(model, today), dash = TC.dashboard(model, ty);
+  const s = model.settings, ty = TC.trackYear(model, today), dash = TC.dashboard(model, ty), ys = TC.yearSummary(model, today);
   const savedText = longDate(saved.getFullYear() + '-' + String(saved.getMonth() + 1).padStart(2, '0') + '-' + String(saved.getDate()).padStart(2, '0'));
 
+  // 1. the opening page
   w.newPage();
   w.text('TimeTracker', {size: 26, bold: true, after: 2});
   w.text(model.calendar.name || 'School year', {size: 13, color: w.MUTED, after: 2});
   w.text([s.teacher, s.school].filter(Boolean).join(' · ') || 'No name entered yet', {size: 11, color: w.MUTED, after: 2});
   w.text('Saved ' + savedText, {size: 10, color: w.MUTED, after: 14});
-
-  w.text('Where the year stands', {size: 14, bold: true, after: 6});
-  const cols = [{x: w.M}, {x: 300, right: true}, {x: 385, right: true}, {x: 470, right: true}, {x: w.W - w.M, right: true}];
-  w.row([['', {}], ['To date', {}], ['Projected year', {}], ['In the plan', {}], ['Limit', {}]], cols, {bold: true, color: w.MUTED, size: 9});
-  dash.forEach(d => {
-    w.row([[d.label, {}], [hrs(d.toDate), {}], [hrs(d.projected), {bold: true}], [hrs(d.plan), {}], [d.limit == null ? '—' : hrs(d.limit), {}]], cols);
-  });
-  w.y -= 4;
+  w.heading('Where the year stands');
+  const cols = [{w: 204}, {w: 75, right: true}, {w: 85, right: true}, {w: 70, right: true}, {w: 70, right: true}];
+  cols.forEach((c, i) => { c.head = ['', 'To date', 'Projected year', 'In the plan', 'Limit'][i]; });
+  w.table(cols, dash.map(d => [d.label, hrs(d.toDate), {t: hrs(d.projected), bold: true}, hrs(d.plan), d.limit == null ? '—' : hrs(d.limit)]), {head: true, size: 10});
   w.text('To date is the weeks before this one. The projected year adds the rest of the year as planned. Total assignable is Instructional plus Assignable.', {size: 8.5, color: w.MUTED, after: 8});
   [levelSentence(dash[0], 'Instructional'), levelSentence(dash[1], 'Total assignable')].filter(Boolean).forEach(t => w.text(t, {size: 10.5, after: 3}));
   w.y -= 8;
-
-  w.text('About this file', {size: 14, bold: true, after: 6});
+  w.heading('About this file');
   [
-    'This PDF is your TimeTracker. Everything in Time Counter is stored inside it as well, so you can open it again: Settings & data, then Open a TimeTracker.pdf. Other PDF viewers show it as an attached file.',
+    'This PDF is your TimeTracker: the year summary, the change log and a page for every week so far, with the weeks ahead on one page. Everything in Time Counter is stored inside it as well, so you can open it again: Settings & data, then Open a TimeTracker.pdf. Other PDF viewers show it as an attached file.',
     'The attached data includes every note you have written. Anyone you send this file to can read all of it. Check your notes before you send it to admin or anyone else, and keep student names out of them.',
-    'Printing this PDF to a new PDF, or saving it again in another app, can drop the attached data. Keep the original.',
-    'Time Counter estimates your time against clause 8.1 of the collective agreement. It is not an official ruling.'
+    'Printing this PDF to a new PDF, or saving it again in another app, can drop the attached data. Keep the original.'
   ].forEach(p => w.text(p, {size: 10, after: 5}));
 
-  const notes = TC.notesList(model);
-  w.y -= 8; w.need(70);
-  w.text('Notes', {size: 14, bold: true, after: 6});
-  if(!notes.length) w.text('No notes have been written.', {size: 10, color: w.MUTED});
-  notes.forEach(n => {
-    w.need(40);
-    w.text(shortDate(n.date) + (n.start != null ? ' · ' + TC.fmtTime(n.start, true) + '–' + TC.fmtTime(n.end, true) : '') + ' · ' + n.name, {size: 10, bold: true});
-    w.text(n.note, {size: 10, x: w.M + 12, after: 7});
+  // 2. the year summary, 3. the change log
+  yearSummaryPages(w, ys);
+  changeLogPages(w, model);
+
+  // 4. every week so far (the current one included), 5. the weeks ahead on one page
+  const cur = TC.weekStart(today), so = [], ahead = [];
+  ty.weeks.forEach(wk => {
+    if(!wk.operational) return;
+    if(wk.ws <= cur) so.push(wk); else ahead.push(wk);
   });
+  so.forEach(wk => weekPage(w, TC.weekSheet(model, wk.ws), model));
+  if(ahead.length) weeksAheadPage(w, ty, ahead);
 
   w.footers(savedText);
   await doc.attach(utf8(TC.pack(model, saved.toISOString())), ATTACHMENT, {
@@ -2100,10 +2424,13 @@ const S = {
   rot: {seq: null, start: '', countNid: false}, onlyUnset: false,
   duty: null, openDuty: null, ovr: {date: '', dt: ''}, newVer: '', ad: null, flash: null,
   lastSaved: ui.lastSaved || null, firstUse: ui.firstUse || null, nudgeOff: false, busy: false,
-  ny: {name: '', start: '', firstStudentDay: '', lastStudentDay: '', end: '', text: ''}, tt: {name: '', category: 'notCounted'}
+  ny: {name: '', start: '', firstStudentDay: '', lastStudentDay: '', end: '', text: ''}, tt: {name: '', category: 'notCounted'},
+  rep: ui.rep || 'dash', log: {from: '', to: '', type: 'all'},
+  setupSeen: !!ui.setupSeen, setupStep: 1, day: null, focusSel: null
 };
+if(!S.setupSeen && !S.model.modified) S.view = 'setup';          // a device that has never been used starts with the guided setup
 const hist = {undo: [], redo: []};
-const saveUi = () => writeJSON(UIKEY, {view: S.view, tab: S.tab, dt: S.dt, rotWd: S.rotWd, showWeekend: S.showWeekend, lastSaved: S.lastSaved, firstUse: S.firstUse});
+const saveUi = () => writeJSON(UIKEY, {view: S.view, tab: S.tab, dt: S.dt, rotWd: S.rotWd, showWeekend: S.showWeekend, lastSaved: S.lastSaved, firstUse: S.firstUse, rep: S.rep, setupSeen: S.setupSeen});
 const persist = () => { S.saved = writeJSON(KEY, S.model); };
 
 let pending = 0;
@@ -2212,14 +2539,16 @@ function render(){
   const ae = document.activeElement, inRoot = ae && root.contains(ae);
   const key = inRoot && ae.getAttribute('data-key');
   const pos = inRoot ? Array.prototype.indexOf.call(root.querySelectorAll(FOCUSABLE), ae) : -1;
-  if(!VIEWS.some(v => v[0] === S.view)) S.view = 'week';
+  if(!VIEWS.some(v => v[0] === S.view) && S.view !== 'setup') S.view = 'week';
   const flash = S.flash ? '<div class="banner ' + S.flash.level + '" role="status">' + esc(S.flash.text) + (S.flash.undo && hist.undo.length ? ' <button class="link" data-act="undo">Undo</button>' : '') + '</div>' : '';
-  const body = S.view === 'week' ? weekHtml() : S.view === 'cal' ? calHtml() : S.view === 'totals' ? totalsHtml() : S.view === 'data' ? dataHtml() : planHtml();
+  const body = S.view === 'week' ? weekHtml() : S.view === 'cal' ? calHtml() : S.view === 'totals' ? totalsHtml() : S.view === 'data' ? dataHtml() : S.view === 'setup' ? setupHtml() : planHtml();
   root.innerHTML = '<nav class="views" aria-label="Views">' + VIEWS.map(v => '<button class="vbtn" data-act="view" data-view="' + v[0] + '"' + (S.view === v[0] ? ' aria-current="page"' : '') + '>' + v[1] + '</button>').join('') + '</nav>' + (backupDue() ? nudgeHtml() : '') + flash + body;
+  root.classList.toggle('isreport', S.view === 'totals' && S.rep !== 'dash');
   pill.textContent = S.saved ? 'Saved on this device' : 'Not saved \u2014 storage is unavailable';
   pill.className = 'pill ' + (S.saved ? 'ok' : 'bad');
   undoBtn.disabled = !hist.undo.length; redoBtn.disabled = !hist.redo.length;
-  if(inRoot){
+  if(S.focusSel){ const f = root.querySelector(S.focusSel); S.focusSel = null; if(f) f.focus(); }
+  else if(inRoot){
     const el = (key && root.querySelector('[data-key="' + key + '"]')) || (pos >= 0 && root.querySelectorAll(FOCUSABLE)[pos]);
     if(el){ el.focus(); if(el.type === 'text' && el.setSelectionRange){ const n = el.value.length; el.setSelectionRange(n, n); } }
   }
@@ -2624,7 +2953,7 @@ function pRot(P){
 }
 
 /* ---------- About you & limits (on the Settings & data screen) ---------- */
-function pAbout(P){
+function pAbout(P, o){
   const s = S.model.settings, lim = P.lim;
   const num = (label, prop, val, attrs, hint) => '<label>' + label + ' <input type="number" ' + attrs + ' value="' + esc(val == null ? '' : val) + '" data-f="set" data-prop="' + prop + '" data-key="set:' + prop + '" class="w-num"></label>' + (hint ? ' <span class="hint">' + hint + '</span>' : '');
   return '<section class="card"><h2>About you</h2><div class="form-row">' +
@@ -2638,10 +2967,10 @@ function pAbout(P){
     '<div class="form-row">' + num('Instructional limit, h at 1.0 FTE', 'instructionalHours', s.limits.instructionalHours, 'min="1" step="1"') + ' ' +
     num('Total assignable limit, h at 1.0 FTE', 'totalAssignableHours', s.limits.totalAssignableHours, 'min="1" step="1"') + '</div>' +
     (lim.error ? '' : '<p class="hint">Your limits: ' + hrs(lim.instructionalMinutes) + ' instructional; ' + (lim.totalAssignableMinutes == null ? 'total assignable needs the typical hours' : hrs(lim.totalAssignableMinutes) + ' total assignable') + '.</p>') + '</section>' +
-    '<section class="card"><h2>Counting and display</h2><div class="form-row">' +
+    (o && o.short ? '' : '<section class="card"><h2>Counting and display</h2><div class="form-row">' +
     num('A gap this short (min) between blocks counts as Transition', 'gapMaxMinutes', s.gapMaxMinutes, 'min="0" max="60" step="1"') + ' ' +
     num('Warn when a projection reaches this % of a limit', 'warnPercent', s.warnPercent, 'min="1" max="100" step="1"') + ' ' +
-    '<label>Clock <select data-f="set" data-prop="clock12" data-key="set:clock12"><option value="12"' + (s.clock12 ? ' selected' : '') + '>12-hour</option><option value="24"' + (!s.clock12 ? ' selected' : '') + '>24-hour</option></select></label></div></section>';
+    '<label>Clock <select data-f="set" data-prop="clock12" data-key="set:clock12"><option value="12"' + (s.clock12 ? ' selected' : '') + '>12-hour</option><option value="24"' + (!s.clock12 ? ' selected' : '') + '>24-hour</option></select></label></div></section>');
 }
 const startOverHtml = () => '<section class="card"><h2>Start over</h2><p class="hint">Replaces everything with the school template. You can undo it.</p><p><button class="btn danger" data-act="reset">Reset to the school template</button></p></section>';
 
@@ -2746,6 +3075,17 @@ function weekFooterHtml(ws){
       : w.edits ? w.edits + ' edit' + (w.edits === 1 ? '' : 's') + ' this week. ' : 'No edits: this week follows the plan. ') + 'Convention days count a fixed 6 h whatever is on them.</p></section>';
 }
 
+// On a narrow screen the week shows one day at a time (the CSS hides the others); this is the day shown.
+function selectedDay(cols){
+  const dates = cols.map(r => r.date), td = localToday();
+  if(S.day === 'last') S.day = dates[dates.length - 1];
+  else if(S.day === 'first') S.day = dates[0];
+  else if(S.day && dates.indexOf(S.day) < 0){                                   // moved to another week: keep the same weekday
+    const same = cols.find(r => r.weekday === TC.weekday(S.day)); S.day = same ? same.date : null;
+  }
+  if(!S.day || dates.indexOf(S.day) < 0) S.day = dates.indexOf(td) >= 0 ? td : dates[0];
+  return S.day;
+}
 function weekHtml(){
   const m = S.model, ws = curWeek(), td = localToday(), range = TC.weekRange(m);
   const status = TC.weekStatus(m, ws), locked = status === 'confirmed';
@@ -2753,6 +3093,7 @@ function weekHtml(){
   const cols = days.filter(r => r.weekday >= 1 && r.weekday <= 5 || S.showWeekend || r.blocks.length || r.status !== 'closed' || (m.edits[r.date] || []).length);
   const {lo, hi} = gridRange(cols);
   const H = (hi - lo) * PPM;
+  const sel = selectedDay(cols);
   const last = TC.addDays(ws, 6);
   const stName = {planned: 'Planned', edited: 'Edited', reopened: 'Unlocked', confirmed: 'Confirmed'}[status];
   const held = TC.weekSummary(m, ws).held;
@@ -2773,6 +3114,9 @@ function weekHtml(){
     h += '<details class="card review"><summary><strong>' + review.length + ' past week' + (review.length === 1 ? '' : 's') + ' not confirmed yet</strong> <span class="muted">— they count with their edits until you confirm them</span></summary><div class="chips">' +
       review.map(r => '<button class="chipbtn" data-act="wk-go" data-ws="' + r.ws + '">' + fmtShort(r.ws) + ' – ' + fmtShort(TC.addDays(r.ws, 4)) + ' · ' + ({edited: 'Edited', reopened: 'Unlocked'}[r.status] || 'Planned') + '</button>').join('') + '</div></details>';
   }
+  h += '<div class="daybar noprint" role="group" aria-label="Day of the week"><button class="btn sm" data-act="day-prev" aria-label="Previous day">‹</button>' +
+    cols.map(r => '<button class="chipbtn' + (r.date === sel ? ' on' : '') + '" data-act="day-go" data-date="' + r.date + '"' + (r.date === sel ? ' aria-current="date"' : '') + '>' + fmtDay(r.date) + '</button>').join('') +
+    '<button class="btn sm" data-act="day-next" aria-label="Next day">›</button></div>';
   h += '<div class="scroll wkscroll"><div class="wk-grid" data-rs="' + lo + '" data-ppm="' + PPM + '" style="grid-template-columns:58px repeat(' + cols.length + ',minmax(128px,1fr))">';
   // header row
   h += '<div class="wk-corner"></div>';
@@ -2780,7 +3124,7 @@ function weekHtml(){
     const edits = TC.userEdits(m, r.date).length, fixed = !!r.fixed;
     const label = r.status === 'closed' ? (r.statusLabel === 'Weekend' ? 'Weekend' : 'Closed' + (r.statusLabel ? ': ' + r.statusLabel : ''))
       : r.status === 'instructional' ? (r.statusLabel || 'School day') : STATUS_NAME[r.status] + (r.statusLabel && r.statusLabel !== STATUS_NAME[r.status] ? ': ' + r.statusLabel : '');
-    h += '<div class="wk-head' + (r.date === td ? ' today' : '') + (r.status === 'closed' ? ' closed' : '') + '"><div class="d1">' + (r.date === td ? '<span class="tdy">Today</span> ' : '') + fmtDay(r.date) + '</div>' +
+    h += '<div class="wk-head' + (r.date === td ? ' today' : '') + (r.status === 'closed' ? ' closed' : '') + (r.date === sel ? ' sel' : '') + '" data-d="' + r.date + '"><div class="d1">' + (r.date === td ? '<span class="tdy">Today</span> ' : '') + fmtDay(r.date) + '</div>' +
       '<div class="d2">' + (r.dayTypeId ? esc(r.dayTypeName || dtName(r.dayTypeId)) : r.status === 'instructional' ? '<span class="warn-t">⚠ no day type</span>' : '<span class="muted">' + esc(STATUS_NAME[r.status]) + '</span>') + (edits ? ' <span class="pen" title="' + edits + ' edit' + (edits === 1 ? '' : 's') + '">✎</span>' : '') + '</div>' +
       '<div class="d3 muted">' + esc(label) + '</div>' +
       (r.leave ? '<div class="d3"><span class="chip c-u">' + (r.leave.kind === 'sick' ? 'Sick leave' : r.leave.kind === 'personal' ? 'Personal leave' : 'Leave') + '</span></div>' : '') +
@@ -2792,7 +3136,7 @@ function weekHtml(){
   for(let x = lo; x <= hi; x += 60) h += '<span style="top:' + ((x - lo) * PPM) + 'px">' + clock(x) + '</span>';
   h += '</div>';
   cols.forEach(r => {
-    h += '<div class="wk-body' + (r.status === 'closed' ? ' closed' : '') + (r.date === td ? ' today' : '') + (r.fixed ? ' fixedday' : '') + '" data-date="' + r.date + '" style="height:' + H + 'px;background-size:100% ' + (60 * PPM) + 'px"' + (locked || r.fixed ? ' data-noadd="1"' : '') + '>';
+    h += '<div class="wk-body' + (r.status === 'closed' ? ' closed' : '') + (r.date === td ? ' today' : '') + (r.fixed ? ' fixedday' : '') + (r.date === sel ? ' sel' : '') + '" data-date="' + r.date + '" style="height:' + H + 'px;background-size:100% ' + (60 * PPM) + 'px"' + (locked || r.fixed ? ' data-noadd="1"' : '') + '>';
     if(r.fixed) h += '<div class="fixedlbl"><strong>Teachers’ Convention</strong><br>Counts as a fixed ' + hrs(r.totals.assignable) + ' Assignable, whatever is on the day.</div>';
     else if(r.status === 'closed' && !r.blocks.length) h += '<div class="closedlbl">' + (r.statusLabel && r.statusLabel !== 'Weekend' ? esc(r.statusLabel) : 'No school') + '</div>';
     else if(r.status === 'instructional' && !r.dayTypeId && !r.blocks.length) h += '<div class="closedlbl">No day type is set for this school day.</div>';
@@ -3187,6 +3531,108 @@ const pct0 = x => Math.round(x * 100) + '%';
 const nf0 = new Intl.NumberFormat('en-CA', {maximumFractionDigits: 0});
 const nf1 = new Intl.NumberFormat('en-CA', {minimumFractionDigits: 1, maximumFractionDigits: 1});
 let tcache = null;
+/* =====================================================================
+   Reports (stage 6): the year summary, the week sheet and the change log.
+   They print as they look, and the PDF carries the same figures.
+   ===================================================================== */
+const REPS = [['dash', 'Dashboard'], ['year', 'Year summary'], ['week', 'Week sheet'], ['log', 'Change log']];
+function repNavHtml(){
+  return '<nav class="tabs noprint" aria-label="Totals sections">' + REPS.map(r =>
+    '<button class="tab" data-act="rep" data-rep="' + r[0] + '"' + (S.rep === r[0] ? ' aria-current="page"' : '') + '>' + r[1] + '</button>').join('') + '</nav>';
+}
+function reportFootHtml(){
+  return '<div class="rfoot">This is an <strong>estimate</strong> against clause 8.1 of the ATA/CBE collective agreement, not an official ruling. ' +
+    'See the <a href="https://local38.teachers.ab.ca/About%20the%20Local/Salaries%20and%20Benefits/Pages/CBA_Benefits.aspx" rel="noopener">collective agreement</a> ' +
+    '(https://local38.teachers.ab.ca/About%20the%20Local/Salaries%20and%20Benefits/Pages/CBA_Benefits.aspx) and the ' +
+    '<a href="https://teachers.ab.ca/pay-and-benefits/assignable-and-instructional-time-calculators" rel="noopener">ATA assignable and instructional time calculators</a> ' +
+    '(https://teachers.ab.ca/pay-and-benefits/assignable-and-instructional-time-calculators). ATA Local 38: 403-262-6616, info@ata38.ab.ca.</div>';
+}
+const printBtn = label => '<button class="btn noprint" data-act="print">' + label + '</button>';
+const within = (s, limit) => limit == null ? 'no limit known yet' : s.level === 'over' ? '✕ over the limit' : s.level === 'near' ? '▲ close to the limit' : '✓ within the limit';
+const headroomText = s => s.headroom == null ? '' : s.headroom >= 0 ? hrs(s.headroom) + ' to spare' : hrs(-s.headroom) + ' over';
+
+function yearReportHtml(){
+  const y = TC.yearSummary(S.model, localToday()), h = y.header, d = y.days;
+  const rows = (list, o) => list.map(l => '<tr><th scope="row">' + esc(l.name) + '</th><td class="num">' + hrs(l.plan) + '</td><td class="num">' + (l.adjust ? signed(l.adjust) : '—') + '</td><td class="num">' + hrs(l.total) + '</td></tr>').join('') ||
+    '<tr><td colspan="4" class="muted">' + o + '</td></tr>';
+  const typeTable = (list, label, sum, total, empty) => '<div class="scroll"><table class="tbl"><thead><tr><th>Time type</th><th class="num">Plan</th><th class="num">Edits (net)</th><th class="num">Total</th></tr></thead><tbody>' +
+    rows(list, empty) + '<tr class="total"><th scope="row">' + label + '</th><td class="num">' + hrs(sum.plan) + '</td><td class="num">' + (sum.adjust ? signed(sum.adjust) : '—') + '</td><td class="num">' + hrs(total) + '</td></tr></tbody></table></div>';
+  const lines = y.planLines.filter(l => l.minutes.instructional > 0 || l.status === 'instructional');
+  const ins = y.instructional, asg = y.totalAssigned;
+  return '<div class="report"><section class="card rsec"><div class="rtop"><h2>Year summary</h2>' + printBtn('Print the year summary') + '</div>' +
+    '<p class="hint">Laid out like the Local 38 calculator, so it can be checked against the official tool. It is the whole year: the weeks so far plus the plan for the rest.</p>' +
+    '<dl class="kv"><div><dt>Teacher</dt><dd>' + esc(h.teacher || '(not entered)') + '</dd></div><div><dt>School</dt><dd>' + esc(h.school || '(not entered)') + '</dd></div><div><dt>FTE</dt><dd>' + esc(h.fte) + '</dd></div><div><dt>Year</dt><dd>' + esc(h.year) + '</dd></div>' +
+    (h.fte < 1 ? '<div><dt>Typical annual assigned time, 1.0 FTE</dt><dd>' + (h.typicalAssignedHours ? esc(h.typicalAssignedHours) + ' h' : '(not entered yet)') + '</dd></div>' : '') + '</dl></section>' +
+    '<section class="card rsec"><h2>Time summary</h2><div class="scroll"><table class="tbl"><thead><tr><th></th><th class="num">Time</th><th class="num">Limit</th><th>Status</th></tr></thead><tbody>' +
+    '<tr><th scope="row">Total instructional time</th><td class="num">' + hrs(ins.total) + '</td><td class="num">' + (ins.limit == null ? '—' : hrs(ins.limit)) + '</td><td>' + within(ins.status, ins.limit) + '</td></tr>' +
+    '<tr><th scope="row">Total assigned non-instructional duties</th><td class="num">' + hrs(y.assigned.total) + '</td><td class="num">—</td><td></td></tr>' +
+    '<tr class="total"><th scope="row">Total assigned time</th><td class="num">' + hrs(asg.total) + '</td><td class="num">' + (asg.limit == null ? '—' : hrs(asg.limit)) + '</td><td>' + within(asg.status, asg.limit) + '</td></tr></tbody></table></div>' +
+    '<p class="hint">Operational days ' + d.operational + ', instructional days ' + d.instructional + ' (Mon ' + d.byWeekday[1] + ', Tue ' + d.byWeekday[2] + ', Wed ' + d.byWeekday[3] + ', Thu ' + d.byWeekday[4] + ', Fri ' + d.byWeekday[5] + '), non-instruction days ' + d.nid + ', Teachers’ Convention days ' + d.convention + '.</p>' +
+    (y.missing ? '<p class="warn-t">⚠ ' + y.missing + ' school day' + (y.missing === 1 ? ' has' : 's have') + ' no day type yet, so ' + (y.missing === 1 ? 'it is' : 'they are') + ' left out of every figure here.</p>' : '') +
+    (y.unassigned.total ? '<p class="warn-t">⚠ ' + hrs(y.unassigned.total) + ' of time has no time type yet and is not counted.</p>' : '') + '</section>' +
+    '<section class="card rsec"><h2>Instructional time: plan lines</h2><p class="hint">Days × the planned minutes of each kind of day, from the plan alone.</p><div class="scroll"><table class="tbl"><thead><tr><th>Kind of day</th><th class="num">Days</th><th class="num">Min / day</th><th class="num">Min / year</th><th class="num">Hours / year</th></tr></thead><tbody>' +
+    lines.map(l => '<tr><th scope="row">' + esc(l.name) + '</th><td class="num">' + l.days + '</td><td class="num">' + l.perDay.instructional + '</td><td class="num">' + nf0.format(l.minutes.instructional) + '</td><td class="num">' + hrs(l.minutes.instructional) + '</td></tr>').join('') +
+    '<tr class="total"><th scope="row">Subtotal: the plan</th><td class="num">' + lines.reduce((n, l) => n + l.days, 0) + '</td><td></td><td class="num">' + nf0.format(ins.sum.plan) + '</td><td class="num">' + hrs(ins.sum.plan) + '</td></tr></tbody></table></div></section>' +
+    '<section class="card rsec"><h2>Instructional time: by time type</h2><p class="hint">Edits are the net change from what the plan had: edited blocks, coverage, and weeks confirmed as they happened.</p>' +
+    typeTable(ins.lines, 'TOTAL ANNUAL INSTRUCTIONAL TIME', ins.sum, ins.total, 'None yet') +
+    (ins.limit != null ? '<p>Maximum annual instructional time at this FTE: <strong>' + hrs(ins.limit) + '</strong>. Projected <strong>' + hrs(ins.total) + '</strong>, ' + within(ins.status, ins.limit) + (headroomText(ins.status) ? ' (' + headroomText(ins.status) + ')' : '') + '.</p>' : '') + '</section>' +
+    '<section class="card rsec"><h2>Assigned non-instructional duties</h2>' + typeTable(y.assigned.lines, 'TOTAL ANNUAL ASSIGNED NON-INSTRUCTIONAL TIME', y.assigned.sum, y.assigned.total, 'None yet') +
+    '<p>Total assigned time, instructional plus assigned: <strong>' + hrs(asg.total) + '</strong>' + (asg.limit != null ? ' of ' + hrs(asg.limit) + ', ' + within(asg.status, asg.limit) + (headroomText(asg.status) ? ' (' + headroomText(asg.status) + ')' : '') : ' (the limit needs the school’s typical full-time hours)') + '.</p></section>' +
+    '<section class="card rsec"><h2>Not counted: the record</h2><p class="hint">Prep, marking, reporting and the like count toward neither limit. This is a record of how much of it there is.</p>' +
+    typeTable(y.notCounted.lines, 'All not-counted time', y.notCounted.sum, y.notCounted.total, 'None yet') + '</section>' + reportFootHtml() + '</div>';
+}
+
+function weekReportHtml(){
+  const m = S.model, ws = curWeek(), sh = TC.weekSheet(m, ws), a = sh.actual, dl = sh.delta, range = TC.weekRange(m);
+  const first = sh.days[0].date, last = sh.days[sh.days.length - 1].date;
+  const stName = {planned: 'Planned', edited: 'Edited', reopened: 'Unlocked', confirmed: 'Confirmed'}[sh.status];
+  const nav = '<div class="wkbar noprint"><button class="btn" data-act="wk-prev"' + (ws <= range.first ? ' disabled' : '') + '>‹ Previous</button><button class="btn" data-act="wk-today">This week</button><button class="btn" data-act="wk-next"' + (ws >= range.last ? ' disabled' : '') + '>Next ›</button>' +
+    '<label class="inl">Go to <input type="date" value="' + ws + '" data-f="wkDate" data-key="wkDate" min="' + m.calendar.start + '" max="' + m.calendar.end + '" aria-label="Go to the week of this date"></label><span class="spacer"></span>' + printBtn('Print the week sheet') + '</div>';
+  let h = '<div class="report">' + nav + '<section class="card rsec"><h2>Week of ' + fmtDay(first) + ' – ' + fmtDay(last) + ', ' + last.slice(0, 4) + ' <span class="stpill st-' + sh.status + '">' + stName + '</span></h2>' +
+    '<p>Instructional <strong>' + hrs(a.instructional) + '</strong> · Assignable <strong>' + hrs(a.assignable) + '</strong> · Not counted <strong>' + hrs(a.notCounted) + '</strong>' +
+    (dl.instructional || dl.assignable || dl.notCounted ? '<span class="muted"> · against the plan: ' + signed(dl.instructional) + ' instructional, ' + signed(dl.assignable) + ' assignable, ' + signed(dl.notCounted) + ' not counted</span>' : '') + '</p>' +
+    (m.settings.teacher ? '<p class="hint">' + esc(m.settings.teacher) + (m.settings.school ? ', ' + esc(m.settings.school) : '') + '</p>' : '') + '</section>';
+  sh.days.forEach(d => {
+    const tag = [d.dayTypeName, d.statusLabel && d.statusLabel !== d.dayTypeName ? d.statusLabel : ({nid: 'Non-instruction day', convention: 'Teachers’ Convention', closed: 'No school'}[d.status] || ''),
+      d.leave ? (d.leave.kind === 'sick' ? 'Sick leave' : d.leave.kind === 'personal' ? 'Personal leave' : 'Leave') + (d.leave.note ? ': ' + d.leave.note : '') : ''].filter(Boolean);
+    h += '<section class="card rsec"><h3>' + fmtDay(d.date) + (tag.length ? ' <span class="muted">· ' + esc(tag.join(' · ')) + '</span>' : '') + '</h3>';
+    if(d.fixed) h += '<p class="hint">Counts a fixed ' + hrs(d.totals.assignable) + ' of Assignable time, whatever is on the day.</p>';
+    else if(!d.blocks.length) h += '<p class="hint">' + (d.status === 'closed' ? 'No school.' : 'Nothing on this day.') + '</p>';
+    else{
+      h += '<div class="scroll"><table class="tbl"><thead><tr><th>Time</th><th>Block</th><th>Time type</th><th class="num">Min</th><th>Note</th></tr></thead><tbody>' +
+        d.blocks.map(b => '<tr><td>' + rng(b.start, b.end) + '</td><th scope="row">' + (b.edited ? '<span class="pen" title="Changed from the plan" aria-label="changed from the plan">✎</span> ' : '') + esc(b.name) + '</th><td>' + (b.category ? '<span class="chip ' + CAT[b.category].cls + '"><b aria-hidden="true">' + CAT[b.category].icon + '</b>' + esc(b.typeName) + '</span>' : '<span class="warn-t">no time type</span>') + '</td><td class="num">' + b.minutes + '</td><td>' + esc(b.note) + '</td></tr>').join('') +
+        '</tbody></table></div><p class="hint">Transition between blocks ' + d.transitionMinutes + ' min · Instructional ' + hrs(d.totals.instructional) + ' · Assignable ' + hrs(d.totals.assignable) + ' · Not counted ' + hrs(d.totals.notCounted) + '</p>';
+    }
+    h += '</section>';
+  });
+  return h + '<p class="hint">✎ changed from the plan</p>' + reportFootHtml() + '</div>';
+}
+
+function logReportHtml(){
+  const m = S.model, f = S.log, all = TC.changeLog(m), list = TC.filterLog(all, f);
+  const typeOpts = '<option value="all"' + (f.type === 'all' ? ' selected' : '') + '>Everything</option>' +
+    '<optgroup label="Kind">' + [['dayType', 'Day type changes'], ['leave', 'Leave tags'], ['event', 'Confirming, unlocking and importing']].map(x => '<option value="' + x[0] + '"' + (f.type === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</optgroup>' +
+    '<optgroup label="Time type">' + m.timeTypes.map(t => '<option value="' + esc(t.id) + '"' + (f.type === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('') + '</optgroup>';
+  return '<div class="report"><section class="card rsec"><div class="rtop"><h2>Change log</h2>' + printBtn('Print the change log') + '</div>' +
+    '<p class="hint">Every change away from the plan, with the day it was entered and its note. Confirming, unlocking and importing are listed too.</p>' +
+    '<div class="form-row noprint"><label>From <input type="date" value="' + esc(f.from) + '" data-f="logf" data-prop="from" data-key="log:from"></label><label>To <input type="date" value="' + esc(f.to) + '" data-f="logf" data-prop="to" data-key="log:to"></label>' +
+    '<label>Show <select data-f="logf" data-prop="type" data-key="log:type">' + typeOpts + '</select></label>' +
+    ((f.from || f.to || f.type !== 'all') ? '<button class="btn" data-act="log-clear">Show everything</button>' : '') + '</div>' +
+    (list.length ? '<p class="hint">' + list.length + (list.length === all.length ? '' : ' of ' + all.length) + ' entr' + (list.length === 1 ? 'y' : 'ies') + (f.from || f.to ? ' from ' + (f.from ? fmtDate(f.from) : 'the start') + ' to ' + (f.to ? fmtDate(f.to) : 'the end') : '') + '.</p>' +
+      '<div class="scroll"><table class="tbl"><thead><tr><th>Date</th><th>What changed</th><th>Entered</th><th>Note</th></tr></thead><tbody>' +
+      list.map(x => '<tr' + (x.kind === 'event' ? ' class="ev"' : '') + '><th scope="row">' + (x.date ? fmtDay(x.date) : '') + '</th><td>' + esc(x.what) + '</td><td>' + (x.entered ? fmtDate(x.entered) : '') + '</td><td>' + esc(x.note) + '</td></tr>').join('') + '</tbody></table></div>'
+      : '<p class="hint">' + (all.length ? 'Nothing matches that filter.' : 'Nothing has been changed from the plan yet.') + '</p>') + '</section>' + reportFootHtml() + '</div>';
+}
+
+function whatCountsHtml(){
+  return '<details class="card whatcounts"><summary><strong>What counts?</strong> <span class="muted">· Instructional, Assignable and Not counted, in plain words</span></summary>' +
+    '<p>Every block has a time type, and every time type belongs to one of three categories. The category decides which totals the minutes go into. The wording follows the ATA’s definitions of assignable and instructional time.</p>' +
+    '<ul class="plain"><li>' + catChip('instructional') + ' Time you are assigned to deliver, or evaluate outcomes from, an approved program of studies: your classes, covering a colleague’s class when there is no substitute, mandatory tutorial time and exam invigilation. The limit is 916 h × FTE. It is counted the same on a sick or personal day as on a regular day.</li>' +
+    '<li>' + catChip('assignable') + ' Other time the school assigns you at a particular time and place: supervision (before and after classes, recess, nutrition and lunch breaks), transition time between classes, staff and other mandatory meetings and committees, parent-teacher interviews and school events, school- or board-directed training, time assigned before or after the school day, and required attendance on non-instruction days. Each Teachers’ Convention day counts 6 h. Instructional plus Assignable is your <strong>total assignable time</strong>, with a limit of 1,200 h at 1.0 FTE.</li>' +
+    '<li>' + catChip('notCounted') + ' Time that counts toward neither limit: prep, marking, reporting, your own lunch, parent contact admin has not prescribed, and voluntary clubs or coaching unless admin gives them a set time and place. Time Counter keeps a record of it.</li></ul>' +
+    '<p class="hint">Time Counter estimates against clause 8.1 of the ATA/CBE collective agreement. It is a reference, not an official ruling.</p></details>';
+}
+
 function tracked(){
   const td = localToday();
   if(!tcache || tcache.rev !== S.rev || tcache.td !== td){
@@ -3346,6 +3792,13 @@ function notCountedLog(c){
 }
 
 function totalsHtml(){
+  const nav = repNavHtml();
+  if(S.rep === 'year') return nav + yearReportHtml();
+  if(S.rep === 'week') return nav + weekReportHtml();
+  if(S.rep === 'log') return nav + logReportHtml();
+  return nav + dashboardHtml();
+}
+function dashboardHtml(){
   const c = tracked(), ty = c.ty;
   const d = k => c.dash.find(x => x.key === k);
   let h = answerHtml(c);
@@ -3360,7 +3813,7 @@ function totalsHtml(){
   h += '<section class="card"><h2>How this is counted</h2><ul class="plain"><li><strong>To date</strong> is the weeks before this one: confirmed weeks as confirmed, and past weeks you have not confirmed with their edits' + (TC.weeksToReview(S.model, c.td).length ? ' (' + TC.weeksToReview(S.model, c.td).length + ' to review)' : '') + '.</li>' +
     '<li><strong>Projected year end</strong> is that plus this week and every later date as planned, including edits already entered.</li>' +
     '<li><strong>Headroom</strong> is the limit minus the projection. <strong>Pace</strong> compares the share of school days gone by with the share of the limit used.</li>' +
-    '<li>Both limits scale with FTE (now ' + S.model.settings.fte + '). Sick and personal leave days keep their time, and each Teachers’ Convention day counts a fixed 6 h.</li></ul></section>';
+    '<li>Both limits scale with FTE (now ' + S.model.settings.fte + '). Sick and personal leave days keep their time, and each Teachers’ Convention day counts a fixed 6 h.</li></ul></section>' + whatCountsHtml();
   return h;
 }
 
@@ -3413,6 +3866,41 @@ root.addEventListener('keydown', e => {
   e.preventDefault(); chartShow(w, i);
 });
 
+/* =====================================================================
+   First-run setup (stage 6): seven short steps that reuse the Plan screens.
+   Every step can be skipped, and the whole thing can be run again from
+   Settings & data.
+   ===================================================================== */
+const SETUP_STEPS = [
+  {title: 'School year', text: 'Time Counter starts with the 2026–27 calendar. Check that it matches your school’s calendar.'},
+  {title: 'About you', text: 'Your name and school print on your reports. Enter your FTE too: below 1.0, the total assignable limit needs your school’s typical annual assigned hours for a full-time teacher.'},
+  {title: 'Day types and bell times', text: 'A day type is a named day schedule: Monday, Friday A, Early dismissal and so on. The bell times for each follow on the next step, beside your timetable. If a colleague has already set these up, open their TimeTracker.pdf and bring in just the school setup.'},
+  {title: 'Timetable for the first term', text: 'Say what each period is: a class, prep, lunch. Bell times are shared by the days that follow the same schedule, so you only change a time once. Anything left without a time type is not counted yet.'},
+  {title: 'Duties', text: 'Supervision and recurring meetings: the Friday meeting is already here. A duty takes the minutes it covers.'},
+  {title: 'Friday letters', text: 'Fridays rotate through A to D, and the pattern is not known in advance, so each Friday needs its letter. Use the rotation fill once you know where the pattern starts, then fix single Fridays as the year goes on.'},
+  {title: 'Review', text: 'This is the whole year as planned. Anything flagged below is worth a look. You can change any of it later under Plan.'}
+];
+function setupHtml(){
+  const P = preview(), n = S.setupStep, st = SETUP_STEPS[n - 1];
+  let h = '<section class="card setup"><div class="rtop"><h2>Set up your year</h2><button class="btn" data-act="setup-close">' + (n === SETUP_STEPS.length ? 'Close setup' : 'Skip setup') + '</button></div>' +
+    '<ol class="steps" aria-label="Setup steps">' + SETUP_STEPS.map((x, i) => '<li><button class="step' + (i + 1 === n ? ' on' : '') + '" data-act="setup-go" data-step="' + (i + 1) + '"' + (i + 1 === n ? ' aria-current="step"' : '') + '><span class="sn">' + (i + 1) + '</span><span class="sl">' + esc(x.title) + '</span></button></li>').join('') + '</ol>' +
+    '<h3 class="sttitle" tabindex="-1">Step ' + n + ' of ' + SETUP_STEPS.length + ': ' + esc(st.title) + '</h3><p>' + esc(st.text) + '</p></section>';
+  if(n === 1){
+    const c = TC.countDays(S.model), cal = S.model.calendar;
+    h += '<section class="card"><h2>' + esc(cal.name || 'Your calendar') + '</h2><p><strong>' + c.operational + ' operational days</strong>, <strong>' + c.instructional + ' instructional days</strong> (Mon ' + c.byWeekday[1] + ', Tue ' + c.byWeekday[2] + ', Wed ' + c.byWeekday[3] + ', Thu ' + c.byWeekday[4] + ', Fri ' + c.byWeekday[5] + '), ' + c.nid + ' non-instruction days and ' + c.convention + ' Teachers’ Convention days.</p>' +
+      '<p class="hint">' + esc(cal.source || '') + (cal.source ? '. ' : '') + 'If your school’s calendar has changed (for example it uses a non-instruction day for conferences), you can edit any date on the Calendar view with <em>Edit dates</em>. A different school year is started under Settings &amp; data.</p></section>';
+  }else if(n === 2) h += pAbout(P, {short: true});
+  else if(n === 3){
+    h += '<section class="card"><h2>A colleague has already set this up?</h2><p class="hint">Open their TimeTracker.pdf and choose <strong>School setup only</strong>. It brings in the calendar, day types, bell times, Friday letters and shared duties, and leaves your timetable, notes and settings alone.</p><p><button class="btn" data-act="pdf-open">Open a TimeTracker.pdf…</button></p></section>' + pDayTypes(P);
+  }
+  else if(n === 4) h += pBells(P);
+  else if(n === 5) h += pDuties(P);
+  else if(n === 6) h += pRot(P);
+  else h += stripHtml(P) + pPreview(P);
+  h += '<div class="setupnav noprint">' + (n > 1 ? '<button class="btn" data-act="setup-back">‹ Back</button>' : '') + '<span class="spacer"></span>' +
+    (n < SETUP_STEPS.length ? '<button class="btn" data-act="setup-next">Skip this step</button><button class="btn primary" data-act="setup-next">Next ›</button>' : '<button class="btn primary" data-act="setup-close">Finish: go to This week</button>') + '</div>';
+  return h;
+}
 /* =====================================================================
    Settings & data (stage 5): save and open TimeTracker.pdf, school setup,
    a new year, time types
@@ -3581,7 +4069,7 @@ function dataHtml(){
   const P = preview();
   return '<section class="card"><h2>Your TimeTracker.pdf</h2><p>' + esc(lastSavedText()) + '</p>' +
     '<p class="hint">One file is both your printout and your backup. It carries all of your data inside it, so you can open it here again, fully editable. <strong>Every note you have written is in it.</strong> Check your notes before you send it to admin or anyone else.</p>' +
-    '<div class="form-row"><button class="btn primary" data-act="pdf-save"' + (S.busy ? ' disabled' : '') + '>Save as PDF</button><button class="btn" data-act="pdf-open"' + (S.busy ? ' disabled' : '') + '>Open a TimeTracker.pdf…</button></div>' +
+    '<div class="form-row"><button class="btn primary" data-act="pdf-save"' + (S.busy ? ' disabled' : '') + '>Save as PDF</button><button class="btn" data-act="pdf-open"' + (S.busy ? ' disabled' : '') + '>Open a TimeTracker.pdf…</button><button class="btn" data-act="setup-open">Run the guided setup</button></div>' +
     '<p class="hint">You can also drop a TimeTracker.pdf anywhere on this page. When you open one you choose between <strong>Replace everything</strong> and <strong>School setup only</strong>, which takes a colleague’s calendar, day types, bell times, Friday letters and shared duties and leaves the rest of your file alone. Printing a TimeTracker.pdf to a new PDF drops the data, so keep the original.</p></section>' +
     pAbout(P) + timeTypesHtml() + newYearHtml() + startOverHtml();
 }
@@ -3614,6 +4102,12 @@ async function act(a, b){
   switch(a){
   case 'view': S.view = d.view; S.flash = null; saveUi(); schedule(); break;
   case 'undo': undo(); break;
+  case 'day-go': S.day = d.date; schedule(); break;
+  case 'day-prev': case 'day-next': {
+    const dates = Array.prototype.map.call(root.querySelectorAll('.wk-head[data-d]'), e => e.dataset.d), i = dates.indexOf(S.day), k = a === 'day-prev' ? -1 : 1;
+    if(i + k >= 0 && i + k < dates.length) S.day = dates[i + k];
+    else{ S.week = TC.addDays(curWeek(), 7 * k); S.day = k < 0 ? 'last' : 'first'; }
+    S.flash = null; schedule(); break; }
   case 'wk-prev': S.week = TC.addDays(curWeek(), -7); S.flash = null; schedule(); break;
   case 'wk-next': S.week = TC.addDays(curWeek(), 7); S.flash = null; schedule(); break;
   case 'wk-today': S.week = null; S.flash = null; schedule(); break;
@@ -3635,6 +4129,14 @@ async function act(a, b){
     else { S.week = TC.weekStart(d.date); S.view = 'week'; S.flash = null; saveUi(); schedule(); }
     break;
   case 'tab': S.view = 'plan'; S.tab = d.tab; S.flash = null; saveUi(); schedule(); break;
+  case 'setup-go': S.setupStep = +d.step; S.flash = null; S.focusSel = '.sttitle'; schedule(); break;
+  case 'setup-next': S.setupStep = Math.min(SETUP_STEPS.length, S.setupStep + 1); S.focusSel = '.sttitle'; schedule(); break;
+  case 'setup-back': S.setupStep = Math.max(1, S.setupStep - 1); S.focusSel = '.sttitle'; schedule(); break;
+  case 'setup-close': S.setupSeen = true; S.view = 'week'; S.flash = null; saveUi(); schedule(); break;
+  case 'setup-open': S.view = 'setup'; S.setupStep = 1; S.flash = null; schedule(); break;
+  case 'rep': S.rep = d.rep; S.flash = null; saveUi(); schedule(); break;
+  case 'print': window.print(); break;
+  case 'log-clear': S.log = {from: '', to: '', type: 'all'}; schedule(); break;
   case 'pdf-save': savePdf(); break;
   case 'pdf-open': fileInput.value = ''; fileInput.click(); break;
   case 'nudge-off': S.nudgeOff = true; schedule(); break;
@@ -3827,6 +4329,7 @@ function field(el){
   case 'rotStart': S.rot.start = el.value; break;
   case 'rotNid': S.rot.countNid = el.checked; break;
   case 'onlyUnset': S.onlyUnset = el.checked; schedule(); break;
+  case 'logf': S.log[d.prop] = el.value; schedule(); break;
   case 'ny': S.ny[d.prop] = el.value; schedule(); break;
   case 'ttNew': S.tt[d.prop] = el.value; break;
   case 'ttname': commit(mm => { TC.renameTimeType(mm, d.id, el.value); }); break;
@@ -4861,6 +5364,77 @@ check('E20', 'Extra: time types and notes', t => {
   t.eq([s.year, s.teacher, s.school, s.confirmedWeeks, s.notes], ['CBE 2026–27 Instructional Calendar', 'Zoë Ng', 'Test School', 2, 3], 'the summary shows year, name, confirmed weeks and notes');
 });
 
+
+check('E21', 'Extra: the year summary, laid out like the Local 38 calculator', t => {
+  const m = richModel();
+  m.duties.push({id: 'monthly', name: 'Staff meeting', typeId: 'meeting', start: T('15:00'), end: T('16:00'), from: null, to: null, off: [], shared: false, rule: {kind: 'nthWeekday', n: 1, weekday: 2}});
+  const y = TC.yearSummary(m, TODAY), ty = TC.trackYear(m, TODAY);
+  const sum = (list, k) => list.reduce((n, l) => n + l.minutes[k], 0);
+  t.eq(['instructional', 'assignable', 'notCounted'].map(k => sum(y.planLines, k)), [ty.plan.instructional, ty.plan.assignable, ty.plan.notCounted], 'the plan lines (days × planned minutes) add up to the plan exactly, in every category');
+  t.ok(y.planLines.every(l => l.days > 0 && l.minutes.instructional === l.days * l.perDay.instructional), 'each plan line is days times minutes per day');
+  t.ok(y.planLines.some(l => /with a duty on that date/.test(l.name)), 'a day that holds a duty only on certain dates gets its own line, so the lines stay exact');
+  const conv = y.planLines.find(l => l.name === 'Teachers’ Convention');
+  t.eq([conv.days, conv.perDay.assignable, conv.minutes.assignable], [2, 360, 720], 'Convention is 2 days at a fixed 6 h');
+  t.eq([y.instructional.sum.plan, y.instructional.sum.adjust, y.instructional.sum.plan + y.instructional.sum.adjust, y.instructional.total], [ty.plan.instructional - 0, y.instructional.sum.adjust, ty.projected.instructional, ty.projected.instructional], 'instructional: plan lines plus adjustments is the projected year');
+  t.ok(y.instructional.adjustments.every(a => a.adjust !== 0) && y.instructional.adjustments.some(a => a.typeId === 'coverage' && a.adjust === 47), 'adjustment lines are the net change from edits by time type (47 min of Coverage)');
+  t.eq([y.assigned.sum.total, y.notCounted.sum.total, y.totalAssigned.total], [ty.projected.assignable, ty.projected.notCounted, ty.projected.totalAssignable], 'the assigned and not-counted lines add up to their totals, and total assigned is instructional plus assigned');
+  t.ok([].concat(y.instructional.lines, y.assigned.lines, y.notCounted.lines).every(l => l.total === l.plan + l.adjust), 'every line is plan plus adjustment');
+  t.eq([y.days.operational, y.days.instructional, y.days.byWeekday], [196, 181, {1: 34, 2: 40, 3: 38, 4: 38, 5: 31}], 'the day counts match the calendar, to check against the official calculator');
+  t.eq([y.instructional.limit, y.totalAssigned.limit, y.header.fte], [916 * 60, 1200 * 60, 1], 'the limits are at the user’s FTE');
+  m.settings.fte = 0.5; m.settings.typicalAssignedHours = 1190;
+  const h = TC.yearSummary(m, TODAY);
+  t.eq([h.instructional.limit, h.totalAssigned.limit], [458 * 60, 595 * 60], 'at 0.5 FTE the limits halve, with the school’s typical hours');
+  const blank = TC.yearSummary(TC.newModel(), TODAY), nl = blank.planLines.find(l => l.name === 'School days with no day type');
+  t.eq([blank.missing, nl.days, nl.minutes.instructional + nl.minutes.assignable], [30, 30, 0], 'school days with no day type are counted, and carry no minutes');
+  // several versions: lines are kept apart by the version they come from
+  const v2 = withClasses(); TC.ensureVersion(v2, '2027-01-04');
+  const y2 = TC.yearSummary(v2, TODAY);
+  t.ok(y2.planLines.some(l => l.versionStart === '2027-01-04') && sum(y2.planLines, 'instructional') === TC.trackYear(v2, TODAY).plan.instructional, 'with a later timetable version the lines say which version, and still add up');
+});
+
+check('E22', 'Extra: the week sheet', t => {
+  const m = richModel(), ws = TC.weekSheet(m, '2026-10-05');
+  t.eq([ws.days.length, ws.days.map(d => d.date)], [5, ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09']], 'it shows the school week, not a quiet weekend');
+  const tue = ws.days[1], club = tue.blocks.find(b => b.name === 'Club');
+  t.eq([club.note, club.edited, club.start, club.end, club.typeName], ['room 12', true, T('15:00'), T('15:30'), 'Robotics club'], 'every block has its times, type and note, and edited ones are marked');
+  t.ok(ws.days.every(d => d.blocks.every((b, i) => i === 0 || d.blocks[i - 1].end <= b.start)), 'blocks are in order and do not overlap');
+  const total = d => d.blocks.reduce((n, b) => n + b.minutes, 0) + d.transitionMinutes;
+  t.ok(ws.days.every(d => total(d) === d.totals.instructional + d.totals.assignable + d.totals.notCounted + d.totals.unassigned), 'a day’s blocks plus its Transition are the whole day');
+  t.eq([tue.blocks.some(b => b.source === 'gap'), tue.transitionMinutes > 0], [false, true], 'the Transition the gaps make is one line a day, not a row each');
+  t.eq(ws.actual.assignable, ws.days.reduce((n, d) => n + d.totals.assignable, 0), 'the week’s totals are the days added up');
+  const lab = TC.weekSheet(m, '2026-09-07');
+  t.eq([lab.days[0].status, lab.days[0].statusLabel, lab.status], ['closed', 'Labour Day', 'confirmed'], 'a holiday shows as a closed day, and the week says it is confirmed');
+});
+
+check('E23', 'Extra: the change log', t => {
+  const m = richModel();
+  const log = TC.changeLog(m);
+  t.eq(log.map(x => x.date + ' ' + x.kind), ['2026-09-07 event', '2026-09-08 add', '2026-09-10 leave', '2026-09-14 event', '2026-09-14 event', '2026-09-22 add', '2026-10-06 add'], 'edits and the confirm and unlock events come out in date order');
+  const grad = log.find(x => /Grad/.test(x.what));
+  t.eq([grad.entered, grad.note, grad.what], ['2026-09-22', 'Told admin → agreed 🤖 ễ', 'Added Grad → 🤖, 2:45 pm–3:45 pm (Meeting, 60 min)'], 'each entry has the day it was entered, its note and what it was');
+  t.eq(TC.changeLog(m, {from: '2026-09-20'}).length, 2, 'it can be filtered from a date');
+  t.eq(TC.changeLog(m, {to: '2026-09-09'}).length, 2, 'to a date');
+  t.eq(TC.changeLog(m, {type: 'coverage'}).map(x => x.date), ['2026-09-08'], 'by time type');
+  t.eq([TC.changeLog(m, {type: 'event'}).length, TC.changeLog(m, {type: 'leave'}).length, TC.changeLog(m, {type: 'dayType'}).length], [3, 1, 0], 'or by kind');
+  // a moved block, a changed time type, a removed block and a day type change
+  const m2 = withClasses();
+  TC.editBlock(m2, '2026-10-07', 'p2', {start: T('10:13'), end: T('11:00'), typeId: 'coverage'}, {entered: '2026-10-07'});
+  TC.deleteBlock(m2, '2026-10-08', 'p3', {entered: '2026-10-08', note: 'away'});
+  TC.setDayTypeEdit(m2, '2026-10-09', 'friB', {entered: '2026-10-09'});
+  const l2 = TC.changeLog(m2);
+  t.ok(/moved from .* to 10:13 am.11:00 am; time type Class → Coverage/.test(l2[0].what), 'a changed block says how: moved, and its time type from → to (' + l2[0].what + ')');
+  t.ok(/^Removed /.test(l2[1].what) && l2[1].note === 'away' && l2[1].minutes < 0, 'a removed block says so, with the minutes taken away and the note');
+  t.ok(/^Day type .* → Friday B$/.test(l2[2].what) && l2[2].kind === 'dayType', 'a day type change says from and to');
+  // a block edited before a week was confirmed keeps the day it was entered after the unlock
+  const m3 = withClasses();
+  TC.addBlock(m3, '2026-09-15', {start: T('15:00'), end: T('15:30'), typeId: 'meeting', name: 'Grad', note: 'x'}, {entered: '2026-09-15'});
+  TC.confirmWeek(m3, '2026-09-14', {at: '2026-09-18'}); TC.unlockWeek(m3, '2026-09-14', {at: '2026-09-25'});
+  let k = TC.changeLog(m3).find(x => x.kind === 'kept');
+  t.eq([k.entered, k.what], ['2026-09-15', 'Kept from the confirmed week: Grad, 3:00 pm–3:30 pm'], 'an edit from before the week was confirmed is listed after it is unlocked, with the day it was entered');
+  TC.deleteBlock(m3, '2026-09-15', 'edit:' + m3.edits['2026-09-15'].find(e => e.op === 'add' && e.name === 'Grad').id, {entered: '2026-09-26'});
+  t.ok(/then removed$/.test(TC.changeLog(m3).find(x => x.kind === 'kept').what), 'and what happened to it since');
+  t.eq(TC.changeLog(m3).filter(x => x.kind === 'kept').length, 1, 'blocks that were simply the plan are not listed as changes');
+});
 
 await Promise.all(jobs);
 results.sort((a, b) => (typeof a.n === 'number' ? a.n : 99) - (typeof b.n === 'number' ? b.n : 99));
