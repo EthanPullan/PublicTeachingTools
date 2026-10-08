@@ -204,9 +204,10 @@ and port it upstream by hand.
   confirmed weeks and settings are never touched. `applySetup` computes the counts it
   reports before it changes anything, so `previewSetup` (on a copy) and the real import
   agree and a repeat import reports nothing.
-- **A new year** (`TC.newYear`) keeps day types, bell times, the timetable, time types
-  and settings, loads a new calendar, and clears Friday letters, edits, confirmed weeks,
-  dates on duties and the log. The calendar is typed in, one line per exception
+- **A new year** (`TC.newYear`) keeps day types, bell times, time types and settings,
+  loads a new calendar, and clears the timetable (a deliberate choice: what each period
+  is changes every year, and a stale one would count silently wrong), Friday letters,
+  edits, confirmed weeks, dates on duties and the log. The calendar is typed in, one line per exception
   (`2027-11-11 to 2027-11-13 closed Fall Break`), and `TC.parseCalendar` reports line
   numbers and the day counts to check against the school's calendar. To start from last
   year's file, open it first, then start the new year.

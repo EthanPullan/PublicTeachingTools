@@ -1788,11 +1788,12 @@ function parseCalendar(m, f, text){
       .sort((a, b) => a.from < b.from ? -1 : 1)};
   return {ok: true, errors, calendar, counts: countDays({calendar, calendarEdits: {}})};
 }
-// Carry over day types, bell times, the timetable, time types and settings. Load the new
-// calendar. Clear Friday letters, edits, confirmed weeks and anything tied to a date.
+// Carry over day types, bell times, time types and settings. Load the new calendar. Clear
+// the timetable (what each period is changes every year), Friday letters, edits, confirmed
+// weeks and anything tied to a date.
 function newYear(m, cal, meta){
   const last = m.versions[m.versions.length - 1], from = m.calendar.name || 'last year';
-  const v = clone(last); v.start = cal.start;
+  const v = clone(last); v.start = cal.start; v.timetable = {};
   const nextOn = (date, wd) => { let d = date; for(let k = 0; k < 7 && weekday(d) !== wd; k++) d = addDays(d, 1); return d; };
   const duties = m.duties.map(d => {
     d = clone(d); d.from = null; d.to = null; d.off = [];
@@ -3568,7 +3569,7 @@ function newYearHtml(){
       '</tbody></table></div></details>';
   }
   return '<section class="card"><h2>Start a new school year</h2>' +
-    '<p class="hint">Keeps your day types, bell times, timetable, time types and settings. Loads the new calendar. Clears Friday letters, edits, confirmed weeks and anything tied to a date (duty dates, the change log). To start from last year’s TimeTracker.pdf, open it above first, then come back here.</p>' +
+    '<p class="hint">Keeps your day types, bell times, time types and settings. Loads the new calendar. Clears your timetable, Friday letters, edits, confirmed weeks and anything tied to a date (duty dates, the change log). To start from last year’s TimeTracker.pdf, open it above first, then come back here.</p>' +
     '<div class="form-row"><label>Name <input type="text" value="' + esc(f.name) + '" data-f="ny" data-prop="name" data-key="ny:name" placeholder="e.g. 2027–28 school year"></label></div>' +
     '<div class="form-row">' + date('First operational day', 'start') + date('First student day', 'firstStudentDay') + date('Last student day', 'lastStudentDay') + date('Last operational day', 'end') + '</div>' +
     '<div class="form-row"><label class="wide">Days that are not ordinary school days, one per line' +
@@ -3587,11 +3588,11 @@ function dataHtml(){
 async function startNewYear(){
   const m = S.model, f = S.ny, res = TC.parseCalendar(m, f, f.text);
   if(!res.ok) return;
-  const nEdits = Object.keys(m.edits).reduce((n, d) => n + TC.userEdits(m, d).length, 0), nLetters = Object.keys(m.dayTypeOverrides).length, nConf = Object.keys(m.confirmed).length;
+  const nEdits = Object.keys(m.edits).reduce((n, d) => n + TC.userEdits(m, d).length, 0), nLetters = Object.keys(m.dayTypeOverrides).length, nConf = Object.keys(m.confirmed).length, nTT = Object.keys(m.versions[m.versions.length - 1].timetable).reduce((n, id) => n + Object.keys(m.versions[m.versions.length - 1].timetable[id]).length, 0);
   for(;;){
     const r = await ask('Start ' + res.calendar.name + '?',
-      '<p><strong>Kept:</strong> day types, bell times, your timetable, time types, your name and settings.</p>' +
-      '<p><strong>Cleared:</strong> ' + nLetters + ' day type' + (nLetters === 1 ? '' : 's') + ' set by date (Friday letters), ' + nEdits + ' edit' + (nEdits === 1 ? '' : 's') + ', ' + nConf + ' confirmed week' + (nConf === 1 ? '' : 's') + ', dates on duties, and the change log.</p>' +
+      '<p><strong>Kept:</strong> day types, bell times, time types, your name and settings.</p>' +
+      '<p><strong>Cleared:</strong> your timetable (' + nTT + ' period' + (nTT === 1 ? '' : 's') + ' typed), ' + nLetters + ' day type' + (nLetters === 1 ? '' : 's') + ' set by date (Friday letters), ' + nEdits + ' edit' + (nEdits === 1 ? '' : 's') + ', ' + nConf + ' confirmed week' + (nConf === 1 ? '' : 's') + ', dates on duties, and the change log.</p>' +
       '<p><strong>Loaded:</strong> the new calendar (' + res.counts.operational + ' operational days, ' + res.counts.instructional + ' instructional).</p>' +
       '<p class="hint">Save last year’s TimeTracker.pdf first if you want to keep it. You can undo this until you close the page.</p>',
       [CANCEL, {label: 'Save last year first', value: 'save'}, {label: 'Start the new year', value: 'ok', kind: 'danger'}]);
@@ -3601,8 +3602,8 @@ async function startNewYear(){
   }
   S.week = null; S.ver = null; S.dt = null; S.ad = null; S.duty = null; S.openDuty = null;
   const ok = commit(mm => { TC.newYear(mm, res.calendar, {at: localToday()}); },
-    res.calendar.name + ' started. Next: set the Friday letters under Plan, and check your timetable still matches your classes.');
-  if(ok){ S.ny = {name: '', start: '', firstStudentDay: '', lastStudentDay: '', end: '', text: ''}; S.view = 'plan'; S.tab = 'rot'; S.flash.undo = true; saveUi(); schedule(); }
+    res.calendar.name + ' started. Next, under Plan: enter your timetable, then set the Friday letters.');
+  if(ok){ S.ny = {name: '', start: '', firstStudentDay: '', lastStudentDay: '', end: '', text: ''}; S.view = 'plan'; S.tab = 'bells'; S.flash.undo = true; saveUi(); schedule(); }
 }
 
 /* =====================================================================
@@ -4823,14 +4824,15 @@ check('E19', 'Extra: typing in a new calendar, and starting a new year', t => {
   old.duties.push({id: 'dl', name: 'Dates', typeId: 'supervision', start: T('8:00'), end: T('8:05'), from: null, to: null, off: [], shared: false, rule: {kind: 'dates', dates: ['2026-10-01']}});
   const ny = TC.parseCalendar(old, {name: '', start: '2027-08-25', firstStudentDay: '2027-08-30', lastStudentDay: '2028-06-23', end: '2028-06-28'}, '2027-09-06 closed Labour Day\n2028-06-23 early Last day');
   t.ok(ny.ok && ny.counts.instructional > 170, 'a new calendar parses');
-  const kept = JSON.stringify([old.dayTypes, old.timeTypes, old.settings, old.versions[0].timetable, old.versions[0].schedules]);
+  const kept = JSON.stringify([old.dayTypes, old.timeTypes, old.settings, old.versions[0].schedules]);
   TC.newYear(old, ny.calendar, {at: '2027-08-20'});
   t.eq([old.calendar.id, old.calendarEdits, old.dayTypeOverrides, old.edits, old.confirmed, old.versions.length, old.versions[0].start], ['custom-2027-28', {}, {}, {}, {}, 1, '2027-08-25'], 'it loads the new calendar and clears Friday letters, edits and confirmed weeks');
-  t.eq(JSON.stringify([old.dayTypes, old.timeTypes, old.settings, old.versions[0].timetable, old.versions[0].schedules]) === kept, true, 'day types, time types, settings, the timetable and the bell times carry over');
+  t.eq([JSON.stringify([old.dayTypes, old.timeTypes, old.settings, old.versions[0].schedules]) === kept, old.versions[0].timetable], [true, {}], 'day types, time types, settings and the bell times carry over; the timetable is cleared');
   const r = old.duties.find(d => d.id === 'r'), dl = old.duties.find(d => d.id === 'dl');
   t.eq([r.from, r.to, r.off, r.rule.startDate, TC.weekday(r.rule.startDate), dl.rule.dates], [null, null, [], '2027-08-31', 2, []], 'dates on duties are cleared, and a repeating duty starts on the same weekday in the first student week');
   t.eq([old.log.map(x => x.kind), old.duties.find(d => d.id === 'friMeeting').shared], [['new-year'], true], 'the log starts again, and the Friday meeting stays shared');
   t.eq(TC.checkModel(old), null, 'the new year passes the checks');
+  t.eq(TC.planSummary(old).year.unassigned > 0, true, 'every period needs a time type again');
   t.eq(TC.missingDayTypeDates(old, 5).length, ny.counts.byWeekday[5] - 1, 'every instructional Friday needs a letter again (except the one the calendar gives Early dismissal)');
 });
 
