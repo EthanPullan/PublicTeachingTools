@@ -37,6 +37,9 @@ Those files change upstream; this one only records what is different **here**.
 - `tools/time-counter/index.html` — **native to this repo.** Plans and records a
   school year of work time against the instructional and assignable limits. Being
   built in stages, and linked from the homepage.
+- `tools/time-counter/self-test.js` and `tools/time-counter/tests/` — the tests, kept
+  out of `index.html` so the tool itself stays small. See *Time Counter — how it's
+  built*.
 - `.nojekyll` — serve files as-is on GitHub Pages.
 
 ## The EAL tool has forked from upstream
@@ -113,12 +116,29 @@ and port it upstream by hand.
 
 - **Engine first, screens later.** The scripts, in order: a DOM-free engine
   (`window.TimeCounter`), the PDF layer (`window.TimeCounterPdf`), the screens, the
-  self-test, and last of all the inlined pdf-lib. Opening the page with `?test` runs
-  every check and shows pass or fail for each. The self-test is async because the PDF
-  checks wait for the library; `window.TimeCounterTest` is set when all have finished.
+  inlined pdf-lib, and a few lines that fetch `self-test.js` only when the address ends
+  in `?test`. That runs every check and shows pass or fail for each; it is async
+  because the PDF checks wait for the library, and `window.TimeCounterTest` is set when
+  all have finished.
+- **Tests live in their own files.** `self-test.js` holds the in-page checks (the brief's
+  numbered ones, then extras named E1, E2 …). `tests/` holds the Playwright suites that
+  drive the real screens, one file per build stage, with `run-all.js` to run them and a
+  README. Add a check to `self-test.js` for anything in the engine or the PDF, and a
+  browser test for anything a person does on a screen. Run them before committing.
+- **Version.** `VERSION` in the engine (0.6 = the six stages of the brief) is shown in
+  the page footer and every PDF page, and stored in the save envelope as `appVersion`.
+  It is separate from `FILE_VERSION` and the model `version`, which change only when the
+  shape of a saved file or model does. Bump it when releasing, and the one check in
+  `self-test.js` that names it.
 - **Minutes and local dates only.** Dates are `YYYY-MM-DD` strings, times are
   minutes after midnight, totals are whole minutes (hours are for display). No
   `Date` with a time zone anywhere, so daylight-saving changes can't move a block.
+- **Extra-curricular time is two time types:** *Extra-curricular volunteer* (Not counted)
+  and *Extra-curricular assigned* (Assignable, when admin gives it a time and place).
+  The volunteer type keeps the old id `voluntary`, so older saves still open; `migrate`
+  renames it only if nobody changed the name, and adds the assigned type. **Conference
+  time is Assignable**, under *School event*, evenings included, and a new block on a
+  conference day starts with that type.
 - **Layers, and each minute counted once.** A day is built from calendar status,
   day type, the timetable version in force, bells, required arrival/departure,
   duties, then that week's edits. The later layer takes the minutes it covers.
