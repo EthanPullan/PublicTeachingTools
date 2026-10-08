@@ -164,6 +164,76 @@
   dialog.dlg form{padding:18px 20px;} dialog.dlg h2{margin:0 0 8px;font-size:16px;} .dbody p{margin:6px 0;font-size:13.5px;}
   .dact{display:flex;flex-direction:row-reverse;gap:8px;justify-content:flex-start;margin-top:14px;}
   @media (max-width:620px){ .strip{grid-template-columns:1fr 1fr;gap:8px;} .scard{padding:9px 10px;} .big{font-size:18px;margin:2px 0 4px;} .slabel{font-size:10px;} .sub{font-size:11px;} .tab{padding:7px 9px;font-size:12.5px;} }
+
+  /* ---- the week and the calendar (stage 3) ---- */
+  :root{ --k-u:#8a6d1c; }
+  .views{display:flex;gap:6px;margin:0 0 14px;}
+  .vbtn{font:inherit;font-size:13.5px;font-weight:700;padding:8px 18px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;}
+  .vbtn:hover{color:var(--ink);border-color:var(--accent);}
+  .vbtn[aria-current=page]{background:var(--board);border-color:var(--board);color:#fff;}
+  .wkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 10px;}
+  .wkt{font-size:15px;} .spacer{flex:1;}
+  .stpill{font-size:12px;font-weight:700;border-radius:20px;padding:3px 11px;border:1px solid var(--line);background:var(--panel-2);}
+  .stpill.st-edited{background:var(--warn-soft);border-color:var(--accent);color:#7a4d0e;}
+  .stpill.st-confirmed{background:var(--ok-soft);border-color:var(--ok);}
+  .review{padding:10px 14px;} .review summary{cursor:pointer;font-size:13px;}
+  .wkscroll{border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);}
+  .wk-grid{display:grid;grid-template-rows:auto auto;min-width:640px;}
+  .wk-corner{border-bottom:1px solid var(--line);}
+  .wk-head{padding:7px 8px 8px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);background:var(--panel);font-size:12px;}
+  .wk-head.today{background:var(--accent-soft);} .wk-head.closed{background:var(--panel-2);color:var(--muted);}
+  .wk-head .d1{font-weight:700;font-size:13px;} .wk-head .tdy{font-size:10px;text-transform:uppercase;letter-spacing:.06em;background:var(--accent);color:#fff;border-radius:10px;padding:1px 6px;}
+  .wk-head .d3{font-size:11px;} .wk-head .d4{font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums;} .wk-head .d5{margin-top:5px;display:flex;gap:4px;}
+  .pen{color:var(--accent-deep);font-weight:700;}
+  .wk-axis{position:relative;font-size:10.5px;color:var(--muted);}
+  .wk-axis span{position:absolute;right:5px;transform:translateY(-50%);white-space:nowrap;background:var(--panel);padding:0 2px;}
+  .wk-axis span:first-child{transform:none;}
+  .wk-body{position:relative;border-left:1px solid var(--line);background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px);cursor:cell;}
+  .wk-body.closed{background-color:var(--panel-2);} .wk-body.today{box-shadow:inset 0 0 0 2px var(--accent-soft);}
+  .wk-body.drop{outline:3px dashed var(--accent);outline-offset:-3px;background-color:var(--accent-soft);}
+  .wk-body[data-noadd]{cursor:default;}
+  .closedlbl,.fixedlbl{position:absolute;left:8px;right:8px;top:10px;font-size:12px;color:var(--muted);}
+  .fixedlbl{background:var(--c-a-soft);border:1px solid var(--c-a);border-radius:8px;padding:8px;color:#7a4d0e;}
+  .blk{position:absolute;left:3px;right:3px;box-sizing:border-box;border-radius:6px;border:1px solid;border-left-width:4px;padding:2px 5px;margin:0;font:inherit;font-size:11.5px;line-height:1.25;text-align:left;overflow:hidden;cursor:grab;touch-action:pan-y;color:var(--ink);display:block;}
+  .blk .bn{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .blk .bt{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .blk.tiny{padding:0 5px;line-height:1.1;font-size:10.5px;}
+  .blk.k-i{background:var(--c-i-soft);border-color:var(--c-i);} .blk.k-a{background:var(--c-a-soft);border-color:var(--c-a);} .blk.k-n{background:var(--c-n-soft);border-color:var(--c-n);}
+  .blk.k-u{background:repeating-linear-gradient(135deg,#fff,#fff 5px,#f6efd9 5px,#f6efd9 10px);border-color:var(--k-u);border-style:dashed;border-left-style:solid;}
+  .blk.gap{background:repeating-linear-gradient(135deg,transparent,transparent 3px,rgba(185,120,31,.22) 3px,rgba(185,120,31,.22) 5px);border:0;border-left:3px solid var(--c-a);cursor:default;pointer-events:none;border-radius:0;}
+  .blk.edited{box-shadow:0 0 0 2px var(--panel),0 0 0 3px var(--ink);}
+  .blk.dragging{opacity:.8;z-index:5;cursor:grabbing;box-shadow:0 6px 16px rgba(20,40,33,.3);}
+  .blk:hover{filter:brightness(.97);}
+  .blk .rz{position:absolute;left:0;right:0;height:7px;cursor:ns-resize;touch-action:none;} .blk .rz.t{top:0;} .blk .rz.b{bottom:0;}
+  .blk .rz::after{content:"";position:absolute;left:35%;right:35%;height:2px;border-radius:2px;background:rgba(22,36,31,.35);opacity:0;} .blk .rz.t::after{top:2px;} .blk .rz.b::after{bottom:2px;} .blk:hover .rz::after{opacity:1;}
+  body.dragging{user-select:none;cursor:grabbing;} body.dragging *{cursor:grabbing !important;}
+  .tip{position:fixed;z-index:60;background:var(--ink);color:#fff;font-size:12px;border-radius:6px;padding:3px 8px;pointer-events:none;white-space:nowrap;}
+  .dghost{position:fixed;z-index:50;pointer-events:none;padding:4px 10px;border-radius:6px;border:1px solid;border-left-width:4px;font-size:12px;font-weight:700;box-shadow:0 6px 16px rgba(20,40,33,.3);}
+  .dghost.k-i{background:var(--c-i-soft);border-color:var(--c-i);} .dghost.k-a{background:var(--c-a-soft);border-color:var(--c-a);} .dghost.k-n{background:var(--c-n-soft);border-color:var(--c-n);}
+  .legend{margin:6px 2px 12px;}
+  .palrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;} .plab{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);min-width:7.5em;}
+  .pal{font:inherit;font-size:12.5px;padding:4px 11px;border-radius:7px;border:1px solid;border-left-width:4px;cursor:grab;color:var(--ink);touch-action:manipulation;}
+  .pal.k-i{background:var(--c-i-soft);border-color:var(--c-i);} .pal.k-a{background:var(--c-a-soft);border-color:var(--c-a);} .pal.k-n{background:var(--c-n-soft);border-color:var(--c-n);}
+  .pal:disabled{opacity:.45;cursor:default;}
+  .qa{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .tbl td.chg{font-weight:700;}
+  /* dialogs and forms */
+  .dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px;margin:10px 0;}
+  label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);} label.f input,label.f select{width:100%;}
+  .dsub{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:12.5px;}
+  .radios{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0;} .menu{display:flex;flex-direction:column;gap:8px;}
+  .derr{margin:8px 0 0;color:var(--danger);font-size:13px;font-weight:600;}
+  .defbtn{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;padding:0;border:0;}
+  dialog.dlg{width:min(560px,92vw);}
+  /* the year */
+  .months{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:14px;}
+  .month{padding:10px 12px;margin:0;} .month h3{margin:0 0 6px;font-size:13.5px;}
+  .mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;} .mh{font-size:10px;font-weight:700;color:var(--muted);text-align:center;}
+  .cd{font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:38px;border-radius:6px;border:1px solid var(--line);padding:1px 0;cursor:pointer;color:var(--ink);background:#fff;}
+  .cd b{font-size:12px;line-height:1.1;} .cd span{font-size:9.5px;color:var(--muted);line-height:1.1;white-space:nowrap;}
+  .cd:disabled{opacity:.35;cursor:default;} .cd:hover:not(:disabled){border-color:var(--accent);}
+  .cd.st-instructional{background:#fff;border-color:var(--board-line);} .cd.st-nid{background:var(--c-a-soft);border-color:var(--c-a);} .cd.st-convention{background:var(--c-i-soft);border-color:var(--c-i);} .cd.st-closed{background:var(--panel-2);color:var(--muted);}
+  .cd.today{outline:2px solid var(--accent);outline-offset:1px;} .cd.miss{box-shadow:inset 0 -3px 0 var(--accent);} .cd.edited b{text-decoration:underline dotted;}
+  .legend2{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;} .legend2 .cd{flex-direction:row;gap:6px;min-height:0;padding:3px 10px;cursor:default;font-size:12px;} .legend2 .cd b{font-size:11px;}
 </style>
 </head>
 <body>
@@ -731,12 +801,17 @@ function setDutyOccurrence(duty, date, on){
 // op 'add'     {start, end, typeId, name, note}
 // op 'remove'  {ref}                 op 'change' {ref, typeId?, name?, start?, end?}
 // op 'dayType' {dayTypeId}           op 'leave'  {kind}   (a tag only: totals do not change)
+function assertUnlocked(m, date){
+  if(m.confirmed[weekStart(date)]) throw new Error('This week is confirmed. Unlock it to change it.');
+}
 function addEdit(m, date, edit, meta){
+  assertUnlocked(m, date);
   const e = Object.assign({id: 'e' + (++m.seq)}, edit, {entered: (meta && meta.entered) || null});
   (m.edits[date] || (m.edits[date] = [])).push(e);
   return e;
 }
 function removeEdit(m, date, id){
+  assertUnlocked(m, date);
   m.edits[date] = (m.edits[date] || []).filter(e => e.id !== id);
   if(!m.edits[date].length) delete m.edits[date];
 }
@@ -751,6 +826,208 @@ function coverClass(m, date, ref, o){
   if(s < lo || e > hi || e <= s) throw new Error('Cover range is outside the block');
   return addEdit(m, date, {op:'add', start:s, end:e, typeId:'coverage',
                            name: o.whose ? 'Coverage: ' + o.whose : 'Coverage', note: o.note || ''}, o);
+}
+
+/* ---------- editing a block (what the week grid and the quick actions use) ---------- */
+// A block is named by its `ref` as resolveDay reports it: a bell id, 'duty:<id>',
+// 'arrival', 'departure', or 'edit:<id>' for a block this week added itself.
+// Edits stay minimal: one change per planned block (further changes are merged into
+// it, and a change back to the plan removes it), and a block the week added is
+// edited in place.
+function liveBlock(m, date, ref){
+  const day = resolveDay(m, date);
+  if(day.fixed) throw new Error('Teachers’ Convention days count a fixed 6 h, whatever blocks are on them.');
+  const bs = day.blocks.filter(b => b.ref === ref);
+  if(!bs.length) return null;
+  return {start: bs[0].planned.start, end: bs[0].planned.end, typeId: bs[0].typeId, name: bs[0].name, source: bs[0].source, label: bs[0].label};
+}
+function checkBlock(m, o){
+  if(!(o.end > o.start) || o.start < 0 || o.end > 1440) throw new Error('A block has to end after it starts, within one day.');
+  if(!o.typeId || !m.timeTypes.some(t => t.id === o.typeId)) throw new Error('Pick a time type.');
+  if(o.typeId === 'other' && !(o.name || '').trim()) throw new Error('“Other assigned” needs a description.');
+}
+function addBlock(m, date, o, meta){
+  assertUnlocked(m, date);
+  if(resolveDay(m, date).fixed) throw new Error('Teachers’ Convention days count a fixed 6 h, whatever blocks are on them.');
+  checkBlock(m, o);
+  return addEdit(m, date, {op:'add', start:o.start, end:o.end, typeId:o.typeId, name:(o.name || '').trim(), note:(o.note || '').trim()}, meta);
+}
+function editBlock(m, date, ref, props, meta){
+  assertUnlocked(m, date);
+  const cur = liveBlock(m, date, ref);
+  if(!cur) throw new Error('That block is no longer in this day.');
+  const next = {start: props.start != null ? props.start : cur.start, end: props.end != null ? props.end : cur.end,
+                typeId: props.typeId !== undefined ? props.typeId : cur.typeId, name: props.name !== undefined ? props.name : cur.name};
+  if(!(next.end > next.start) || next.start < 0 || next.end > 1440) throw new Error('A block has to end after it starts, within one day.');
+  if(props.typeId !== undefined && !m.timeTypes.some(t => t.id === props.typeId)) throw new Error('Pick a time type.');
+  if(next.typeId === 'other' && !(next.name || '').trim()) throw new Error('“Other assigned” needs a description.');
+  const list = m.edits[date] || (m.edits[date] = []);
+  if(ref.indexOf('edit:') === 0){
+    const e = list.find(x => x.op === 'add' && x.id === ref.slice(5));
+    if(!e) throw new Error('That block is no longer in this day.');
+    e.start = next.start; e.end = next.end; e.typeId = next.typeId; e.name = next.name;
+    if(props.note !== undefined) e.note = props.note;
+    return e;
+  }
+  let e = list.find(x => x.op === 'change' && x.ref === ref);
+  if(!e){ e = {id: 'e' + (++m.seq), op: 'change', ref, entered: (meta && meta.entered) || null}; list.push(e); }
+  ['start', 'end', 'typeId', 'name'].forEach(k => { if(props[k] !== undefined && props[k] !== null) e[k] = props[k]; });
+  if(props.note !== undefined) e.note = props.note;
+  // a change that puts the block back where the plan has it is no change at all
+  const plan = resolveDay(m, date, {planOnly: true}).blocks.filter(b => b.ref === ref);
+  if(plan.length){
+    const pp = plan[0], pr = {start: pp.planned.start, end: pp.planned.end, typeId: pp.typeId, name: pp.name};
+    ['start', 'end', 'typeId', 'name'].forEach(k => { if(k in e && e[k] === pr[k]) delete e[k]; });
+    if(!['start', 'end', 'typeId', 'name'].some(k => k in e)) m.edits[date] = list.filter(x => x !== e);
+  }
+  if(!m.edits[date].length) delete m.edits[date];
+  return e;
+}
+function deleteBlock(m, date, ref, meta){
+  assertUnlocked(m, date);
+  const cur = liveBlock(m, date, ref);
+  if(!cur) throw new Error('That block is no longer in this day.');
+  let list = m.edits[date] || [];
+  if(ref.indexOf('edit:') === 0) list = list.filter(x => !(x.op === 'add' && x.id === ref.slice(5)));
+  else{
+    list = list.filter(x => !(x.op === 'change' && x.ref === ref));
+    list.push({id: 'e' + (++m.seq), op: 'remove', ref, note: (meta && meta.note) || '', entered: (meta && meta.entered) || null});
+  }
+  if(list.length) m.edits[date] = list; else delete m.edits[date];
+}
+// Put a planned block back as the plan has it (drops this week's changes to it).
+function resetBlock(m, date, ref){
+  assertUnlocked(m, date);
+  const list = (m.edits[date] || []).filter(x => !((x.op === 'change' || x.op === 'remove') && x.ref === ref));
+  if(list.length) m.edits[date] = list; else delete m.edits[date];
+}
+function splitBlock(m, date, ref, at, meta){
+  assertUnlocked(m, date);
+  const cur = liveBlock(m, date, ref);
+  if(!cur) throw new Error('That block is no longer in this day.');
+  if(!(at > cur.start && at < cur.end)) throw new Error('The split time must fall inside the block.');
+  if(!cur.typeId) throw new Error('Give the block a time type before splitting it.');
+  editBlock(m, date, ref, {end: at}, meta);
+  return addBlock(m, date, {start: at, end: cur.end, typeId: cur.typeId, name: cur.name}, meta);
+}
+function ranOver(m, date, ref, minutes, meta){
+  const cur = liveBlock(m, date, ref);
+  if(!cur) throw new Error('That block is no longer in this day.');
+  return editBlock(m, date, ref, {end: Math.min(1440, cur.end + minutes)}, meta);
+}
+// The end of the school day as scheduled (bells, arrival and departure, duties), for
+// "add an after-school meeting". null when the day has nothing scheduled.
+function scheduledEnd(m, date){
+  const bs = resolveDay(m, date, {planOnly: true}).blocks.filter(b => b.source !== 'gap' && b.end != null);
+  return bs.length ? Math.max.apply(null, bs.map(b => b.end)) : null;
+}
+function afterSchoolMeeting(m, date, o, meta){
+  const start = o.start != null ? o.start : scheduledEnd(m, date);
+  if(start == null) throw new Error('Pick a start time.');
+  return addBlock(m, date, {start, end: start + (o.minutes || 45), typeId: 'meeting', name: o.name, note: o.note}, meta);
+}
+// Move one duty occurrence to another time, or to another date; the occurrence is
+// removed from the first date and added to the second.
+function swapDuty(m, date, ref, o, meta){
+  if(ref.indexOf('duty:') !== 0) throw new Error('That is not a duty.');
+  assertUnlocked(m, date);
+  if(o.toDate && o.toDate !== date){
+    assertUnlocked(m, o.toDate);
+    const cur = liveBlock(m, date, ref);
+    if(!cur) throw new Error('That block is no longer in this day.');
+    checkBlock(m, {start: o.start != null ? o.start : cur.start, end: o.end != null ? o.end : cur.end, typeId: cur.typeId, name: cur.name});
+    deleteBlock(m, date, ref, meta);
+    return addBlock(m, o.toDate, {start: o.start != null ? o.start : cur.start, end: o.end != null ? o.end : cur.end, typeId: cur.typeId, name: cur.name,
+                                  note: (o.note || '') + (o.note ? ' ' : '') + '(moved from ' + date + ')'}, meta);
+  }
+  return editBlock(m, date, ref, {start: o.start, end: o.end, note: o.note}, meta);
+}
+function setLeave(m, date, kind, meta){
+  assertUnlocked(m, date);
+  const list = (m.edits[date] || []).filter(x => x.op !== 'leave');
+  if(kind) list.push({id: 'e' + (++m.seq), op: 'leave', kind, note: (meta && meta.note) || '', entered: (meta && meta.entered) || null});
+  if(list.length) m.edits[date] = list; else delete m.edits[date];
+}
+// "This Friday was actually Friday C": a change to the plan's day type for one date.
+function setDayTypeEdit(m, date, dayTypeId, meta){
+  assertUnlocked(m, date);
+  let list = (m.edits[date] || []).filter(x => x.op !== 'dayType');
+  if(dayTypeId && dayTypeId !== dayTypeFor(m, date)) list.push({id: 'e' + (++m.seq), op: 'dayType', dayTypeId, note: (meta && meta.note) || '', entered: (meta && meta.entered) || null});
+  if(list.length) m.edits[date] = list; else delete m.edits[date];
+}
+// Clear a day's edits, or a whole week's. Returns how many edits were cleared.
+function resetDay(m, date){
+  assertUnlocked(m, date);
+  const n = (m.edits[date] || []).length;
+  delete m.edits[date];
+  return n;
+}
+function resetWeek(m, ws){
+  assertUnlocked(m, ws);
+  let n = 0;
+  for(let k = 0; k < 7; k++) n += resetDay(m, addDays(ws, k));
+  return n;
+}
+
+/* ---------- what a change would do, and how a week compares with its plan ---------- */
+// Runs a change on a copy of the model and reports the difference it makes to the
+// totals of the given dates. The real model is not touched.
+function describeChange(m, dates, fn){
+  dates = [].concat(dates);
+  const probe = JSON.parse(JSON.stringify(m));
+  const sum = mm => {
+    const t = {instructional:0, assignable:0, notCounted:0, unassigned:0};
+    dates.forEach(d => { const r = resolveDay(mm, d); for(const k in t) t[k] += r.totals[k]; });
+    return t;
+  };
+  const before = sum(probe);
+  fn(probe);
+  const after = sum(probe), delta = {};
+  for(const k in before) delta[k] = after[k] - before[k];
+  delta.totalAssignable = delta.instructional + delta.assignable;
+  return {before, after, delta};
+}
+function weekSummary(m, ws){
+  const actual = {instructional:0, assignable:0, notCounted:0, unassigned:0}, plan = Object.assign({}, actual);
+  let edits = 0;
+  for(let k = 0; k < 7; k++){
+    const d = addDays(ws, k), a = resolveDay(m, d), p = resolveDay(m, d, {planOnly: true});
+    for(const j in actual){ actual[j] += a.totals[j]; plan[j] += p.totals[j]; }
+    edits += (m.edits[d] || []).length;
+  }
+  const delta = {};
+  for(const j in actual) delta[j] = actual[j] - plan[j];
+  [actual, plan, delta].forEach(o => { o.totalAssignable = o.instructional + o.assignable; });
+  return {ws, status: weekStatus(m, ws), actual, plan, delta, edits};
+}
+const weekRange = m => ({first: weekStart(m.calendar.start), last: weekStart(m.calendar.end)});
+// Past weeks with school that are not confirmed (they still count as planned).
+function weeksToReview(m, today){
+  const cur = weekStart(today), out = [];
+  for(let ws = weekStart(m.calendar.start); ws < cur && ws <= m.calendar.end; ws = addDays(ws, 7)){
+    if(m.confirmed[ws]) continue;
+    let op = 0;
+    for(let k = 0; k < 7; k++) if(statusOf(m, addDays(ws, k)).status !== 'closed') op++;
+    if(!op) continue;
+    out.push({ws, status: weekStatus(m, ws), operational: op});
+  }
+  return out;
+}
+// How a confirmed week would change if it were unlocked now (it is rebuilt from the
+// current plan and its edits), so that nothing shifts without anyone noticing.
+function confirmedDrift(m, ws){
+  const c = m.confirmed[ws];
+  if(!c) return null;
+  const delta = {instructional:0, assignable:0, notCounted:0, unassigned:0};
+  let dates = 0;
+  for(let k = 0; k < 7; k++){
+    const d = addDays(ws, k), now = resolveDay(m, d, {ignoreConfirmed: true}).totals;
+    const then = summarize(c.days[d] ? c.days[d].blocks : []).totals;
+    let changed = false;
+    for(const j in delta){ delta[j] += now[j] - then[j]; if(now[j] !== then[j]) changed = true; }
+    if(changed) dates++;
+  }
+  return {delta, dates};
 }
 
 /* ---------- confirming a week ---------- */
@@ -1104,6 +1381,8 @@ window.TimeCounter = {
   newModel, touch, statusOf, setCalendarDate, datesWhere, countDays,
   dayTypeFor, setDayType, addDayType, versionFor, ensureVersion, addPeriod, removePeriod, setTimetable, setArrivalDeparture,
   splitPeriod, mergePeriods, moveTimetableEntry, deleteVersion, setDayTypeArrivalDeparture,
+  liveBlock, addBlock, editBlock, deleteBlock, resetBlock, splitBlock, ranOver, scheduledEnd, afterSchoolMeeting, swapDuty,
+  setLeave, setDayTypeEdit, resetDay, resetWeek, describeChange, weekSummary, weekRange, weeksToReview, confirmedDrift,
   scheduleOf, bellsOf, dayTypesUsing, unlinkSchedule, linkSchedule, renameSchedule, updateBell, migrate,
   renameDayType, copyDayType, dayTypeUsage, deleteDayType, rotationPlan, applyRotation, planDay, dayTypeTotals, planSummary,
   dutyDates, setDutyOccurrence, addEdit, removeEdit, coverClass, confirmWeek, unlockWeek, weekStatus,
@@ -1114,7 +1393,7 @@ window.TimeCounter = {
 
 <script>
 /* =====================================================================
-   Time Counter — the Plan screens (stage 2): the generic week.
+   Time Counter — the screens: This week, Calendar and Plan.
    Opens by default; ?test shows the engine self-test instead.
    ===================================================================== */
 (function(){
@@ -1161,12 +1440,13 @@ function loadModel(){
 const ui = readJSON(UIKEY) || {};
 const S = {
   model: loadModel(), rev: 0, saved: true,
+  view: ui.view || 'week', week: null, showWeekend: !!ui.showWeekend, calEdit: false,
   tab: ui.tab || 'preview', dt: ui.dt || null, ver: null, rotWd: ui.rotWd || 5,
   rot: {seq: null, start: '', countNid: false}, onlyUnset: false,
   duty: null, openDuty: null, ovr: {date: '', dt: ''}, newVer: '', ad: null, flash: null
 };
 const hist = {undo: [], redo: []};
-const saveUi = () => writeJSON(UIKEY, {tab: S.tab, dt: S.dt, rotWd: S.rotWd});
+const saveUi = () => writeJSON(UIKEY, {view: S.view, tab: S.tab, dt: S.dt, rotWd: S.rotWd, showWeekend: S.showWeekend});
 const persist = () => { S.saved = writeJSON(KEY, S.model); };
 
 let pending = 0;
@@ -1199,15 +1479,21 @@ function redo(){
 const dlg = document.createElement('dialog');
 dlg.className = 'dlg';
 document.body.appendChild(dlg);
-function ask(title, body, actions){
+function ask(title, body, actions, validate){
   return new Promise(resolve => {
-    dlg.innerHTML = '<form method="dialog"><h2>' + esc(title) + '</h2><div class="dbody">' + body + '</div><div class="dact">' +
-      actions.slice().reverse().map(a => '<button class="btn ' + (a.kind || '') + '" value="' + esc(a.value) + '">' + esc(a.label) + '</button>').join('') + '</div></form>';
-    dlg.onclose = () => {
-      const f = dlg.querySelector('form'), data = {};
-      new FormData(f).forEach((v, k) => { data[k] = v; });
-      resolve({value: dlg.returnValue, data});
-    };
+    const btn = a => '<button class="btn ' + (a.kind || '') + '" value="' + esc(a.value) + '"' + (a.check ? ' data-check="1"' : '') + '>' + esc(a.label) + '</button>';
+    const def = actions.find(a => a.value === 'ok');   // Enter in a field presses OK, not whichever button comes first
+    dlg.innerHTML = '<form method="dialog"><h2>' + esc(title) + '</h2>' + (def ? '<button class="defbtn" value="ok"' + (def.check ? ' data-check="1"' : '') + ' tabindex="-1" aria-hidden="true"></button>' : '') +
+      '<div class="dbody">' + body + '</div><p class="derr" role="alert" hidden></p><div class="dact">' + actions.slice().reverse().map(btn).join('') + '</div></form>';
+    const form = dlg.querySelector('form'), err = dlg.querySelector('.derr');
+    const dataOf = () => { const data = {}; new FormData(form).forEach((v, k) => { data[k] = v; }); return data; };
+    form.addEventListener('submit', ev => {
+      const sub = ev.submitter;
+      if(!validate || !sub || !sub.dataset.check) return;
+      const msg = validate(dataOf(), sub.value);
+      if(msg){ ev.preventDefault(); err.textContent = msg; err.hidden = false; }
+    });
+    dlg.onclose = () => resolve({value: dlg.returnValue, data: dataOf()});
     dlg.returnValue = '';
     dlg.showModal();
   });
@@ -1253,20 +1539,25 @@ const TABS = () => [['preview', 'Preview'], ['daytypes', 'Day types'], ['bells',
   ['rot', S.rotWd === 5 ? 'Friday letters' : WD[S.rotWd] + ' rotation'], ['limits', 'About you & limits']];
 
 const FOCUSABLE = 'input,select,button,textarea';
+const VIEWS = [['week', 'This week'], ['cal', 'Calendar'], ['plan', 'Plan']];
+function planHtml(){
+  const P = preview();
+  const panels = {preview: pPreview, daytypes: pDayTypes, bells: pBells, arrival: pArrival, duties: pDuties, rot: pRot, limits: pLimits};
+  if(!panels[S.tab]) S.tab = 'preview';
+  return stripHtml(P) + '<nav class="tabs" aria-label="Plan sections">' + TABS().map(t =>
+    '<button class="tab" data-act="tab" data-tab="' + t[0] + '"' + (S.tab === t[0] ? ' aria-current="page"' : '') + '>' + esc(t[1]) + '</button>').join('') + '</nav>' +
+    '<div class="panel">' + panels[S.tab](P) + '</div>';
+}
 function render(){
   // Keep keyboard focus where it was: by name if the control has one, else by position.
   const ae = document.activeElement, inRoot = ae && root.contains(ae);
   const key = inRoot && ae.getAttribute('data-key');
   const pos = inRoot ? Array.prototype.indexOf.call(root.querySelectorAll(FOCUSABLE), ae) : -1;
-  const P = preview();
-  const panels = {preview: pPreview, daytypes: pDayTypes, bells: pBells, arrival: pArrival, duties: pDuties, rot: pRot, limits: pLimits};
-  if(!panels[S.tab]) S.tab = 'preview';
-  const flash = S.flash ? '<div class="banner ' + S.flash.level + '" role="status">' + esc(S.flash.text) + '</div>' : '';
-  root.innerHTML = stripHtml(P) +
-    '<nav class="tabs" aria-label="Plan sections">' + TABS().map(t =>
-      '<button class="tab" data-act="tab" data-tab="' + t[0] + '"' + (S.tab === t[0] ? ' aria-current="page"' : '') + '>' + esc(t[1]) + '</button>').join('') + '</nav>' +
-    flash + '<div class="panel">' + panels[S.tab](P) + '</div>';
-  pill.textContent = S.saved ? 'Saved on this device' : 'Not saved — storage is unavailable';
+  if(!VIEWS.some(v => v[0] === S.view)) S.view = 'week';
+  const flash = S.flash ? '<div class="banner ' + S.flash.level + '" role="status">' + esc(S.flash.text) + (S.flash.undo && hist.undo.length ? ' <button class="link" data-act="undo">Undo</button>' : '') + '</div>' : '';
+  const body = S.view === 'week' ? weekHtml() : S.view === 'cal' ? calHtml() : planHtml();
+  root.innerHTML = '<nav class="views" aria-label="Views">' + VIEWS.map(v => '<button class="vbtn" data-act="view" data-view="' + v[0] + '"' + (S.view === v[0] ? ' aria-current="page"' : '') + '>' + v[1] + '</button>').join('') + '</nav>' + flash + body;
+  pill.textContent = S.saved ? 'Saved on this device' : 'Not saved \u2014 storage is unavailable';
   pill.className = 'pill ' + (S.saved ? 'ok' : 'bad');
   undoBtn.disabled = !hist.undo.length; redoBtn.disabled = !hist.redo.length;
   if(inRoot){
@@ -1695,15 +1986,563 @@ function pLimits(P){
     '<section class="card"><h2>Start over</h2><p class="hint">Replaces everything with the school template. You can undo it.</p><p><button class="btn danger" data-act="reset">Reset to the school template</button></p></section>';
 }
 
+
+/* =====================================================================
+   This week (stage 3): the specific week, and the year calendar
+   ===================================================================== */
+function localToday(){ const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function curWeek(){
+  const r = TC.weekRange(S.model);
+  if(!S.week) S.week = TC.weekStart(localToday());
+  if(S.week < r.first) S.week = r.first;
+  if(S.week > r.last) S.week = r.last;
+  return S.week;
+}
+const weekDays = () => { const ws = curWeek(); return [0, 1, 2, 3, 4, 5, 6].map(k => TC.addDays(ws, k)); };
+const weekLocked = d => !!S.model.confirmed[TC.weekStart(d)];
+const STATUS_NAME = {instructional: 'School day', nid: 'Non-instruction day', convention: 'Teachers’ Convention', closed: 'Closed'};
+const KCLS = {instructional: 'k-i', assignable: 'k-a', notCounted: 'k-n'};
+const fmtDay = d => fmtDate(d).replace(/, \d{4}$/, '');
+function shortName(n){
+  const w = String(n).trim().split(/\s+/);
+  return [w[0].length > 4 ? w[0].slice(0, 3) : w[0]].concat(w.slice(1)).join(' ').slice(0, 7);
+}
+const signed = (min, unit) => (min > 0 ? '+' : min < 0 ? '−' : '') + (unit === 'min' ? Math.abs(min) + ' min' : nf.format(Math.abs(Math.round(min / 60 * 100) / 100)) + ' h');
+function deltaText(dl){
+  const parts = [];
+  [['instructional', 'Instructional'], ['assignable', 'Assignable'], ['notCounted', 'Not counted'], ['unassigned', 'No type']].forEach(p => {
+    if(dl[p[0]]) parts.push(p[1] + ' ' + signed(dl[p[0]], 'min'));
+  });
+  return parts.length ? parts.join(', ') : 'No change to the totals';
+}
+const fld = (label, inner) => '<label class="f"><span>' + label + '</span>' + inner + '</label>';
+const NOTE_HINT = 'Who asked and why? Please don’t enter student names.';
+
+/* ---------- the week ---------- */
+function gridRange(days){
+  let lo = 1440, hi = 0;
+  days.forEach(r => r.blocks.forEach(b => { if(b.start != null){ lo = Math.min(lo, b.start); hi = Math.max(hi, b.end); } }));
+  if(lo >= hi){ lo = 8 * 60; hi = 15 * 60; }
+  lo = Math.floor(lo / 60) * 60; hi = Math.ceil(hi / 60) * 60;
+  if(hi - lo < 6 * 60) hi = Math.min(1440, lo + 6 * 60);
+  return {lo, hi};
+}
+const PPM = 1.4;   // pixels per minute
+
+function blockHtml(b, date, lo, locked){
+  const top = (b.start - lo) * PPM, h = Math.max(b.minutes * PPM, 6);
+  if(b.source === 'gap'){
+    return '<div class="blk gap" style="top:' + top + 'px;height:' + h + 'px" title="Transition ' + rng(b.start, b.end) + ' (' + b.minutes + ' min)"></div>';
+  }
+  const piece = b.planned, ownTop = b.start === piece.start, ownBottom = b.end === piece.end;
+  const tiny = h < 30;
+  const label = b.name + (b.typeName && b.typeName !== b.name ? ', ' + b.typeName : '') + ', ' + (b.category ? CAT[b.category].name : 'no time type yet') + ', ' + rng(b.start, b.end) + ', ' + b.minutes + ' minutes' + (b.edited ? ', edited from the plan' : '');
+  return '<button class="blk ' + (b.category ? KCLS[b.category] : 'k-u') + (b.edited ? ' edited' : '') + (tiny ? ' tiny' : '') + '" style="top:' + top + 'px;height:' + h + 'px"' +
+    ' data-ref="' + esc(b.ref) + '" data-date="' + date + '" data-s="' + b.start + '" data-e="' + b.end + '" data-ps="' + piece.start + '" data-pe="' + piece.end + '" data-locked="' + (locked ? 1 : 0) + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
+    (!locked && ownTop ? '<i class="rz t"></i>' : '') +
+    '<span class="bn">' + (b.edited ? '<span class="pen" aria-hidden="true">✎</span> ' : '') + esc(b.name) + '</span>' +
+    (tiny ? '' : '<span class="bt">' + rng(b.start, b.end) + ' · ' + b.minutes + ' min</span>') +
+    (!locked && ownBottom ? '<i class="rz b"></i>' : '') + '</button>';
+}
+
+function paletteHtml(locked){
+  let h = '<section class="card"><h2>Add a block</h2><p class="hint">' + (locked ? 'This week is confirmed, so it can’t be changed. Unlock it first.' : 'Drag a time type onto the week, or press one to add it with a form. Transition is added for you.') + '</p>';
+  ['instructional', 'assignable', 'notCounted'].forEach(c => {
+    h += '<div class="palrow"><span class="plab">' + CAT[c].name + '</span>' + S.model.timeTypes.filter(t => t.category === c && t.id !== 'transition' && t.id !== 'convention')
+      .map(t => '<button class="pal ' + KCLS[c] + '" data-type="' + esc(t.id) + '"' + (locked ? ' disabled' : '') + ' title="' + esc(t.includes || '') + '">' + esc(t.name) + '</button>').join('') + '</div>';
+  });
+  return h + '</section>';
+}
+function quickHtml(locked, hasEdits){
+  const b = (act, label) => '<button class="btn" data-act="' + act + '"' + (locked ? ' disabled' : '') + '>' + label + '</button>';
+  return '<section class="card"><h2>Quick actions</h2><div class="qa">' +
+    b('qa-cover', 'Covered a class…') + b('qa-ran', 'Ran over…') + b('qa-after', 'Add after-school meeting…') + b('qa-duty', 'Swap or drop a duty…') +
+    b('qa-daytype', 'Change day type…') + b('qa-leave', 'Mark leave…') +
+    '<button class="btn" data-act="qa-reset"' + (locked || !hasEdits ? ' disabled' : '') + '>Reset to plan…</button></div></section>';
+}
+
+function weekFlagsHtml(ws, locked){
+  const flags = TC.weekFlags(S.model, ws);
+  let unassigned = 0, udays = 0;
+  const items = [];
+  flags.forEach(f => {
+    if(f.code === 'unassigned-minutes'){ unassigned += f.minutes; udays++; return; }
+    let act = '';
+    if(f.code === 'edit-orphan' && !locked) act = '<button class="link" data-act="edit-del" data-date="' + f.date + '" data-id="' + esc(f.editId) + '">Delete this edit</button>';
+    if(f.code === 'missing-day-type' && !locked) act = '<button class="link" data-act="qa-daytype" data-date="' + f.date + '">Set the day type</button>';
+    items.push('<li><span class="ico" aria-hidden="true">⚠</span><span class="txt"><strong>' + fmtDay(f.date) + ':</strong> ' + esc(f.msg) + '</span>' + act + '</li>');
+  });
+  if(unassigned) items.push('<li><span class="ico" aria-hidden="true">ℹ</span><span class="txt">' + unassigned + ' min over ' + udays + ' day' + (udays === 1 ? '' : 's') + ' have no time type yet and are not counted. Set them under Plan → Bells &amp; timetable.</span></li>');
+  if(!items.length) return '';
+  return '<section class="card"><h2>Needs a look</h2><ul class="checks">' + items.join('') + '</ul></section>';
+}
+
+function weekFooterHtml(ws){
+  const w = TC.weekSummary(S.model, ws), a = w.actual, p = w.plan, d = w.delta;
+  const row = (label, cat, k) => '<tr><th scope="row">' + label + (cat ? ' ' + catChip(cat) : '') + '</th><td class="num">' + hrs(a[k]) + '</td><td class="num">' + hrs(p[k]) + '</td><td class="num' + (d[k] ? ' chg' : '') + '">' + (d[k] ? signed(d[k]) : '—') + '</td></tr>';
+  return '<section class="card"><h2>This week’s totals</h2><div class="scroll"><table class="tbl"><thead><tr><th>Category</th><th class="num">This week</th><th class="num">Plan</th><th class="num">Difference</th></tr></thead><tbody>' +
+    row('Instructional', 'instructional', 'instructional') + row('Assignable', 'assignable', 'assignable') + row('Total assignable', null, 'totalAssignable') + row('Not counted', 'notCounted', 'notCounted') +
+    (a.unassigned || p.unassigned ? row('No time type yet', null, 'unassigned') : '') + '</tbody></table></div>' +
+    '<p class="hint">' + (w.edits ? w.edits + ' edit' + (w.edits === 1 ? '' : 's') + ' this week. ' : 'No edits: this week follows the plan. ') + 'Convention days count a fixed 6 h whatever is on them.</p></section>';
+}
+
+function weekHtml(){
+  const m = S.model, ws = curWeek(), td = localToday(), range = TC.weekRange(m);
+  const status = TC.weekStatus(m, ws), locked = status === 'confirmed';
+  const dates = weekDays(), days = dates.map(d => TC.resolveDay(m, d));
+  const cols = days.filter(r => r.weekday >= 1 && r.weekday <= 5 || S.showWeekend || r.blocks.length || r.status !== 'closed' || (m.edits[r.date] || []).length);
+  const {lo, hi} = gridRange(cols);
+  const H = (hi - lo) * PPM;
+  const last = TC.addDays(ws, 6);
+  const stName = {planned: 'Planned', edited: 'Edited', confirmed: 'Confirmed'}[status];
+  let h = '<div class="wkbar"><button class="btn" data-act="wk-prev"' + (ws <= range.first ? ' disabled' : '') + '>‹ Previous</button><button class="btn" data-act="wk-today">Today</button><button class="btn" data-act="wk-next"' + (ws >= range.last ? ' disabled' : '') + '>Next ›</button>' +
+    '<label class="inl">Go to <input type="date" value="' + ws + '" data-f="wkDate" data-key="wkDate" min="' + m.calendar.start + '" max="' + m.calendar.end + '" aria-label="Go to the week of this date"></label>' +
+    '<strong class="wkt">' + fmtDay(ws) + ' – ' + fmtDay(last) + ', ' + last.slice(0, 4) + '</strong>' +
+    '<span class="stpill st-' + status + '">' + (locked ? '🔒 ' : status === 'edited' ? '✎ ' : '') + stName + '</span>' +
+    '<label class="chk"><input type="checkbox" data-f="wkWeekend" data-key="wkWeekend"' + (S.showWeekend ? ' checked' : '') + '> Show weekends</label><span class="spacer"></span>' +
+    (locked ? '<button class="btn" data-act="wk-unlock">Unlock…</button>' : '<button class="btn primary" data-act="wk-confirm">Confirm this week…</button>') + '</div>';
+  if(locked){
+    const c = m.confirmed[ws];
+    h += '<div class="banner ok">🔒 This week is confirmed' + (c.at ? ' (' + fmtDate(c.at) + ')' : '') + ': <strong>this is what happened</strong>. It keeps these blocks even if the timetable or duties change later. Unlock it to change it; the unlock is logged.</div>';
+  }
+  const review = TC.weeksToReview(m, td);
+  if(review.length){
+    h += '<details class="card review"><summary><strong>' + review.length + ' past week' + (review.length === 1 ? '' : 's') + ' not confirmed yet</strong> <span class="muted">— they count as planned until you confirm them</span></summary><div class="chips">' +
+      review.map(r => '<button class="chipbtn" data-act="wk-go" data-ws="' + r.ws + '">' + fmtShort(r.ws) + ' – ' + fmtShort(TC.addDays(r.ws, 4)) + ' · ' + (r.status === 'edited' ? 'Edited' : 'Planned') + '</button>').join('') + '</div></details>';
+  }
+  h += '<div class="scroll wkscroll"><div class="wk-grid" data-rs="' + lo + '" data-ppm="' + PPM + '" style="grid-template-columns:58px repeat(' + cols.length + ',minmax(128px,1fr))">';
+  // header row
+  h += '<div class="wk-corner"></div>';
+  cols.forEach(r => {
+    const edits = (m.edits[r.date] || []).length, fixed = !!r.fixed;
+    const label = r.status === 'closed' ? (r.statusLabel === 'Weekend' ? 'Weekend' : 'Closed' + (r.statusLabel ? ': ' + r.statusLabel : ''))
+      : r.status === 'instructional' ? (r.statusLabel || 'School day') : STATUS_NAME[r.status] + (r.statusLabel && r.statusLabel !== STATUS_NAME[r.status] ? ': ' + r.statusLabel : '');
+    h += '<div class="wk-head' + (r.date === td ? ' today' : '') + (r.status === 'closed' ? ' closed' : '') + '"><div class="d1">' + (r.date === td ? '<span class="tdy">Today</span> ' : '') + fmtDay(r.date) + '</div>' +
+      '<div class="d2">' + (r.dayTypeId ? esc(r.dayTypeName || dtName(r.dayTypeId)) : r.status === 'instructional' ? '<span class="warn-t">⚠ no day type</span>' : '<span class="muted">' + esc(STATUS_NAME[r.status]) + '</span>') + (edits ? ' <span class="pen" title="' + edits + ' edit' + (edits === 1 ? '' : 's') + '">✎</span>' : '') + '</div>' +
+      '<div class="d3 muted">' + esc(label) + '</div>' +
+      (r.leave ? '<div class="d3"><span class="chip c-u">' + (r.leave.kind === 'sick' ? 'Sick leave' : r.leave.kind === 'personal' ? 'Personal leave' : 'Leave') + '</span></div>' : '') +
+      '<div class="d4">I ' + nf.format(r.totals.instructional / 60) + ' · A ' + nf.format(r.totals.assignable / 60) + ' · N ' + nf.format(r.totals.notCounted / 60) + '</div>' +
+      '<div class="d5"><button class="btn sm" data-act="add-day" data-date="' + r.date + '"' + (locked || fixed ? ' disabled' : '') + '>+ Add</button> <button class="btn sm" data-act="day-menu" data-date="' + r.date + '"' + (locked ? ' disabled' : '') + ' aria-label="Day actions for ' + fmtDay(r.date) + '">⋯</button></div></div>';
+  });
+  // body row
+  h += '<div class="wk-axis" style="height:' + H + 'px">';
+  for(let x = lo; x <= hi; x += 60) h += '<span style="top:' + ((x - lo) * PPM) + 'px">' + clock(x) + '</span>';
+  h += '</div>';
+  cols.forEach(r => {
+    h += '<div class="wk-body' + (r.status === 'closed' ? ' closed' : '') + (r.date === td ? ' today' : '') + (r.fixed ? ' fixedday' : '') + '" data-date="' + r.date + '" style="height:' + H + 'px;background-size:100% ' + (60 * PPM) + 'px"' + (locked || r.fixed ? ' data-noadd="1"' : '') + '>';
+    if(r.fixed) h += '<div class="fixedlbl"><strong>Teachers’ Convention</strong><br>Counts as a fixed ' + hrs(r.totals.assignable) + ' Assignable, whatever is on the day.</div>';
+    else if(r.status === 'closed' && !r.blocks.length) h += '<div class="closedlbl">' + (r.statusLabel && r.statusLabel !== 'Weekend' ? esc(r.statusLabel) : 'No school') + '</div>';
+    else if(r.status === 'instructional' && !r.dayTypeId && !r.blocks.length) h += '<div class="closedlbl">No day type is set for this school day.</div>';
+    r.blocks.forEach(b => { if(b.start != null) h += blockHtml(b, r.date, lo, locked); });
+    h += '</div>';
+  });
+  h += '</div></div><p class="hint legend">Colour shows the category, and the label says it too. <span class="pen">✎</span> means the block was changed or added this week. Drag a block to move it, drag its top or bottom edge to resize it, or press it to open its form.</p>';
+  h += weekFlagsHtml(ws, locked) + quickHtml(locked, status === 'edited') + paletteHtml(locked) + weekFooterHtml(ws);
+  return h;
+}
+
+/* ---------- guarded edits: ask first when Instructional time would go down ---------- */
+async function guardedEdit(dates, fn, okText){
+  let r;
+  try{ r = TC.describeChange(S.model, dates, fn); }
+  catch(err){ S.flash = {level: 'bad', text: err.message}; schedule(); return false; }
+  if(r.delta.instructional < 0){
+    const ask1 = await ask('This lowers Instructional time',
+      '<p>This change takes <strong>' + Math.abs(r.delta.instructional) + ' min</strong> away from Instructional time (' + esc(deltaText(r.delta)) + '). Continue?</p><p class="hint">You can undo it afterwards.</p>',
+      [CANCEL, {label: 'Make the change', value: 'ok', kind: 'primary'}]);
+    if(ask1.value !== 'ok'){ schedule(); return false; }
+  }
+  const done = commit(fn);
+  if(done){ S.flash = {level: 'ok', text: (okText || 'Saved.') + ' ' + deltaText(r.delta) + '.', undo: true}; schedule(); }
+  return done;
+}
+const meta = () => ({entered: localToday()});
+function lockedMsg(d){
+  if(d && weekLocked(d) || !d && S.model.confirmed[curWeek()]){ S.flash = {level: 'bad', text: 'This week is confirmed. Unlock it to change it.'}; schedule(); return true; }
+  return false;
+}
+
+/* ---------- forms ---------- */
+async function openBlockForm(date, ref){
+  const m = S.model, day = TC.resolveDay(m, date);
+  const bs = day.blocks.filter(x => x.ref === ref);
+  if(!bs.length) return;
+  const b = bs[0], pr = b.planned, locked = weekLocked(date), isAdd = ref.indexOf('edit:') === 0, isDuty = b.source === 'duty';
+  const plan = isAdd ? null : TC.resolveDay(m, date, {planOnly: true}).blocks.find(x => x.ref === ref);
+  const dis = locked ? ' disabled' : '';
+  const planned = plan && b.edited ? '<p class="hint">In the plan: ' + rng(plan.planned.start, plan.planned.end) + ' · ' + esc(plan.name) + (plan.typeName ? ' (' + esc(plan.typeName) + ')' : '') + '</p>' : '';
+  const body = '<div class="dgrid">' +
+    fld('Time type', '<select name="typeId"' + dis + '>' + typeOptions(b.typeId, '— not set —') + '</select>') +
+    fld('Name', '<input type="text" name="name" value="' + esc(b.name) + '"' + dis + '>') +
+    fld('Starts', '<input type="time" name="start" value="' + tval(pr.start) + '"' + dis + '>') +
+    fld('Ends', '<input type="time" name="end" value="' + tval(pr.end) + '"' + dis + '>') +
+    (isDuty && !locked ? fld('Move to another date', '<select name="toDate">' + weekDays().filter(d => !weekLocked(d)).map(d => '<option value="' + d + '"' + (d === date ? ' selected' : '') + '>' + fmtDay(d) + '</option>').join('') + '</select>') : '') +
+    fld('Note', '<input type="text" name="note" value="' + esc(b.note) + '" placeholder="' + esc(NOTE_HINT) + '"' + dis + '>') + '</div>' +
+    '<p class="hint">' + catChip(b.category) + ' · ' + b.minutes + ' min' + (b.minutes !== pr.end - pr.start ? ' showing (the rest is covered by another block)' : '') + '</p>' + planned +
+    (locked ? '' : '<div class="dsub"><span>Ran over:</span> <button class="btn sm" value="run5">+5 min</button> <button class="btn sm" value="run10">+10 min</button> <button class="btn sm" value="run15">+15 min</button>' +
+      ' <label class="inl">Split at <input type="time" name="splitAt"></label> <button class="btn sm" value="split" data-check="1">Split</button>' +
+      (b.edited && !isAdd ? ' <button class="btn sm" value="reset">Put back as planned</button>' : '') + '</div>');
+  const acts = locked ? [{label: 'Close', value: 'cancel'}] : [CANCEL, {label: 'Delete block', value: 'del', kind: 'danger'}, {label: 'Save', value: 'ok', kind: 'primary', check: true}];
+  const r = await ask(locked ? 'Block (confirmed week)' : 'Edit block', body, acts, (d, v) => {
+    if(v === 'split'){ if(!d.splitAt) return 'Pick the time to split at.'; return null; }
+    if(!d.start || !d.end) return 'Enter a start and an end time.';
+    if(T(d.end) <= T(d.start)) return 'A block has to end after it starts.';
+    return null;
+  });
+  if(r.value === 'cancel' || r.value === '' || locked) return;
+  const f = r.data, mt = meta();
+  if(r.value === 'del') return void guardedEdit([date], mm => TC.deleteBlock(mm, date, ref, Object.assign({note: f.note}, mt)), 'Block deleted.');
+  if(r.value === 'reset') return void guardedEdit([date], mm => TC.resetBlock(mm, date, ref), 'Put back as planned.');
+  if(/^run\d+$/.test(r.value)){ const n = +r.value.slice(3); return void guardedEdit([date], mm => TC.ranOver(mm, date, ref, n, mt), 'Ran over by ' + n + ' min.'); }
+  if(r.value === 'split') return void guardedEdit([date], mm => TC.splitBlock(mm, date, ref, T(f.splitAt), mt), 'Block split.');
+  const props = {};
+  const ns = T(f.start), ne = T(f.end);
+  if(ns !== pr.start) props.start = ns;
+  if(ne !== pr.end) props.end = ne;
+  if(f.typeId && f.typeId !== b.typeId) props.typeId = f.typeId;
+  if(f.name !== b.name) props.name = f.name.trim();
+  if((f.note || '') !== (b.note || '')) props.note = f.note.trim();
+  if(isDuty && f.toDate && f.toDate !== date){
+    return void guardedEdit([date, f.toDate], mm => TC.swapDuty(mm, date, ref, {toDate: f.toDate, start: ns, end: ne, note: props.note}, mt), 'Moved to ' + fmtDay(f.toDate) + '.');
+  }
+  if(!Object.keys(props).length) return;
+  guardedEdit([date], mm => TC.editBlock(mm, date, ref, props, mt), 'Block changed.');
+}
+
+async function openAddForm(o){
+  o = o || {};
+  const m = S.model, dates = weekDays();
+  if(lockedMsg(o.date)) return;
+  const date = o.date && !weekLocked(o.date) ? o.date : (dates.find(d => d === localToday()) || dates.find(d => TC.statusOf(m, d).status !== 'closed') || dates[0]);
+  let start = o.start;
+  if(start == null){ const e = TC.scheduledEnd(m, date); start = e != null ? e : T('15:00'); }
+  const end = o.end != null ? o.end : Math.min(1440, start + 30);
+  const opts = dates.map(d => { const fx = TC.statusOf(m, d).status === 'convention'; return '<option value="' + d + '"' + (d === date ? ' selected' : '') + (fx ? ' disabled' : '') + '>' + fmtDay(d) + (fx ? ' (Convention: fixed 6 h)' : '') + '</option>'; }).join('');
+  const body = '<div class="dgrid">' + fld('Date', '<select name="date">' + opts + '</select>') + fld('Time type', '<select name="typeId">' + typeOptions(o.typeId || 'meeting') + '</select>') +
+    fld('Name', '<input type="text" name="name" placeholder="e.g. Meeting about grad">') +
+    fld('Starts', '<input type="time" name="start" value="' + tval(start) + '">') + fld('Ends', '<input type="time" name="end" value="' + tval(end) + '">') +
+    fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div>' +
+    '<p class="hint">A new block takes the minutes it covers, so nothing is counted twice. The note travels with every saved copy of your TimeTracker.pdf.</p>';
+  const r = await ask('Add a block', body, [CANCEL, {label: 'Add block', value: 'ok', kind: 'primary', check: true}], d => {
+    if(!d.start || !d.end) return 'Enter a start and an end time.';
+    if(T(d.end) <= T(d.start)) return 'A block has to end after it starts.';
+    if(d.typeId === 'other' && !d.name.trim()) return '“Other assigned” needs a description.';
+    return null;
+  });
+  if(r.value !== 'ok') return;
+  const f = r.data;
+  guardedEdit([f.date], mm => TC.addBlock(mm, f.date, {start: T(f.start), end: T(f.end), typeId: f.typeId, name: f.name, note: f.note}, meta()), 'Block added.');
+}
+
+function blockOptions(filter){
+  let h = '';
+  weekDays().forEach(d => {
+    const day = TC.resolveDay(S.model, d);
+    if(day.fixed || weekLocked(d)) return;
+    const seen = {}, opts = [];
+    day.blocks.forEach(b => {
+      if(!b.ref || b.source === 'gap' || seen[b.ref] || !filter(b)) return;
+      seen[b.ref] = 1;
+      opts.push('<option value="' + esc(d + '|' + b.ref) + '">' + rng(b.planned.start, b.planned.end) + ' · ' + esc(b.name) + (b.typeName && b.typeName !== b.name ? ' (' + esc(b.typeName) + ')' : '') + '</option>');
+    });
+    if(opts.length) h += '<optgroup label="' + fmtDay(d) + '">' + opts.join('') + '</optgroup>';
+  });
+  return h;
+}
+const splitVal = v => { const i = v.indexOf('|'); return [v.slice(0, i), v.slice(i + 1)]; };
+const schoolDayOptions = (sel, pred) => weekDays().filter(d => !weekLocked(d) && (!pred || pred(d))).map(d => '<option value="' + d + '"' + (d === sel ? ' selected' : '') + '>' + fmtDay(d) + '</option>').join('');
+const nothingToDo = (title, text) => ask(title, '<p>' + text + '</p>', [{label: 'OK', value: 'ok', kind: 'primary'}]);
+
+async function qaCover(){
+  if(lockedMsg()) return;
+  const opts = blockOptions(b => b.typeId === 'prep');
+  if(!opts) return void nothingToDo('Covered a class', 'There are no Prep blocks this week to turn into Coverage.');
+  const r = await ask('Covered a class', '<p>This turns a Prep block into Coverage (Instructional) for the same minutes, with no substitute.</p><div class="dgrid">' +
+    fld('Which Prep block', '<select name="blk">' + opts + '</select>') + fld('Whose class? (optional)', '<input type="text" name="whose" placeholder="e.g. a colleague’s Grade 7 math">') +
+    fld('Only part of it: from', '<input type="time" name="start">') + fld('to', '<input type="time" name="end">') +
+    fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div><p class="hint">Leave the times empty to cover the whole block.</p>',
+    [CANCEL, {label: 'Cover it', value: 'ok', kind: 'primary', check: true}], d => (d.start && !d.end) || (!d.start && d.end) ? 'Fill in both times, or neither.' : null);
+  if(r.value !== 'ok') return;
+  const [date, ref] = splitVal(r.data.blk), f = r.data;
+  guardedEdit([date], mm => TC.coverClass(mm, date, ref, {start: f.start ? T(f.start) : undefined, end: f.end ? T(f.end) : undefined, whose: f.whose.trim(), note: f.note.trim(), entered: localToday()}), 'Covered a class.');
+}
+async function qaRan(){
+  if(lockedMsg()) return;
+  const opts = blockOptions(() => true);
+  if(!opts) return void nothingToDo('Ran over', 'There are no blocks to extend this week.');
+  const r = await ask('Ran over', '<p>Extend a block. It takes the minutes it runs into.</p><div class="dgrid">' + fld('Which block', '<select name="blk">' + opts + '</select>') +
+    '</div><div class="radios"><label class="chk"><input type="radio" name="mins" value="5" checked> 5 min</label><label class="chk"><input type="radio" name="mins" value="10"> 10 min</label><label class="chk"><input type="radio" name="mins" value="15"> 15 min</label>' +
+    '<label class="chk"><input type="radio" name="mins" value="custom"> Other <input type="number" name="custom" min="1" max="240" class="w-num"> min</label></div>',
+    [CANCEL, {label: 'Extend it', value: 'ok', kind: 'primary', check: true}], d => d.mins === 'custom' && !(+d.custom >= 1) ? 'Enter the number of minutes.' : null);
+  if(r.value !== 'ok') return;
+  const [date, ref] = splitVal(r.data.blk), n = r.data.mins === 'custom' ? Math.round(+r.data.custom) : +r.data.mins;
+  guardedEdit([date], mm => TC.ranOver(mm, date, ref, n, meta()), 'Ran over by ' + n + ' min.');
+}
+async function qaAfter(date){
+  if(lockedMsg()) return;
+  const dates = weekDays().filter(d => !weekLocked(d) && TC.statusOf(S.model, d).status !== 'convention');
+  const sel = date || dates.find(d => d === localToday()) || dates.find(d => TC.statusOf(S.model, d).status === 'instructional') || dates[0];
+  const r = await ask('Add an after-school meeting', '<div class="dgrid">' + fld('Day', '<select name="date">' + schoolDayOptions(sel, d => TC.statusOf(S.model, d).status !== 'convention') + '</select>') +
+    fld('Name of the meeting', '<input type="text" name="name" placeholder="e.g. Staff meeting about grad">') + fld('How long, min', '<input type="number" name="minutes" value="45" min="5" max="480" class="w-num">') +
+    fld('Starts (optional)', '<input type="time" name="start">') + fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div>' +
+    '<p class="hint">Leave the start empty to begin when the day’s scheduled time ends (the last bell and any required departure).</p>',
+    [CANCEL, {label: 'Add meeting', value: 'ok', kind: 'primary', check: true}], d => !d.name.trim() ? 'Give the meeting a name.' : !(+d.minutes >= 5) ? 'Enter how many minutes it lasts.' : null);
+  if(r.value !== 'ok') return;
+  const f = r.data;
+  guardedEdit([f.date], mm => TC.afterSchoolMeeting(mm, f.date, {name: f.name.trim(), minutes: Math.round(+f.minutes), start: f.start ? T(f.start) : null, note: f.note.trim()}, meta()), 'Meeting added.');
+}
+async function qaDuty(){
+  if(lockedMsg()) return;
+  const opts = blockOptions(b => b.source === 'duty');
+  if(!opts) return void nothingToDo('Swap or drop a duty', 'There are no duties this week.');
+  const r = await ask('Swap or drop a duty', '<p>This changes one occurrence only. The duty in the plan stays as it is.</p><div class="dgrid">' + fld('Which duty', '<select name="blk">' + opts + '</select>') + '</div>' +
+    '<div class="radios"><label class="chk"><input type="radio" name="how" value="time" checked> Move it to another time that day</label><label class="chk"><input type="radio" name="how" value="date"> Move it to another day</label><label class="chk"><input type="radio" name="how" value="drop"> Drop it this week</label></div>' +
+    '<div class="dgrid">' + fld('New start', '<input type="time" name="start">') + fld('New end', '<input type="time" name="end">') + fld('New day (for “another day”)', '<select name="toDate">' + schoolDayOptions('') + '</select>') +
+    fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div><p class="hint">Leave the times empty to keep the duty’s own times.</p>',
+    [CANCEL, {label: 'Apply', value: 'ok', kind: 'primary', check: true}], d => (d.how === 'time' && !d.start && !d.end) ? 'Enter a new start or end time.' : ((d.start && !d.end) || (!d.start && d.end)) && d.how !== 'drop' && d.how === 'time' ? 'Fill in both times, or neither.' : null);
+  if(r.value !== 'ok') return;
+  const [date, ref] = splitVal(r.data.blk), f = r.data;
+  if(f.how === 'drop') return void guardedEdit([date], mm => TC.deleteBlock(mm, date, ref, Object.assign({note: f.note.trim()}, meta())), 'Duty dropped for this week.');
+  const o = {start: f.start ? T(f.start) : undefined, end: f.end ? T(f.end) : undefined, note: f.note.trim()};
+  if(f.how === 'date') o.toDate = f.toDate;
+  guardedEdit(f.how === 'date' ? [date, f.toDate] : [date], mm => TC.swapDuty(mm, date, ref, o, meta()), 'Duty moved.');
+}
+async function qaDayType(date){
+  if(lockedMsg()) return;
+  const m = S.model, dates = weekDays().filter(d => !weekLocked(d) && TC.statusOf(m, d).status !== 'convention');
+  const sel = date || dates.find(d => d === localToday()) || dates[0];
+  const r = await ask('Change day type', '<p>For example: this Friday was actually Friday C, or a day ran an early dismissal schedule.</p><div class="dgrid">' +
+    fld('Day', '<select name="date">' + schoolDayOptions(sel, d => TC.statusOf(m, d).status !== 'convention') + '</select>') +
+    fld('It ran as', '<select name="dt">' + dtOptions('', '— the plan’s day type —') + '</select>') + fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div>' +
+    '<p class="hint">For a school day that has no day type yet, this sets its day type in the plan (its Friday letter) rather than recording a change.</p>',
+    [CANCEL, {label: 'Change it', value: 'ok', kind: 'primary', check: true}], null);
+  if(r.value !== 'ok') return;
+  const f = r.data;
+  if(!TC.dayTypeFor(m, f.date)){
+    if(!f.dt) return;
+    return void commit(mm => { TC.setDayType(mm, f.date, f.dt); }, fmtDay(f.date) + ' now runs ' + dtName(f.dt) + ' in the plan.');
+  }
+  guardedEdit([f.date], mm => TC.setDayTypeEdit(mm, f.date, f.dt || null, Object.assign({note: f.note.trim()}, meta())), f.dt ? 'Day type changed for this date.' : 'Back to the plan’s day type.');
+}
+async function qaLeave(date){
+  if(lockedMsg()) return;
+  const dates = weekDays().filter(d => !weekLocked(d));
+  const sel = date || dates.find(d => d === localToday()) || dates[0];
+  const r = await ask('Mark leave', '<p>A sick or personal day keeps its time: the totals do not change. The tag is for your own records.</p><div class="dgrid">' +
+    fld('Day', '<select name="date">' + schoolDayOptions(sel) + '</select>') + fld('Leave', '<select name="kind"><option value="sick">Sick leave</option><option value="personal">Personal leave</option><option value="">No leave (remove the tag)</option></select>') +
+    fld('Note', '<input type="text" name="note" placeholder="' + esc(NOTE_HINT) + '">') + '</div>', [CANCEL, {label: 'Save', value: 'ok', kind: 'primary', check: true}], null);
+  if(r.value !== 'ok') return;
+  const f = r.data;
+  commit(mm => { TC.setLeave(mm, f.date, f.kind || null, Object.assign({note: f.note.trim()}, meta())); }, f.kind ? fmtDay(f.date) + ' tagged as leave. The totals are unchanged.' : 'Leave tag removed.');
+}
+async function qaReset(){
+  if(lockedMsg()) return;
+  const m = S.model, dates = weekDays().filter(d => (m.edits[d] || []).length);
+  if(!dates.length) return void nothingToDo('Reset to plan', 'This week has no edits, so it already matches the plan.');
+  const r = await ask('Reset to plan', '<p>This clears the edits so the day or week follows the current plan again. You can undo it.</p><div class="dgrid">' +
+    fld('Reset', '<select name="scope"><option value="week">The whole week (' + dates.reduce((n, d) => n + m.edits[d].length, 0) + ' edits)</option>' + dates.map(d => '<option value="' + d + '">' + fmtDay(d) + ' only (' + m.edits[d].length + ' edit' + (m.edits[d].length === 1 ? '' : 's') + ')</option>').join('') + '</select>') + '</div>',
+    [CANCEL, {label: 'Reset', value: 'ok', kind: 'danger'}]);
+  if(r.value !== 'ok') return;
+  const ws = curWeek(), scope = r.data.scope;
+  guardedEdit(scope === 'week' ? weekDays() : [scope], mm => { if(scope === 'week') TC.resetWeek(mm, ws); else TC.resetDay(mm, scope); }, 'Back to plan.');
+}
+async function dayMenu(date){
+  const r = await ask(fmtDate(date), '<p>What would you like to do on this day?</p><div class="menu"><button class="btn" value="after">Add after-school meeting…</button><button class="btn" value="dt">Change day type…</button><button class="btn" value="leave">Mark leave…</button><button class="btn" value="reset"' + ((S.model.edits[date] || []).length ? '' : ' disabled') + '>Reset this day to plan…</button></div>', [{label: 'Close', value: 'cancel'}]);
+  if(r.value === 'after') qaAfter(date);
+  else if(r.value === 'dt') qaDayType(date);
+  else if(r.value === 'leave') qaLeave(date);
+  else if(r.value === 'reset'){
+    const n = (S.model.edits[date] || []).length;
+    const c = await ask('Reset ' + fmtDay(date) + '?', '<p>This clears ' + n + ' edit' + (n === 1 ? '' : 's') + ' on this day so it follows the plan again. You can undo it.</p>', [CANCEL, {label: 'Reset', value: 'ok', kind: 'danger'}]);
+    if(c.value === 'ok') guardedEdit([date], mm => TC.resetDay(mm, date), 'Back to plan.');
+  }
+}
+
+/* ---------- confirming a week ---------- */
+async function confirmWeekAct(){
+  const m = S.model, ws = curWeek();
+  if(ws > localToday()){ S.flash = {level: 'bad', text: 'That week has not started yet, so there is nothing to confirm.'}; schedule(); return; }
+  const orphans = TC.weekFlags(m, ws).filter(f => f.code === 'edit-orphan').length;
+  const r = await ask('Confirm this week?', '<p>Confirming says <strong>“this is what happened”</strong>. The week keeps its blocks even if your timetable or duties change later, and it is locked until you unlock it.</p>' +
+    (orphans ? '<p class="warn-t">⚠ ' + orphans + ' edit' + (orphans === 1 ? ' points' : 's point') + ' at a block that is no longer in the plan. It will not be counted. Delete it first if it is not needed.</p>' : '') + '<p class="hint">Unlocking is possible, and it is logged.</p>',
+    [CANCEL, {label: 'Confirm week', value: 'ok', kind: 'primary'}]);
+  if(r.value === 'ok') commit(mm => { TC.confirmWeek(mm, ws, {at: localToday()}); }, 'Week confirmed.');
+}
+async function unlockWeekAct(){
+  const m = S.model, ws = curWeek(), dr = TC.confirmedDrift(m, ws);
+  const r = await ask('Unlock this week?', '<p>Unlocking rebuilds the week from the <strong>current plan and its edits</strong>. The unlock is logged.</p>' +
+    (dr && dr.dates ? '<p class="warn-t">⚠ The plan has changed since you confirmed it, so unlocking would change ' + dr.dates + ' day' + (dr.dates === 1 ? '' : 's') + ': ' + esc(deltaText(dr.delta)) + '.</p>' : '<p class="hint">The plan has not changed since you confirmed it, so the week will look the same.</p>'),
+    [CANCEL, {label: 'Unlock week', value: 'ok', kind: 'primary'}]);
+  if(r.value === 'ok') commit(mm => { TC.unlockWeek(mm, ws, {at: localToday()}); }, 'Week unlocked.');
+}
+
+/* ---------- dragging: blocks, their edges, and time types from the palette ---------- */
+let drag = null;
+const snap5 = x => Math.round(x / 5) * 5;
+function tipAt(text, x, y){
+  let t = document.getElementById('tip');
+  if(!t){ t = document.createElement('div'); t.id = 'tip'; t.className = 'tip'; document.body.appendChild(t); }
+  t.textContent = text; t.style.left = (x + 14) + 'px'; t.style.top = (y + 14) + 'px'; t.hidden = false;
+}
+const tipOff = () => { const t = document.getElementById('tip'); if(t) t.hidden = true; };
+function minuteAt(body, y){
+  const g = body.closest('.wk-grid'), r = body.getBoundingClientRect();
+  return Math.max(0, Math.min(1435, snap5(+g.dataset.rs + (y - r.top) / +g.dataset.ppm)));
+}
+function dragEnd(){
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragUp);
+  document.removeEventListener('pointercancel', onDragCancel);
+  document.removeEventListener('keydown', onDragKey);
+  document.body.classList.remove('dragging');
+  document.querySelectorAll('.wk-body.drop').forEach(x => x.classList.remove('drop'));
+  const gh = document.getElementById('ghost'); if(gh) gh.remove();
+  tipOff();
+}
+function onDragCancel(){ if(drag) { dragEnd(); drag = null; schedule(); } }
+function onDragKey(e){ if(e.key === 'Escape') onDragCancel(); }
+function onDragMove(e){
+  const d = drag; if(!d) return;
+  const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+  if(!d.moved){
+    if(d.locked || d.touch){ if(Math.hypot(dx, dy) >= 4) d.dragged = true; return; }   // a drag in a confirmed week or on a touch screen does nothing
+    if(Math.hypot(dx, dy) < (d.kind === 'pal' ? 6 : 4)) return;
+    d.moved = true; document.body.classList.add('dragging');
+    if(d.kind === 'pal'){
+      const gh = document.createElement('div'); gh.id = 'ghost'; gh.className = 'dghost ' + d.cls; gh.textContent = d.label; document.body.appendChild(gh);
+    }else d.blk.classList.add('dragging');
+  }
+  if(d.kind === 'pal'){
+    const gh = document.getElementById('ghost'); gh.style.left = (e.clientX + 8) + 'px'; gh.style.top = (e.clientY + 8) + 'px';
+    document.querySelectorAll('.wk-body.drop').forEach(x => x.classList.remove('drop'));
+    const el = document.elementFromPoint(e.clientX, e.clientY), body = el && el.closest('.wk-body');
+    if(body && !body.dataset.noadd){ body.classList.add('drop'); tipAt(fmtDay(body.dataset.date) + ' ' + clock(minuteAt(body, e.clientY)), e.clientX, e.clientY); } else tipOff();
+    return;
+  }
+  const dm = snap5(dy / d.ppm);
+  let ns = d.ps, ne = d.pe;
+  if(d.mode === 'move'){ ns += dm; ne += dm; if(ns < 0){ ne -= ns; ns = 0; } if(ne > 1440){ ns -= ne - 1440; ne = 1440; } }
+  else if(d.mode === 'top') ns = Math.max(0, Math.min(d.ps + dm, d.pe - 5));
+  else ne = Math.min(1440, Math.max(d.pe + dm, d.ps + 5));
+  d.ns = ns; d.ne = ne;
+  const fs = d.mode === 'bottom' ? d.fs : d.fs + (ns - d.ps), fe = d.mode === 'top' ? d.fe : d.fe + (ne - d.pe);
+  d.blk.style.top = ((fs - d.rs) * d.ppm) + 'px'; d.blk.style.height = (Math.max(fe - fs, 5) * d.ppm) + 'px';
+  tipAt(rng(ns, ne) + ' (' + (ne - ns) + ' min)', e.clientX, e.clientY);
+}
+function onDragUp(e){
+  const d = drag; dragEnd(); drag = null;
+  if(!d) return;
+  if(d.kind === 'pal'){
+    if(!d.moved) return void openAddForm({typeId: d.typeId});
+    const el = document.elementFromPoint(e.clientX, e.clientY), body = el && el.closest('.wk-body');
+    if(body && !body.dataset.noadd){ const s = minuteAt(body, e.clientY); openAddForm({date: body.dataset.date, start: s, end: Math.min(1440, s + 30), typeId: d.typeId}); } else schedule();
+    return;
+  }
+  if(d.kind === 'body'){ if(!d.moved && !d.dragged) openAddForm({date: d.date, start: d.start}); return; }
+  if(!d.moved){ if(!d.dragged) openBlockForm(d.date, d.ref); return; }
+  if(d.ns === d.ps && d.ne === d.pe) return void schedule();
+  guardedEdit([d.date], mm => TC.editBlock(mm, d.date, d.ref, {start: d.ns, end: d.ne}, meta()), 'Block ' + (d.mode === 'move' ? 'moved' : 'resized') + '.');
+}
+function beginDrag(d){
+  drag = d;
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragUp);
+  document.addEventListener('pointercancel', onDragCancel);
+  document.addEventListener('keydown', onDragKey);
+}
+root.addEventListener('pointerdown', e => {
+  if(e.button !== 0 || S.view !== 'week') return;
+  const pal = e.target.closest('.pal'), blk = e.target.closest('.blk[data-ref]'), body = e.target.closest('.wk-body');
+  const touch = e.pointerType === 'touch';
+  if(pal && !pal.disabled){
+    beginDrag({kind: 'pal', typeId: pal.dataset.type, cls: Array.from(pal.classList).filter(c => /^k-/.test(c)).join(' '), label: pal.textContent, x0: e.clientX, y0: e.clientY, moved: false, touch});
+  }else if(blk){
+    const g = blk.closest('.wk-grid'), rect = blk.getBoundingClientRect(), y = e.clientY - rect.top, locked = blk.dataset.locked === '1';
+    let mode = 'move';
+    if(blk.querySelector('.rz.t') && y <= 7) mode = 'top'; else if(blk.querySelector('.rz.b') && y >= rect.height - 7) mode = 'bottom';
+    beginDrag({kind: 'blk', blk, date: blk.dataset.date, ref: blk.dataset.ref, mode, x0: e.clientX, y0: e.clientY, moved: false, touch, locked, rs: +g.dataset.rs, ppm: +g.dataset.ppm,
+      ps: +blk.dataset.ps, pe: +blk.dataset.pe, fs: +blk.dataset.s, fe: +blk.dataset.e});
+  }else if(body && !body.dataset.noadd && !e.target.closest('button')){
+    beginDrag({kind: 'body', date: body.dataset.date, start: minuteAt(body, e.clientY), x0: e.clientX, y0: e.clientY, moved: false, touch, locked: true});
+  }
+});
+
+/* =====================================================================
+   Calendar: the whole year
+   ===================================================================== */
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function calHtml(){
+  const m = S.model, cal = m.calendar, td = localToday(), counts = TC.countDays(m);
+  let h = '<section class="card"><h2>' + esc(cal.name) + '</h2><p class="hint">' + esc(cal.source) + '. Click a date to open its week' + (S.calEdit ? ' — but <strong>Edit dates</strong> is on, so clicking changes the date instead.' : '.') + '</p>' +
+    '<div class="form-row"><label class="chk"><input type="checkbox" data-f="calEdit" data-key="calEdit"' + (S.calEdit ? ' checked' : '') + '> Edit dates</label></div>' +
+    '<div class="legend2"><span class="cd st-instructional"><b>1</b>School day</span><span class="cd st-nid"><b>2</b>Non-instruction day</span><span class="cd st-convention"><b>3</b>Teachers’ Convention</span><span class="cd st-closed"><b>4</b>Closed</span><span class="cd st-instructional"><b>✎</b>Edited date</span><span class="cd st-instructional miss"><b>⚠</b>No day type</span></div></section>';
+  h += '<div class="months">';
+  const first = cal.start.slice(0, 7), last = cal.end.slice(0, 7);
+  const months = [];
+  for(let y = +first.slice(0, 4), mo = +first.slice(5); (y + '-' + pad2(mo)) <= last; ){ months.push([y, mo]); if(++mo > 12){ mo = 1; y++; } }
+  months.forEach(ym => {
+    const y = ym[0], mo = ym[1], key = y + '-' + pad2(mo), c = counts.byMonth[key] || {operational: 0, instructional: 0};
+    const dim = new Date(Date.UTC(y, mo, 0)).getUTCDate(), lead = (TC.weekday(key + '-01') + 6) % 7;
+    h += '<section class="card month"><h3>' + MONTH_NAMES[mo - 1] + ' ' + y + ' <span class="muted">· ' + c.instructional + ' school day' + (c.instructional === 1 ? '' : 's') + '</span></h3><div class="mgrid" role="grid" aria-label="' + MONTH_NAMES[mo - 1] + ' ' + y + '">' + ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(x => '<span class="mh">' + x + '</span>').join('');
+    for(let i = 0; i < lead; i++) h += '<span></span>';
+    for(let day = 1; day <= dim; day++){
+      const date = key + '-' + pad2(day), st = TC.statusOf(m, date), inYear = date >= cal.start && date <= cal.end;
+      const dt = st.status === 'closed' ? null : TC.dayTypeFor(m, date, st);
+      const lbl = st.status === 'instructional' ? (dt ? shortName(dtName(dt)) : '⚠') : st.status === 'nid' ? 'NID' : st.status === 'convention' ? 'Conv' : '';
+      const aria = fmtDate(date) + ': ' + STATUS_NAME[st.status] + (st.label ? ' (' + st.label + ')' : '') + (dt ? ', ' + dtName(dt) : st.status === 'instructional' ? ', no day type' : '') + (st.edited ? ', edited' : '');
+      h += '<button class="cd st-' + (inYear ? st.status : 'closed') + (st.edited ? ' edited' : '') + (date === td ? ' today' : '') + (st.status === 'instructional' && !dt ? ' miss' : '') + '"' + (inYear ? ' data-act="cal-day" data-date="' + date + '"' : ' disabled') + ' aria-label="' + esc(aria) + '" title="' + esc(aria) + '"><b>' + day + (st.edited ? '✎' : '') + '</b><span>' + esc(lbl) + '</span></button>';
+    }
+    h += '</div></section>';
+  });
+  h += '</div><section class="card"><h2>Counts by month</h2><div class="scroll"><table class="tbl"><thead><tr><th>Month</th><th class="num">Operational days</th><th class="num">Instructional days</th></tr></thead><tbody>' +
+    Object.keys(counts.byMonth).sort().map(k => '<tr><th scope="row">' + MONTH_NAMES[+k.slice(5) - 1] + ' ' + k.slice(0, 4) + '</th><td class="num">' + counts.byMonth[k].operational + '</td><td class="num">' + counts.byMonth[k].instructional + '</td></tr>').join('') +
+    '<tr class="total"><th scope="row">Total</th><td class="num">' + counts.operational + '</td><td class="num">' + counts.instructional + '</td></tr></tbody></table></div>' +
+    '<p class="hint">Check these against the month table on the school calendar. Instructional days by weekday: ' + [1, 2, 3, 4, 5].map(w => WD[w].slice(0, 3) + ' ' + counts.byWeekday[w]).join(', ') + '. Non-instruction days: ' + counts.nid + '. Teachers’ Convention days: ' + counts.convention + '.</p></section>';
+  return h;
+}
+async function calDateDialog(date){
+  const m = S.model, st = TC.statusOf(m, date), cur = m.dayTypeOverrides[date] || '';
+  const r = await ask(fmtDate(date), '<p>' + (st.edited ? 'This date was edited. It was originally <strong>' + esc(STATUS_NAME[st.original.status]) + '</strong>' + (st.original.label ? ' (' + esc(st.original.label) + ')' : '') + '.' : 'Change this date if the calendar was amended, for example when a school uses a non-instruction day for Student Learning Conferences.') + '</p><div class="dgrid">' +
+    fld('Status', '<select name="status">' + ['instructional', 'nid', 'convention', 'closed'].map(k => '<option value="' + k + '"' + (st.status === k ? ' selected' : '') + '>' + STATUS_NAME[k] + '</option>').join('') + '</select>') +
+    fld('Label', '<input type="text" name="label" value="' + esc(st.label) + '">') + fld('Day type', '<select name="dt">' + dtOptions(cur, 'Default for this date') + '</select>') + '</div>',
+    [CANCEL].concat(st.edited ? [{label: 'Put back as the calendar had it', value: 'revert'}] : []).concat([{label: 'Save', value: 'ok', kind: 'primary'}]));
+  if(r.value === 'revert') return void commit(mm => { const b = TC.statusOf({calendar: mm.calendar, calendarEdits: {}}, date); TC.setCalendarDate(mm, date, b.status, b.label); }, 'Date put back as the calendar had it.');
+  if(r.value !== 'ok') return;
+  const f = r.data;
+  commit(mm => { TC.setCalendarDate(mm, date, f.status, f.label.trim()); TC.setDayType(mm, date, f.dt || null); }, fmtDay(date) + ' updated.');
+}
+
 /* =====================================================================
    Actions
    ===================================================================== */
 async function act(a, b){
   const d = b.dataset, m = S.model;
   switch(a){
-  case 'tab': S.tab = d.tab; S.flash = null; saveUi(); schedule(); break;
+  case 'view': S.view = d.view; S.flash = null; saveUi(); schedule(); break;
+  case 'undo': undo(); break;
+  case 'wk-prev': S.week = TC.addDays(curWeek(), -7); S.flash = null; schedule(); break;
+  case 'wk-next': S.week = TC.addDays(curWeek(), 7); S.flash = null; schedule(); break;
+  case 'wk-today': S.week = null; S.flash = null; schedule(); break;
+  case 'wk-go': S.week = d.ws; S.view = 'week'; S.flash = null; saveUi(); schedule(); break;
+  case 'wk-confirm': confirmWeekAct(); break;
+  case 'wk-unlock': unlockWeekAct(); break;
+  case 'add-day': openAddForm({date: d.date}); break;
+  case 'day-menu': dayMenu(d.date); break;
+  case 'edit-del': commit(mm => { TC.removeEdit(mm, d.date, d.id); }); break;
+  case 'qa-cover': qaCover(); break;
+  case 'qa-ran': qaRan(); break;
+  case 'qa-after': qaAfter(); break;
+  case 'qa-duty': qaDuty(); break;
+  case 'qa-daytype': qaDayType(d.date); break;
+  case 'qa-leave': qaLeave(); break;
+  case 'qa-reset': qaReset(); break;
+  case 'cal-day':
+    if(S.calEdit) calDateDialog(d.date);
+    else { S.week = TC.weekStart(d.date); S.view = 'week'; S.flash = null; saveUi(); schedule(); }
+    break;
+  case 'tab': S.view = 'plan'; S.tab = d.tab; S.flash = null; saveUi(); schedule(); break;
   case 'goto':
-    S.tab = d.tab; S.flash = null;
+    S.view = 'plan'; S.tab = d.tab; S.flash = null;
     if(d.dt) S.dt = d.dt;
     if(d.ver) S.ver = d.ver;
     if(d.rotwd) S.rotWd = +d.rotwd;
@@ -1785,7 +2624,7 @@ async function act(a, b){
     if(!S.ad.from || S.ad.from < m.calendar.start || S.ad.from > m.calendar.end){ S.flash = {level: 'bad', text: 'Pick a date inside the school year for it to apply from.'}; schedule(); break; }
     commit(mm => { TC.setArrivalDeparture(mm, S.ad.from, arr, dep); }, 'Arrival ' + arr + ' min and departure ' + dep + ' min, from ' + fmtDate(S.ad.from) + ' forward.');
     break; }
-  case 'duty-new': S.duty = emptyDraft(); S.tab = 'duties'; schedule(); break;
+  case 'duty-new': S.duty = emptyDraft(); S.view = 'plan'; S.tab = 'duties'; schedule(); break;
   case 'duty-edit': S.duty = toDraft(m.duties.find(x => x.id === d.id)); schedule(); break;
   case 'duty-cancel': S.duty = null; schedule(); break;
   case 'duty-add-date': if(S.duty.newDate && S.duty.dates.indexOf(S.duty.newDate) < 0) S.duty.dates.push(S.duty.newDate); S.duty.newDate = ''; schedule(); break;
@@ -1831,6 +2670,9 @@ async function act(a, b){
 function field(el){
   const d = el.dataset, f = d.f;
   switch(f){
+  case 'wkDate': if(el.value){ S.week = TC.weekStart(el.value); S.flash = null; schedule(); } break;
+  case 'wkWeekend': S.showWeekend = el.checked; saveUi(); schedule(); break;
+  case 'calEdit': S.calEdit = el.checked; schedule(); break;
   case 'ver': S.ver = el.value; S.flash = null; schedule(); break;
   case 'newVer': S.newVer = el.value; break;
   case 'dtname': commit(mm => { TC.renameDayType(mm, d.id, el.value.trim() || 'Untitled'); }); break;
@@ -1899,7 +2741,14 @@ function field(el){
   }
 }
 
-root.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if(b && !b.disabled) act(b.dataset.act, b); });
+root.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if(b && !b.disabled) return void act(b.dataset.act, b);
+  if(e.detail > 0) return;           // a mouse or touch press is handled by the pointer code; this is the keyboard
+  const blk = e.target.closest('.blk[data-ref]'), pal = e.target.closest('.pal');
+  if(blk) openBlockForm(blk.dataset.date, blk.dataset.ref);
+  else if(pal && !pal.disabled) openAddForm({typeId: pal.dataset.type});
+});
 root.addEventListener('change', e => { if(e.target.dataset && e.target.dataset.f) field(e.target); });
 root.addEventListener('input', e => {   // keep unsaved form drafts current as you type
   const el = e.target;
@@ -2422,6 +3271,139 @@ check('E9', 'Extra: a model saved in the earlier layout still opens', t => {
   t.ok(sc('nid') === null && sc('convention') === null, 'a day type with no bells follows none');
   t.eq(v.schedules[sc('mon')].name, 'Monday – Thursday', 'and the shared set is named after its days');
   t.eq([TC.migrate({format:'other'}), TC.migrate(Object.assign(JSON.parse(JSON.stringify(m)), {version:9}))], [null, null], 'anything else is not opened');
+});
+
+check('E10', 'Extra: editing a block', t => {
+  const m = withClasses(), d = '2026-09-08';          // a Tuesday; Period 1 is a Class, 8:05–8:56
+  const day = () => TC.resolveDay(m, d), p1 = () => day().blocks.find(b => b.ref === 'p1');
+  TC.editBlock(m, d, 'p1', {start:T('8:10'), end:T('8:57')}, {entered:'2026-09-08'});
+  t.eq([p1().start, p1().end, p1().edited], [T('8:10'), T('8:57'), true], 'a block can be moved and resized, and is marked as edited');
+  TC.editBlock(m, d, 'p1', {end:T('8:56')});
+  t.eq(m.edits[d].length, 1, 'further changes are merged into the one edit');
+  TC.editBlock(m, d, 'p1', {start:T('8:05')});
+  t.ok(!m.edits[d], 'putting it back where the plan has it removes the edit');
+  TC.editBlock(m, d, 'p1', {typeId:'prep', note:'Meeting ran long'});
+  t.eq([day().totals.instructional, day().totals.notCounted, p1().note], [94, 51, 'Meeting ran long'], 'a block can be retyped (Class to Prep) and carry a note');
+  TC.resetBlock(m, d, 'p1');
+  t.ok(!m.edits[d] && day().totals.instructional === 145, 'resetting a block brings the plan back');
+  TC.deleteBlock(m, d, 'p1');
+  t.ok(!p1() && m.edits[d][0].op === 'remove', 'deleting a planned block records a removal');
+  TC.resetBlock(m, d, 'p1');
+  const e = TC.addBlock(m, d, {start:T('14:45'), end:T('15:15'), typeId:'meeting', name:'Grad meeting', note:'Admin asked'});
+  TC.editBlock(m, d, 'edit:' + e.id, {end:T('15:30')});
+  t.eq([m.edits[d].length, m.edits[d][0].end], [1, T('15:30')], 'a block the week added is changed in place');
+  TC.deleteBlock(m, d, 'edit:' + e.id);
+  t.ok(!m.edits[d], 'and deleting it simply removes it');
+  const thrown = fn => { try{ fn(); return ''; }catch(x){ return x.message; } };
+  t.ok(thrown(() => TC.addBlock(m, d, {start:T('10:00'), end:T('9:00'), typeId:'meeting'})).includes('end after'), 'a block that ends before it starts is refused');
+  t.ok(thrown(() => TC.addBlock(m, d, {start:T('10:00'), end:T('11:00'), typeId:'other', name:' '})).includes('description'), '“Other assigned” needs a description');
+  t.ok(thrown(() => TC.addBlock(m, '2027-02-11', {start:T('10:00'), end:T('11:00'), typeId:'meeting'})).includes('Convention'), 'a Convention day takes no blocks (it counts a fixed 6 h)');
+  const before = day().totals;
+  const nb = TC.splitBlock(m, d, 'p1', T('8:30'));
+  t.eq([p1().end, day().blocks.find(b => b.ref === 'edit:' + nb.id).start, day().totals.instructional], [T('8:30'), T('8:30'), before.instructional], 'splitting a block keeps every minute and its time type');
+  const nb2 = TC.splitBlock(m, d, 'edit:' + nb.id, T('8:45'));
+  t.eq(day().blocks.filter(b => b.typeId === 'class' && b.start < T('8:56')).length, 3, 'a block made by a split can be split again');
+  t.ok(thrown(() => TC.splitBlock(m, d, 'p5', T('11:40'))).includes('time type'), 'a block with no time type cannot be split');
+});
+
+check('E11', 'Extra: quick actions', t => {
+  const m = withClasses(), wed = '2026-09-09', tue = '2026-09-08', fri = '2026-09-04';
+  const d1 = TC.describeChange(m, wed, x => TC.ranOver(x, wed, 'p4', 5));
+  t.eq([d1.delta.instructional, d1.delta.assignable], [2, -2], 'Ran over +5: 5 min more Class, minus 3 min of the next class and 2 of Transition');
+  t.eq(TC.resolveDay(m, wed).blocks.find(b => b.ref === 'p4').end, T('11:29'), '(describeChange left the real model alone)');
+  TC.ranOver(m, wed, 'p4', 5);
+  t.eq(TC.resolveDay(m, wed).blocks.find(b => b.ref === 'p4').end, T('11:34'), 'applied for real, the block ends 5 min later');
+  t.eq(TC.scheduledEnd(m, tue), T('14:45'), 'the scheduled end of a Tuesday is the last bell, 2:45');
+  t.eq(TC.scheduledEnd(TC.newModel(), fri), null, '(a Friday with no day type has nothing scheduled)');
+  t.eq(TC.scheduledEnd(m, fri), T('14:45'), 'on Friday it is the end of the Friday meeting, not the 12:10 last bell');
+  const a = TC.yearTotals(m);
+  TC.afterSchoolMeeting(m, tue, {name:'Grad', minutes:45});
+  const b = TC.yearTotals(m);
+  t.eq([b.assignable - a.assignable, b.instructional - a.instructional], [45, 0], 'an after-school meeting adds 45 min Assignable');
+  t.eq(TC.resolveDay(m, tue).blocks.find(x => x.name === 'Grad').start, T('14:45'), 'starting right after the day’s scheduled end');
+  TC.setArrivalDeparture(m, m.calendar.start, 0, 15);
+  t.eq(TC.scheduledEnd(m, tue), T('15:00'), 'with a required departure the day is scheduled until 3:00');
+  // swap or drop a duty
+  const tue2 = '2026-09-15';
+  const total = x => TC.resolveDay(m, x).totals.assignable;
+  const both = total(fri) + total(tue2);
+  TC.swapDuty(m, fri, 'duty:friMeeting', {start:T('13:30'), end:T('15:15')});
+  t.eq(TC.resolveDay(m, fri).blocks.find(x => x.ref === 'duty:friMeeting').start, T('13:30'), 'a duty occurrence can move to another time');
+  TC.swapDuty(m, fri, 'duty:friMeeting', {toDate:tue2, start:T('13:00'), end:T('14:45')});
+  const moved = TC.resolveDay(m, tue2).blocks.filter(x => x.name === 'Meeting' && x.edited);
+  t.ok(!TC.resolveDay(m, fri).blocks.some(x => x.name === 'Meeting') && moved.length === 1, 'or to another date: gone from one day, added to the other');
+  t.ok(moved[0].note.includes('moved from 2026-09-04'), 'and says where it came from');
+  t.eq(total(fri) + total(tue2), both - 4, 'the minutes follow it: 105 off one day, 105 on the other, less 4 min of Transition the meeting replaces on Tuesday');
+  const sep18 = '2026-09-18';
+  const q = TC.describeChange(m, sep18, x => TC.deleteBlock(x, sep18, 'duty:friMeeting'));
+  t.eq(q.delta.assignable, -105, 'dropping a duty removes its minutes for that week only');
+  t.ok(TC.resolveDay(m, '2026-09-25').blocks.length === 0 && TC.dutyDates(m, m.duties[0]).some(x => x.date === sep18 && x.state === 'on'), '(the plan still has the duty on that date)');
+  // leave
+  const y0 = TC.yearTotals(m);
+  TC.setLeave(m, tue, 'sick'); TC.setLeave(m, tue, 'personal');
+  t.eq([TC.resolveDay(m, tue).leave.kind, m.edits[tue].filter(x => x.op === 'leave').length], ['personal', 1], 'one leave tag per day');
+  t.eq(TC.yearTotals(m), y0, 'leave changes no totals');
+  TC.setLeave(m, tue, null);
+  t.ok(!TC.resolveDay(m, tue).leave, 'and it can be cleared');
+  // change the day type
+  TC.setDayTypeEdit(m, fri, 'friC');
+  t.eq([TC.resolveDay(m, fri).dayTypeId, TC.dayTypeFor(m, fri)], ['friC', 'friA'], 'a Friday can run as Friday C for one week while the plan still says A');
+  TC.setDayTypeEdit(m, fri, 'friA');
+  t.ok(!(m.edits[fri] || []).some(x => x.op === 'dayType'), 'setting it back to the plan’s day type removes the edit');
+  // reset
+  TC.setLeave(m, wed, 'sick');
+  const n = TC.resetWeek(m, '2026-09-07');
+  t.ok(n >= 1 && !(m.edits[wed]) && !(m.edits[tue]), 'resetting a week clears its edits (' + n + ')');
+});
+
+check('E12', 'Extra: what a change does, and a week against its plan', t => {
+  const m = withClasses(), d = '2026-09-08', ws = '2026-09-07';
+  const snapshot = JSON.stringify(m);
+  const r = TC.describeChange(m, d, x => TC.afterSchoolMeeting(x, d, {name:'Grad', minutes:45}));
+  t.eq([r.delta.assignable, r.delta.instructional, JSON.stringify(m) === snapshot], [45, 0, true], 'describing a change reports +45 Assignable and leaves the model untouched');
+  const low = TC.describeChange(m, d, x => TC.deleteBlock(x, d, 'p1'));
+  t.eq(low.delta.instructional, -51, 'deleting a Class period reports Instructional −51 (the app asks before doing this)');
+  t.eq(TC.weekSummary(m, ws).status, 'planned', 'a week with no edits is Planned');
+  TC.afterSchoolMeeting(m, d, {name:'Grad', minutes:45});
+  const w = TC.weekSummary(m, ws);
+  t.eq([w.status, w.edits, w.delta.assignable, w.delta.totalAssignable, w.delta.instructional], ['edited', 1, 45, 45, 0], 'with an edit it is Edited, +0.75 h Assignable against the plan');
+  t.eq(w.actual.assignable - w.plan.assignable, 45, 'actual minus plan is the difference');
+});
+
+check('E13', 'Extra: a confirmed week is locked', t => {
+  const m = withClasses(), d = '2026-09-08', ws = '2026-09-07';
+  TC.afterSchoolMeeting(m, d, {name:'Grad', minutes:45});
+  TC.confirmWeek(m, ws, {at:'2026-09-11'});
+  t.eq(TC.weekSummary(m, ws).status, 'confirmed', 'confirming marks the week Confirmed');
+  const thrown = fn => { try{ fn(); return ''; }catch(x){ return x.message; } };
+  t.ok(thrown(() => TC.addBlock(m, d, {start:T('10:00'), end:T('11:00'), typeId:'meeting'})).includes('confirmed'), 'a confirmed week takes no new blocks');
+  t.ok(thrown(() => TC.resetWeek(m, ws)).includes('confirmed') && thrown(() => TC.setLeave(m, d, 'sick')).includes('confirmed'), 'no resets or leave tags either');
+  t.eq(TC.confirmedDrift(m, ws).dates, 0, 'nothing has drifted yet');
+  TC.setTimetable(m.versions[0], 'tue', 'p1', {type:'prep', name:''});         // the plan changes later
+  const wk = () => TC.resolveDay(m, d).totals.instructional;
+  t.eq(wk(), 145, 'the confirmed week keeps its blocks (Tuesday Instructional 145 min)');
+  const drift = TC.confirmedDrift(m, ws);
+  t.eq([drift.dates, drift.delta.instructional], [1, -51], 'but unlocking now would change it by −51 min on 1 day, and that is reported first');
+  TC.unlockWeek(m, ws, {at:'2026-09-12'});
+  t.eq([wk(), TC.weekSummary(m, ws).status], [94, 'edited'], 'unlocking rebuilds it from the current plan and its edits');
+  t.eq(m.log.map(x => x.kind), ['confirm', 'unlock'], 'both are logged');
+  t.eq(TC.confirmedDrift(m, ws), null, '(an unlocked week has no drift to report)');
+  TC.resetWeek(m, ws);
+  t.eq(TC.weekSummary(m, ws).status, 'planned', 'and it can be edited and reset again');
+});
+
+check('E14', 'Extra: the weeks to review', t => {
+  const m = TC.newModel();
+  t.eq(TC.weekRange(m), {first:'2026-08-24', last:'2027-06-28'}, 'the school year runs from the week of Aug 24 to the week of Jun 28');
+  let list = TC.weeksToReview(m, '2026-10-08');
+  t.eq(list.map(x => x.ws), ['2026-08-24', '2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28'], 'on Oct 8, the six weeks before this one are to review');
+  TC.confirmWeek(m, '2026-09-14');
+  t.eq(TC.weeksToReview(m, '2026-10-08').length, 5, 'confirming one takes it off the list');
+  list = TC.weeksToReview(m, '2027-04-05').map(x => x.ws);
+  t.ok(!list.includes('2026-12-21') && !list.includes('2026-12-28') && !list.includes('2027-03-22'), 'break weeks with no school are not listed');
+  t.ok(list.includes('2026-11-09') && list.includes('2027-03-29'), 'weeks with some school either side of a break are');
+  t.eq(TC.weeksToReview(m, '2026-08-20'), [], 'before the year starts there is nothing to review');
+  t.ok(TC.weeksToReview(m, '2027-09-01').every(x => x.ws <= '2027-06-28'), 'and nothing past the end of the year is listed');
 });
 
 pending(14, 'Import a colleague’s TimeTracker.pdf as School setup only', 'stage 5');

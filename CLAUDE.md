@@ -137,6 +137,27 @@ and port it upstream by hand.
   differ by day. "Make this day different" gives a day type its own copy. Models
   saved before this (`version: 1`, bells inside each day type) are upgraded by
   `TC.migrate()` when they are opened.
+- **A week is the plan plus edits.** Edits are changes to the plan, kept minimal: one
+  `change` per planned block (later changes merge into it, and a change back to the
+  plan removes it), a `remove` for a deleted block, an `add` for a block the week made
+  itself (edited in place), plus `dayType` and `leave` tags. Screens go through
+  `TC.editBlock` / `addBlock` / `deleteBlock` / `splitBlock` and the quick-action
+  helpers, never straight into `model.edits`. A change that points at a block that is
+  no longer in the plan is **flagged, never dropped**.
+- **Ask before lowering Instructional time.** `guardedEdit()` runs a change on a copy
+  with `TC.describeChange()`; if Instructional would go down it asks first, then
+  reports what changed with an Undo.
+- **A confirmed week is locked.** `confirmWeek` snapshots the week's blocks and every
+  edit helper refuses to touch it. Unlocking **rebuilds it from the current plan and
+  its edits** (a deliberate choice), so the unlock dialog first shows what would
+  change (`TC.confirmedDrift`). Both are logged in `model.log`.
+- **The week grid is plain pointer events** (no drag-and-drop API). Mouse: drag a
+  block, its top or bottom edge, or a time type from the palette. Touch and keyboard:
+  press a block, an empty slot or a palette item to open the same form. Anything a
+  drag can do, a form can do.
+- The calendar year view opens a date's week; its **Edit dates** switch changes a
+  date's status instead. Importing a later year's calendar comes with the *New year*
+  flow in the PDF stage, not as its own screen.
 
 ## Commit / PR rules — IMPORTANT
 
