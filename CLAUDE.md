@@ -186,8 +186,8 @@ and port it upstream by hand.
 - **TimeTracker.pdf is the only export, and the only import.** `TimeCounterPdf.build`
   draws the report with pdf-lib's built-in fonts (an opening page, the year summary,
   the change log, a page for every week so far with the current one, and the weeks
-  ahead on one page; every page carries the estimate notice, the links and Local 38's
-  contact) and attaches `timetracker-data.json`:
+  ahead on one page; every page carries the estimate notice and the links to the
+  agreement and the ATA calculators) and attaches `timetracker-data.json`:
   an envelope (`format: 'time-counter-save'`, `version`, a CRC-32 `checksum`) whose
   `payload` is the whole model as text (`TC.pack`). The page swaps characters the fonts
   cannot draw (arrows, emoji, many accents) through `printable()`; the attachment keeps
@@ -251,5 +251,7 @@ and port it upstream by hand.
   code, comments, or any other artifact. No `Claude-Session:` trailer and no
   `https://claude.ai/code/session…` URLs anywhere. (Plain co-author attribution
   is fine.) This mirrors upstream's rule.
+- **No phone numbers or email addresses** — not Local 38's, not the author's — in the
+  tool, its reports or the PDF. Link to the agreement and the ATA calculators instead.
 - This repo is **shared with colleagues** — it is the one being circulated.
   Keep commit messages and page copy presentable.
