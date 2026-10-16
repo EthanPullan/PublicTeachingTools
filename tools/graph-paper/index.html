@@ -676,6 +676,11 @@
     ['Isometric dots',     { type:'isodots', cell:10 }],
     ['Hexagon paper',      { type:'hex', cell:6 }],
     ['One big hexagon',    { type:'hex', hexSingle:true, minorW:1.5 }],
+    // Two hexagons come out biggest stacked along the page's long side, with a
+    // flat edge facing each other: flat tops one above the other on portrait,
+    // pointy tops side by side on landscape (2.81 in sides on Letter).
+    ['Two big hexagons',   cur => Object.assign({ type:'hex', hexSingle:true, minorW:1.5, gap:6.35 },
+      cur.orient === 'landscape' ? { panelsX:2, panelsY:1, hexOrient:'pointy' } : { panelsX:1, panelsY:2, hexOrient:'flat' })],
     ['Polar',              { type:'polar', cell:6.35, majorEvery:4 }],
     ['Semi-log',           { type:'log', logX:0, logY:3 }],
     ['Log–log',            { type:'log', logX:2, logY:3 }],
@@ -1024,7 +1029,7 @@
         for(let k = 0; k < 6; k++){ const a = (a0 + 60 * k) * Math.PI / 180; v.push([cx + s * Math.cos(a), cy + s * Math.sin(a)]); }
         add({ k:'O', pts:v, s:minorS });
         usedCell = s;
-        summary = '1 hexagon, ' + fmtLen(s / K) + ' sides';
+        summary = (PX * PY > 1 ? 'one hexagon each, ' : '1 hexagon, ') + fmtLen(s / K) + ' sides';
         return;
       }
       const s = cell;
@@ -1718,7 +1723,8 @@
       const b = e.target.closest('.preset'); if(!b) return;
       const keep = {};
       KEEP_ON_PRESET.forEach(k => { keep[k] = S[k]; });
-      S = Object.assign({}, DEFAULTS, keep, PRESETS[+b.dataset.i][1]);
+      const set = PRESETS[+b.dataset.i][1];
+      S = Object.assign({}, DEFAULTS, keep, typeof set === 'function' ? set(S) : set);
       writeAll(null); scheduleRender(); save();
       toast(PRESETS[+b.dataset.i][0] + ' — set up.');
     });
