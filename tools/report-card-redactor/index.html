@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Offline, in-browser tool to redact student names, ID numbers, and other details from exported HTML report cards. Files never leave your device.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#16181C">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23E9EBEE'/%3E%3Crect x='3' y='4.5' width='10' height='2.2' rx='1' fill='%23C3C8CF'/%3E%3Crect x='3' y='9.3' width='10' height='2.6' rx='1' fill='%2316181C'/%3E%3C/svg%3E">
+<title>Report Card Redactor v1.0</title>
+<style>
+  :root{
+    --canvas:#E9EBEE;
+    --surface:#FFFFFF;
+    --ink:#1A1D22;
+    --muted:#5C6470;
+    --faint:#8A929E;
+    --line:#D7DBE0;
+    --line-strong:#C3C8CF;
+    --bar:#16181C;
+    --accent:#B5651D;
+    --accent-ink:#7C440F;
+    --accent-soft:#F6ECE0;
+    --ok:#1F7A5A;
+    --danger:#B23B3B;
+    --radius:10px;
+    --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:var(--canvas);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    padding:22px 28px 18px;
+    border-bottom:1px solid var(--line);
+    background:var(--surface);
+  }
+  .brand{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand h1{
+    font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:8px;
+  }
+  .barword{
+    background:var(--bar);color:transparent;border-radius:3px;
+    padding:0 .35em;user-select:none;position:relative;
+  }
+  .ver{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em;align-self:center}
+  .tag{
+    font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent-ink);background:var(--accent-soft);
+    border:1px solid #E7D6C4;border-radius:999px;padding:3px 10px;
+  }
+  .sub{color:var(--muted);font-size:13px;margin:8px 0 0;max-width:62ch}
+  .sub strong{color:var(--ink);font-weight:600}
+
+  main{
+    display:grid;grid-template-columns:380px 1fr;gap:0;
+    min-height:calc(100vh - 92px);
+  }
+  .panel{
+    background:var(--surface);border-right:1px solid var(--line);
+    padding:20px;overflow:auto;
+  }
+  .stage{padding:20px;overflow:auto}
+
+  .block{margin:0 0 22px}
+  .block:last-child{margin-bottom:0}
+  .label{
+    font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 9px;display:flex;align-items:center;gap:8px;
+  }
+  .label .n{
+    color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;
+    padding:1px 8px;font-size:10px;
+  }
+
+  .drop{
+    border:1.5px dashed var(--line-strong);border-radius:var(--radius);
+    background:#FBFBFA;padding:22px 16px;text-align:center;cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop .big{font-weight:600;font-size:14px}
+  .drop .small{color:var(--muted);font-size:12px;margin-top:4px}
+  .drop.loaded{border-style:solid;border-color:var(--ok);background:#EFF7F2;text-align:left}
+  .drop.loaded .big{color:var(--ok)}
+  .linkbtn{
+    background:none;border:none;color:var(--accent-ink);font:inherit;font-size:12px;
+    text-decoration:underline;cursor:pointer;padding:0;
+  }
+
+  textarea.paste{
+    width:100%;min-height:90px;border:1px solid var(--line-strong);border-radius:8px;
+    padding:9px 11px;font:inherit;font-size:13px;resize:vertical;background:#fff;
+  }
+
+  .addrow{display:flex;gap:8px}
+  input[type=text],input[type=number]{
+    flex:1;border:1px solid var(--line-strong);border-radius:8px;padding:9px 11px;
+    font:inherit;font-size:14px;background:#fff;min-width:0;
+  }
+  input[type=number]{flex:none}
+  input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{
+    outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+  }
+  .btn{
+    border:1px solid var(--line-strong);background:#fff;border-radius:8px;
+    padding:8px 13px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+    transition:background .12s,border-color .12s,transform .05s;white-space:nowrap;
+  }
+  .btn:hover{background:#F4F5F6;border-color:var(--line-strong)}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--bar);color:#fff;border-color:var(--bar)}
+  .btn.primary:hover{background:#000}
+  .btn.primary:disabled{background:var(--line-strong);border-color:var(--line-strong);cursor:not-allowed}
+  .btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.accent:hover{background:var(--accent-ink)}
+  .btn.ghost{font-weight:500;color:var(--muted)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;min-height:4px;max-height:220px;overflow-y:auto}
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;
+    background:#F1F2F4;border:1px solid var(--line);border-radius:999px;
+    padding:4px 6px 4px 11px;font-size:13px;max-width:100%;
+  }
+  .chip .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;font-weight:500}
+  .chip .hit{font-family:var(--mono);font-size:10px;color:var(--muted);
+    background:#fff;border:1px solid var(--line);border-radius:999px;padding:1px 6px}
+  .chip .hit.zero{color:var(--danger);border-color:#EBC9C9;background:#FBEFEF}
+  .chip .x{
+    border:none;background:none;cursor:pointer;color:var(--muted);
+    font-size:16px;line-height:1;padding:0 2px;border-radius:50%;
+  }
+  .chip .x:hover{color:var(--danger)}
+  .empty{color:var(--faint);font-size:12px;font-style:italic;margin-top:10px}
+
+  .opts{display:grid;gap:11px}
+  .optrow{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+  select{
+    border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;background:#fff;
+  }
+  .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+  .switch input{position:absolute;opacity:0;pointer-events:none}
+  .track{width:38px;height:22px;border-radius:999px;background:var(--line-strong);position:relative;transition:background .15s;flex:none}
+  .track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track::after{transform:translateX(16px)}
+  .switch input:focus-visible + .track{box-shadow:0 0 0 3px var(--accent-soft)}
+
+  .stats{display:flex;gap:10px;margin:0 0 14px;flex-wrap:wrap}
+  .stat{
+    flex:1;min-width:120px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:11px 14px;
+  }
+  .stat .v{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em}
+  .stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  .stat.hot .v{color:var(--accent-ink)}
+
+  .toolbar{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+  .seg button{border:none;background:#fff;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--bar);color:#fff}
+  .spacer{flex:1}
+  .hint{font-size:12px;color:var(--faint)}
+
+  .frameWrap{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;height:calc(100vh - 250px);min-height:360px;
+  }
+  iframe#view{width:100%;height:100%;border:none;background:#fff}
+  .placeholder{
+    height:100%;display:flex;align-items:center;justify-content:center;text-align:center;
+    color:var(--faint);font-size:14px;padding:30px;
+  }
+
+  #addsel{
+    position:fixed;z-index:50;display:none;
+    background:var(--bar);color:#fff;border:none;border-radius:7px;
+    padding:7px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.25);
+  }
+  #addsel:hover{background:#000}
+
+  .foot{font-size:12px;color:var(--muted);margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .foot .lock{color:var(--ok);font-weight:600}
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:var(--bar);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:860px){
+    main{grid-template-columns:1fr}
+    .panel{border-right:none;border-bottom:1px solid var(--line)}
+    .frameWrap{height:64vh}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1 aria-label="Report Card Redactor">Redact <span class="barword" aria-hidden="true">student name</span> <span class="barword" aria-hidden="true">99999</span></h1>
+    <span class="ver">v1.0</span>
+    <span class="tag">offline · in-browser</span>
+  </div>
+  <p class="sub">Drop in an exported report card, build a list of names &amp; numbers to remove, and download a clean copy. <strong>The file never leaves this page</strong> — all work happens in your browser.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="block">
+      <p class="label">1 · Load document</p>
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop an HTML file">
+        <div class="big">Drop an .html file here</div>
+        <div class="small">or click to browse · <button type="button" class="linkbtn" id="pasteToggle">paste HTML instead</button></div>
+      </div>
+      <input type="file" id="file" accept=".html,.htm,text/html" hidden>
+      <textarea class="paste" id="pasteBox" placeholder="Paste the report card HTML here…" style="display:none;margin-top:10px"></textarea>
+      <div id="pasteActions" style="display:none;margin-top:8px">
+        <button class="btn primary" id="usePaste">Use pasted HTML</button>
+      </div>
+    </div>
+
+    <div class="block">
+      <p class="label">2 · Words &amp; names to remove <span class="n" id="termN">0</span></p>
+      <div class="addrow">
+        <input type="text" id="termInput" placeholder="Type a name or number, press Enter" autocomplete="off">
+        <button class="btn" id="addBtn">Add</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn ghost" id="importBtn">Import list (.txt / .csv)</button>
+        <button class="btn ghost" id="clearBtn">Clear all</button>
+      </div>
+      <input type="file" id="listFile" accept=".txt,.csv,.tsv,text/plain" hidden>
+      <div class="chips" id="chips"></div>
+      <p class="empty" id="chipsEmpty">No terms yet. Type them above, import a list, or highlight text in the document on the right.</p>
+    </div>
+
+    <div class="block">
+      <p class="label">2b · Student numbers</p>
+      <label class="switch"><input type="checkbox" id="digitOn"><span class="track"></span><span>Blank out numbers within a length range</span></label>
+      <div id="digitOpts" style="display:none;margin-top:11px">
+        <div class="optrow">
+          <span>Number length</span>
+          <span><input type="number" id="digitMin" min="1" max="20" value="9" style="width:52px"> to <input type="number" id="digitMax" min="1" max="20" value="10" style="width:52px"> digits</span>
+        </div>
+        <div class="addrow" style="margin-top:9px">
+          <span style="font-size:13px;color:var(--muted);align-self:center;white-space:nowrap">Replace with</span>
+          <input type="text" id="digitToken" value="[STUDENT ID]">
+        </div>
+        <p class="hint" id="digitFound" style="margin-top:9px"></p>
+      </div>
+    </div>
+
+    <div class="block">
+      <p class="label">2c · Suggested · teacher names <span class="n" id="teacherN">0</span></p>
+      <label class="switch"><input type="checkbox" id="teacherOn" checked><span class="track"></span><span>Auto-block names in &ldquo;Last, First&rdquo; format</span></label>
+      <div id="teacherOpts" style="margin-top:11px">
+        <div class="optrow">
+          <span>Replace each match with</span>
+          <select id="teacherStyle">
+            <option value="teacher">[TEACHER]</option>
+            <option value="name">[NAME]</option>
+            <option value="redacted">[REDACTED]</option>
+            <option value="bar">████ black bar</option>
+            <option value="stars">**** stars</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <input type="text" id="teacherCustom" placeholder="Your replacement text" style="display:none;margin-top:9px">
+        <div class="chips" id="teacherChips"></div>
+        <p class="empty" id="teacherEmpty">Load a document to see suggestions.</p>
+        <button type="button" class="linkbtn" id="teacherReset" style="display:none;margin-top:8px"></button>
+      </div>
+    </div>
+
+    <div class="block">
+      <p class="label">2d · Detected · student names <span class="n" id="studentN">0</span></p>
+      <div class="chips" id="studentChips"></div>
+      <p class="empty" id="studentEmpty">Load a document to detect student names.</p>
+      <button class="btn accent" id="addStudents" style="width:100%;margin-top:10px;display:none">Add all student names to list</button>
+    </div>
+
+    <div class="block">
+      <p class="label">3 · How to replace</p>
+      <div class="opts">
+        <div class="optrow">
+          <span>Replace each match with</span>
+          <select id="style">
+            <option value="redacted">[REDACTED]</option>
+            <option value="name">[NAME]</option>
+            <option value="student" selected>[STUDENT]</option>
+            <option value="bar">████ black bar</option>
+            <option value="stars">**** stars</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+        <input type="text" id="customStyle" placeholder="Your replacement text" style="display:none">
+        <label class="switch"><input type="checkbox" id="wholeWord" checked><span class="track"></span><span>Whole words only</span></label>
+        <label class="switch"><input type="checkbox" id="caseSens"><span class="track"></span><span>Match case exactly</span></label>
+      </div>
+    </div>
+
+    <div class="block">
+      <button class="btn accent" id="downloadBtn" style="width:100%;padding:11px" disabled>Download redacted .html</button>
+      <button class="btn" id="copyBtn" style="width:100%;margin-top:8px" disabled>Copy redacted HTML</button>
+    </div>
+
+    <p class="foot"><span class="lock">●</span> Nothing is uploaded. You can disconnect from the internet and this still works.</p>
+  </section>
+
+  <section class="stage">
+    <div class="stats">
+      <div class="stat"><div class="v" id="sTerms">0</div><div class="k">Terms</div></div>
+      <div class="stat hot"><div class="v" id="sHits">0</div><div class="k">Replacements</div></div>
+      <div class="stat"><div class="v" id="sZero">0</div><div class="k">Terms not found</div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg" id="seg">
+        <button data-v="orig" class="on">Original</button>
+        <button data-v="red">Redacted</button>
+      </div>
+      <span class="hint" id="viewHint">Highlight any text in the document to add it to your list.</span>
+      <div class="spacer"></div>
+    </div>
+
+    <div class="frameWrap">
+      <iframe id="view" title="Document preview" sandbox="allow-same-origin"></iframe>
+      <div class="placeholder" id="ph">Load a report card to see it here.</div>
+    </div>
+  </section>
+</main>
+
+<button id="addsel">+ Add to list</button>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var srcText = "";
+  var fileName = "report-card.html";
+  var terms = [];            // {term, hits}
+  var view = "orig";
+  var lastSelection = "";
+  var lastStudents = [];     // most recent auto-detected student names {name, paren, kind}
+
+  var $ = function(id){ return document.getElementById(id); };
+  var parser = new DOMParser();
+  var ignoredTeachers = {};
+
+  // a single "Last, First [Middle]" name, as used on the report's header/teacher lines
+  var NAME_SRC = "[A-Z][A-Za-z\\u00C0-\\u017F'\u2019.\\-]+,\\s+[A-Z][A-Za-z\\u00C0-\\u017F'\u2019.\\-]+(?:\\s+[A-Z]\\b\\.?)?";
+  // returns >0 only if the WHOLE cell is one-or-more names (so mid-sentence "City, Prov" is ignored)
+  function nameCellCount(t){
+    var re = new RegExp(NAME_SRC, "g"), last=0, count=0, m;
+    while((m=re.exec(t))){ if(!/^[\s,]*$/.test(t.slice(last,m.index))) return 0; count++; last=re.lastIndex; }
+    if(!/^[\s,]*$/.test(t.slice(last))) return 0;
+    return count;
+  }
+  function detectTeacherNames(nodes){
+    var found=[], seen={};
+    nodes.forEach(function(node){
+      var t = node.nodeValue.trim(); if(!t) return;
+      if(nameCellCount(t) > 0){
+        var ms = t.match(new RegExp(NAME_SRC, "g"));
+        if(ms) ms.forEach(function(m){ var k=m.toLowerCase(); if(!seen[k]){ seen[k]=1; found.push(m); } });
+      }
+    });
+    return found;
+  }
+  function nameRegex(name){
+    var esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), pat = esc;
+    if(/^[A-Za-z0-9_]/.test(name)) pat = "(?<![A-Za-z0-9_])" + pat;
+    if(/[A-Za-z0-9_]$/.test(name)) pat = pat + "(?![A-Za-z0-9_])";
+    try { return new RegExp(pat, "g"); } catch(e){ return new RegExp(esc, "g"); }
+  }
+
+  // A student-name cell is a whole text node shaped like "<name> (<paren>)", where the
+  // parenthetical is either a 4+ digit ID or a short nickname. Capturing the ENTIRE name
+  // (not a fixed First/Last shape) keeps particles, prefixes, surname-first ordering and
+  // 3+ tokens — the leading fragments Bug 1 used to leave behind.
+  var NAME_TOKEN = "[A-Za-z\\u00C0-\\u017F][\\w\\u00C0-\\u017F'\\u2019.\\-]*";
+  var STUDENT_CELL = new RegExp("^(" + NAME_TOKEN + "(?:[ ,]+" + NAME_TOKEN + "){0,6})\\s*[(\\uFF08]\\s*([^()\\uFF08\\uFF09]{1,30}?)\\s*[)\\uFF09]$");
+  function parenKind(p){
+    if(/^\d{4,}$/.test(p)) return "id";                                            // student ID
+    if(new RegExp("^" + NAME_TOKEN + "(?:\\s+" + NAME_TOKEN + ")?$").test(p)) return "nick"; // preferred name
+    return "";
+  }
+  function detectStudents(nodes){
+    var found=[], seen={};
+    nodes.forEach(function(node){
+      var t = node.nodeValue.replace(/\s+/g," ").trim();
+      var m = STUDENT_CELL.exec(t); if(!m) return;
+      var name = m[1].trim(), paren = m[2].trim(), kind = parenKind(paren);
+      if(!kind) return;
+      if(kind === "nick" && name.split(/[\s,]+/).filter(Boolean).length < 2) return;  // skip e.g. "Science (Honors)"
+      var key = (name + "|" + paren).toLowerCase();
+      if(!seen[key]){ seen[key]=1; found.push({name:name, paren:paren, kind:kind}); }
+    });
+    return found;
+  }
+  // every distinct term that identifies one student: the whole name (matched first so the
+  // cell collapses to a single [STUDENT]), each individual token — which catches comment
+  // mentions like "Rashad", leading particles and hyphenated parts — and any nickname.
+  // The ID number is left out on purpose; the fixed-length-number tool blanks that.
+  function studentTerms(s){
+    var out = [s.name], seen = {};
+    seen[s.name.toLowerCase()] = 1;
+    function add(t){
+      t = t.replace(/^[\s.'’\-]+|[\s.'’\-]+$/g, "");
+      var k = t.toLowerCase();
+      if(t.length >= 2 && !seen[k]){ seen[k] = 1; out.push(t); }
+    }
+    s.name.split(/[\s,]+/).forEach(function(tok){
+      add(tok);
+      tok.split(/[\-‐-―]/).forEach(add);   // also hyphen-separated parts
+    });
+    if(s.kind === "nick"){ s.paren.split(/[\s,]+/).forEach(add); }
+    return out;
+  }
+
+  /* ---------- loading the document ---------- */
+  function loadHTML(text, name){
+    srcText = text || "";
+    if(name) fileName = name.replace(/\.[^.]+$/,"") + ".html";
+    $("drop").classList.add("loaded");
+    $("drop").querySelector(".big").textContent = "Loaded: " + (name || "pasted HTML");
+    $("drop").querySelector(".small").innerHTML = 'click to load a different file · <button type="button" class="linkbtn" id="pasteToggle2">paste instead</button>';
+    var pt = $("pasteToggle2"); if(pt) pt.addEventListener("click", showPaste);
+    $("ph").style.display = "none";
+    apply();
+  }
+
+  function readFile(f){
+    if(!f) return;
+    var r = new FileReader();
+    r.onload = function(){ loadHTML(String(r.result), f.name); };
+    r.readAsText(f);
+  }
+
+  var drop = $("drop");
+  drop.addEventListener("click", function(e){
+    if(e.target.classList.contains("linkbtn")) return;
+    $("file").click();
+  });
+  drop.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("file").click(); } });
+  drop.addEventListener("dragover", function(e){ e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function(){ drop.classList.remove("over"); });
+  drop.addEventListener("drop", function(e){
+    e.preventDefault(); drop.classList.remove("over");
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+  });
+  $("file").addEventListener("change", function(e){ readFile(e.target.files[0]); });
+
+  function showPaste(){
+    $("pasteBox").style.display = "block";
+    $("pasteActions").style.display = "block";
+    $("pasteBox").focus();
+  }
+  $("pasteToggle").addEventListener("click", showPaste);
+  $("usePaste").addEventListener("click", function(){
+    var t = $("pasteBox").value.trim();
+    if(t){ loadHTML(t, null); $("pasteBox").style.display="none"; $("pasteActions").style.display="none"; }
+  });
+
+  /* ---------- managing the term list ---------- */
+  function addTerms(raw){
+    var parts = String(raw).split(/[\r\n,;\t]+/);
+    var added = 0;
+    parts.forEach(function(p){
+      p = p.trim();
+      if(!p) return;
+      var exists = terms.some(function(t){ return t.term.toLowerCase() === p.toLowerCase(); });
+      if(!exists){ terms.push({term:p, hits:0}); added++; }
+    });
+    if(added){ renderChips(); apply(); }
+    return added;
+  }
+  function removeTerm(i){ terms.splice(i,1); renderChips(); apply(); }
+
+  function renderChips(){
+    var box = $("chips");
+    box.innerHTML = "";
+    terms.forEach(function(t,i){
+      var chip = document.createElement("span");
+      chip.className = "chip";
+      var txt = document.createElement("span");
+      txt.className = "txt"; txt.textContent = t.term; txt.title = t.term;
+      var hit = document.createElement("span");
+      hit.className = "hit" + (t.hits===0 ? " zero" : "");
+      hit.textContent = t.hits;
+      hit.title = t.hits + " match(es) in document";
+      var x = document.createElement("button");
+      x.className = "x"; x.innerHTML = "&times;"; x.title = "Remove";
+      x.addEventListener("click", function(){ removeTerm(i); });
+      chip.appendChild(txt); chip.appendChild(hit); chip.appendChild(x);
+      box.appendChild(chip);
+    });
+    $("chipsEmpty").style.display = terms.length ? "none" : "block";
+    $("termN").textContent = terms.length;
+  }
+
+  function renderTeacherChips(list){
+    var box = $("teacherChips");
+    box.innerHTML = "";
+    list.forEach(function(tc){
+      var chip = document.createElement("span"); chip.className = "chip";
+      var txt = document.createElement("span"); txt.className = "txt"; txt.textContent = tc.name; txt.title = tc.name;
+      var hit = document.createElement("span"); hit.className = "hit" + (tc.hits===0?" zero":""); hit.textContent = tc.hits;
+      var x = document.createElement("button"); x.className = "x"; x.innerHTML = "&times;"; x.title = "Keep this name (don't block it)";
+      x.addEventListener("click", function(){ ignoredTeachers[tc.name.toLowerCase()] = 1; apply(); });
+      chip.appendChild(txt); chip.appendChild(hit); chip.appendChild(x);
+      box.appendChild(chip);
+    });
+    var ignoredCount = Object.keys(ignoredTeachers).length;
+    var empty = $("teacherEmpty");
+    if(list.length){ empty.style.display = "none"; }
+    else { empty.style.display = "block"; empty.textContent = srcText ? "No teacher-style names detected in this document." : "Load a document to see suggestions."; }
+    var reset = $("teacherReset");
+    reset.style.display = ignoredCount ? "inline" : "none";
+    reset.textContent = "restore " + ignoredCount + " kept name" + (ignoredCount===1?"":"s");
+    $("teacherN").textContent = list.length;
+  }
+
+  function renderStudentChips(list){
+    lastStudents = list;
+    var box = $("studentChips");
+    box.innerHTML = "";
+    list.forEach(function(s){
+      var chip = document.createElement("span"); chip.className = "chip";
+      var txt = document.createElement("span"); txt.className = "txt";
+      txt.textContent = s.name; txt.title = s.name + (s.kind==="nick" ? "  ·  (" + s.paren + ")" : "  ·  ID " + s.paren);
+      chip.appendChild(txt);
+      box.appendChild(chip);
+    });
+    $("studentN").textContent = list.length;
+    var empty = $("studentEmpty");
+    empty.style.display = list.length ? "none" : "block";
+    empty.textContent = srcText ? "No student names detected." : "Load a document to detect student names.";
+    $("addStudents").style.display = list.length ? "block" : "none";
+  }
+
+  $("addBtn").addEventListener("click", function(){
+    addTerms($("termInput").value); $("termInput").value=""; $("termInput").focus();
+  });
+  $("termInput").addEventListener("keydown", function(e){
+    if(e.key==="Enter"){ e.preventDefault(); addTerms($("termInput").value); $("termInput").value=""; }
+  });
+  $("clearBtn").addEventListener("click", function(){ terms=[]; renderChips(); apply(); });
+  $("importBtn").addEventListener("click", function(){ $("listFile").click(); });
+  $("listFile").addEventListener("change", function(e){
+    var f = e.target.files[0]; if(!f) return;
+    var r = new FileReader();
+    r.onload = function(){ var n=addTerms(String(r.result)); toast(n+" term"+(n===1?"":"s")+" imported"); };
+    r.readAsText(f); e.target.value="";
+  });
+
+  /* ---------- options ---------- */
+  $("style").addEventListener("change", function(){
+    $("customStyle").style.display = this.value==="custom" ? "block" : "none";
+    apply();
+  });
+  $("customStyle").addEventListener("input", apply);
+  $("wholeWord").addEventListener("change", apply);
+  $("caseSens").addEventListener("change", apply);
+  $("digitOn").addEventListener("change", function(){
+    $("digitOpts").style.display = this.checked ? "block" : "none";
+    apply();
+  });
+  $("digitMin").addEventListener("input", apply);
+  $("digitMax").addEventListener("input", apply);
+  $("digitToken").addEventListener("input", apply);
+  $("teacherOn").addEventListener("change", function(){
+    $("teacherOpts").style.display = this.checked ? "block" : "none";
+    apply();
+  });
+  $("teacherStyle").addEventListener("change", function(){
+    $("teacherCustom").style.display = this.value==="custom" ? "block" : "none";
+    apply();
+  });
+  $("teacherCustom").addEventListener("input", apply);
+  $("teacherReset").addEventListener("click", function(){ ignoredTeachers = {}; apply(); });
+
+  $("addStudents").addEventListener("click", function(){
+    var added = 0;
+    lastStudents.forEach(function(s){
+      studentTerms(s).forEach(function(term){
+        term = String(term).trim();
+        if(!term) return;
+        var exists = terms.some(function(t){ return t.term.toLowerCase() === term.toLowerCase(); });
+        if(!exists){ terms.push({term:term, hits:0}); added++; }
+      });
+    });
+    if(added){ renderChips(); apply(); }
+    toast(added ? ("Added " + added + " student term" + (added===1?"":"s")) : "Those student terms are already in the list");
+  });
+
+  function replacementFor(matched){
+    var s = $("style").value;
+    if(s==="redacted") return "[REDACTED]";
+    if(s==="name") return "[NAME]";
+    if(s==="student") return "[STUDENT]";
+    if(s==="bar") return "\u2588".repeat(Math.max(matched.length,3));
+    if(s==="stars") return "*".repeat(Math.max(matched.length,3));
+    if(s==="custom") return $("customStyle").value || "[REDACTED]";
+    return "[REDACTED]";
+  }
+
+  function teacherReplacementFor(matched){
+    var s = $("teacherStyle").value;
+    if(s==="teacher") return "[TEACHER]";
+    if(s==="name") return "[NAME]";
+    if(s==="redacted") return "[REDACTED]";
+    if(s==="bar") return "\u2588".repeat(Math.max(matched.length,3));
+    if(s==="stars") return "*".repeat(Math.max(matched.length,3));
+    if(s==="custom") return $("teacherCustom").value || "[TEACHER]";
+    return "[TEACHER]";
+  }
+
+  function buildRegex(term){
+    var esc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    var pat = esc;
+    if($("wholeWord").checked){
+      if(/^[A-Za-z0-9_]/.test(term)) pat = "(?<![A-Za-z0-9_])" + pat;
+      if(/[A-Za-z0-9_]$/.test(term)) pat = pat + "(?![A-Za-z0-9_])";
+    }
+    var flags = $("caseSens").checked ? "g" : "gi";
+    try { return new RegExp(pat, flags); }
+    catch(e){ return new RegExp("\\b" + esc + "\\b", flags); } // fallback if lookbehind unsupported
+  }
+
+  /* ---------- the redaction pass ---------- */
+  function textNodesOf(docBody){
+    var walker = docBody.ownerDocument.createTreeWalker(docBody, NodeFilter.SHOW_TEXT, {
+      acceptNode:function(n){
+        var p = n.parentNode ? n.parentNode.nodeName : "";
+        if(p==="SCRIPT"||p==="STYLE") return NodeFilter.FILTER_REJECT;
+        return n.nodeValue && n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    var out=[], n; while((n=walker.nextNode())) out.push(n);
+    return out;
+  }
+
+  function redact(){
+    // returns {doc, html, digitHits, teacherList, teacherHits}; also fills hit counts
+    var doc = parser.parseFromString(srcText || "<html><body></body></html>", "text/html");
+    terms.forEach(function(t){ t.hits = 0; });
+    var digitHits = 0, teacherHits = 0, teacherList = [], studentList = [];
+    if(srcText){
+      var nodes = textNodesOf(doc.body);
+
+      // detect teacher-style names up front, on the original text
+      if($("teacherOn").checked){
+        detectTeacherNames(nodes).forEach(function(name){
+          if(!ignoredTeachers[name.toLowerCase()]) teacherList.push({name:name, hits:0});
+        });
+      }
+
+      // detect student names (a name followed by an ID) to offer as one-click adds
+      studentList = detectStudents(nodes);
+
+      // 1) teacher names FIRST — if a teacher shares a first/last name with a
+      //    student, this keeps the teacher's own cell as [TEACHER] instead of
+      //    letting a student token overwrite part of it (and leak the rest).
+      if(teacherList.length){
+        teacherList.forEach(function(tc){
+          var re = nameRegex(tc.name);
+          nodes.forEach(function(node){
+            node.nodeValue = node.nodeValue.replace(re, function(m){ tc.hits++; teacherHits++; return teacherReplacementFor(m); });
+          });
+        });
+      }
+
+      // 2) your typed/imported + added student terms (longest first)
+      var ordered = terms.slice().sort(function(a,b){ return b.term.length - a.term.length; });
+      ordered.forEach(function(t){
+        var re = buildRegex(t.term);
+        nodes.forEach(function(node){
+          node.nodeValue = node.nodeValue.replace(re, function(m){ t.hits++; return replacementFor(m); });
+        });
+      });
+
+      // 3) numbers whose digit-length falls within [lo, hi]
+      if($("digitOn").checked){
+        var lo = parseInt($("digitMin").value, 10), hi = parseInt($("digitMax").value, 10);
+        if(isNaN(lo)) lo = hi;
+        if(isNaN(hi)) hi = lo;
+        if(lo > hi){ var t0 = lo; lo = hi; hi = t0; }   // tolerate a reversed range
+        lo = Math.max(1, lo);
+        if(lo <= hi){
+          var tok = $("digitToken").value || "[STUDENT ID]";
+          nodes.forEach(function(node){
+            // swap each maximal run of digits whose length is within the range
+            node.nodeValue = node.nodeValue.replace(/\d+/g, function(m){
+              if(m.length >= lo && m.length <= hi){ digitHits++; return tok; }
+              return m;
+            });
+          });
+        }
+      }
+    }
+    var html = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+    return {doc:doc, html:html, digitHits:digitHits, teacherList:teacherList, teacherHits:teacherHits, studentList:studentList};
+  }
+
+  function sanitizedSrcDoc(html){
+    // strip scripts / inline handlers / javascript: just for the preview frame
+    var d = parser.parseFromString(html, "text/html");
+    d.querySelectorAll("script").forEach(function(s){ s.remove(); });
+    d.querySelectorAll("*").forEach(function(el){
+      [].slice.call(el.attributes).forEach(function(a){
+        if(/^on/i.test(a.name)) el.removeAttribute(a.name);
+        if(/^(href|src)$/i.test(a.name) && /^\s*javascript:/i.test(a.value)) el.removeAttribute(a.name);
+      });
+    });
+    return "<!DOCTYPE html>\n" + d.documentElement.outerHTML;
+  }
+
+  var current = {html:"", srcHtml:""};
+
+  function apply(){
+    if(!srcText){
+      $("downloadBtn").disabled = true; $("copyBtn").disabled = true;
+      return;
+    }
+    var r = redact();
+    current.html = r.html;                 // full-fidelity output for download
+    var termHits = terms.reduce(function(s,t){ return s + t.hits; }, 0);
+    var total = termHits + r.teacherHits + r.digitHits;
+    var zero = terms.filter(function(t){ return t.hits===0; }).length;
+    $("sTerms").textContent = terms.length;
+    $("sHits").textContent = total;
+    $("sZero").textContent = zero;
+    renderTeacherChips(r.teacherList);
+    renderStudentChips(r.studentList);
+    if($("digitOn").checked){
+      var lo = parseInt($("digitMin").value,10), hi = parseInt($("digitMax").value,10);
+      if(isNaN(lo)) lo = hi;
+      if(isNaN(hi)) hi = lo;
+      if(lo > hi){ var t0 = lo; lo = hi; hi = t0; }
+      lo = Math.max(1, lo);
+      if(isNaN(lo) || isNaN(hi)){
+        $("digitFound").textContent = "Enter a digit length (or range) to blank.";
+        $("digitFound").style.color = "var(--muted)";
+      } else {
+        var lenLabel = lo===hi ? (lo + "-digit") : (lo + "–" + hi + " digit");
+        $("digitFound").textContent = r.digitHits
+          ? r.digitHits + " " + lenLabel + " number" + (r.digitHits===1?"":"s") + " blanked"
+          : "No " + lenLabel + " numbers found";
+        $("digitFound").style.color = r.digitHits ? "var(--ok)" : "var(--danger)";
+      }
+    }
+    renderChips();
+    $("downloadBtn").disabled = total===0;
+    $("copyBtn").disabled = !srcText;
+    renderView();
+  }
+
+  function renderView(){
+    if(!srcText) return;
+    var html = (view==="red") ? current.html : srcText;
+    $("view").srcdoc = sanitizedSrcDoc(html);
+  }
+
+  /* segmented Original / Redacted toggle */
+  $("seg").addEventListener("click", function(e){
+    var b = e.target.closest("button"); if(!b) return;
+    view = b.getAttribute("data-v");
+    [].forEach.call(this.querySelectorAll("button"), function(x){ x.classList.toggle("on", x===b); });
+    $("viewHint").textContent = view==="orig"
+      ? "Highlight any text in the document to add it to your list."
+      : "Redacted preview — highlight anything still showing to add it too.";
+    $("addsel").style.display = "none";
+    renderView();
+  });
+
+  /* ---------- selecting text directly in the preview ---------- */
+  var addSel = $("addsel");
+  $("view").addEventListener("load", function(){
+    var fdoc;
+    try { fdoc = $("view").contentDocument; } catch(err){ return; }
+    if(!fdoc) return;
+    fdoc.addEventListener("mouseup", function(){
+      var sel = fdoc.getSelection();
+      var s = sel ? sel.toString().trim() : "";
+      if(!s){ addSel.style.display="none"; return; }
+      lastSelection = s;
+      try {
+        var rect = sel.getRangeAt(0).getBoundingClientRect();
+        var off = $("view").getBoundingClientRect();
+        var top = off.top + rect.top - 42;
+        var left = off.left + rect.left + (rect.width/2) - 50;
+        addSel.style.top = Math.max(8, top) + "px";
+        addSel.style.left = Math.max(8, left) + "px";
+        addSel.style.display = "block";
+      } catch(err){ addSel.style.display="none"; }
+    });
+    fdoc.addEventListener("scroll", function(){ addSel.style.display="none"; });
+  });
+  addSel.addEventListener("mousedown", function(e){ e.preventDefault(); });
+  addSel.addEventListener("click", function(){
+    if(lastSelection){ var n=addTerms(lastSelection); toast(n? 'Added "'+lastSelection.slice(0,30)+'"' : "Already in list"); }
+    addSel.style.display = "none";
+  });
+  document.addEventListener("mousedown", function(e){
+    if(e.target!==addSel) addSel.style.display = "none";
+  });
+
+  /* ---------- output ---------- */
+  $("downloadBtn").addEventListener("click", function(){
+    var blob = new Blob([current.html], {type:"text/html"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "redacted-" + fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+    toast("Downloaded redacted-" + fileName);
+  });
+  $("copyBtn").addEventListener("click", function(){
+    navigator.clipboard.writeText(current.html).then(
+      function(){ toast("Redacted HTML copied"); },
+      function(){ toast("Copy failed — use Download instead"); }
+    );
+  });
+
+  /* ---------- toast ---------- */
+  var toastTimer;
+  function toast(msg){
+    var el = $("toast"); el.textContent = msg; el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove("show"); }, 2200);
+  }
+
+  renderChips();
+})();
+</script>
+</body>
+</html>

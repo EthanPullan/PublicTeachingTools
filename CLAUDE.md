@@ -42,6 +42,11 @@ Those files change upstream; this one only records what is different **here**.
 - `tools/time-counter/self-test.js` and `tools/time-counter/tests/` — the tests, kept
   out of `index.html` so the tool itself stays small. See *Time Counter — how it's
   built*.
+- `tools/report-card-redactor/index.html` — **copied from
+  [`EthanPullan/ReportCardRedactor`](https://github.com/EthanPullan/ReportCardRedactor)**
+  (MIT, licence alongside). Strips student names and IDs out of exported HTML report
+  cards. It keeps its own grey palette rather than the style guide's tokens. If it is
+  changed here, port the change to that repo by hand.
 - `.nojekyll` — serve files as-is on GitHub Pages.
 
 ## The EAL tool has forked from upstream
