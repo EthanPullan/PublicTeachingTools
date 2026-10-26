@@ -318,6 +318,9 @@ and port it upstream by hand.
   code, comments, or any other artifact. No `Claude-Session:` trailer and no
   `https://claude.ai/code/session…` URLs anywhere. (Plain co-author attribution
   is fine.) This mirrors upstream's rule.
+- **Push finished work straight to `main`** — standing instruction from the repo
+  owner, no need to ask each time. Work on a branch if you like, but land it on
+  `main` when it's done and tested. (`main` is what GitHub Pages serves.)
 - **No phone numbers or email addresses** — not Local 38's, not the author's — in the
   tool, its reports or the PDF. Link to the agreement and the ATA calculators instead.
 - This repo is **shared with colleagues** — it is the one being circulated.
