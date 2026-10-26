@@ -64,6 +64,7 @@
   .card .mark{width:22px;height:22px;border-radius:6px;background:var(--board);flex:none;
     display:flex;align-items:center;justify-content:center;color:#eaf2ef;font-size:13px;}
   .card h2{margin:0;font-size:15.5px;font-weight:700;flex:1;}
+  .card h2 .redacted{background:var(--ink);color:transparent;border-radius:3px;padding:0 .3em;user-select:none;}
   .card p{margin:0;font-size:13px;color:var(--muted);line-height:1.55;flex:1;}
   .card .tags{display:flex;flex-wrap:wrap;gap:6px;}
   .card .tag{font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);
@@ -146,7 +147,7 @@
       <a class="card" href="tools/report-card-redactor/index.html">
         <div class="top">
           <span class="mark">🔒</span>
-          <h2>Report Card Redactor</h2>
+          <h2 aria-label="Report Card Redactor"><span class="redacted" aria-hidden="true">Report Card</span> <span aria-hidden="true">Redactor</span></h2>
         </div>
         <div class="tags">
           <span class="tag">remove names and IDs</span>
