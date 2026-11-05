@@ -19,7 +19,8 @@ Those files change upstream; this one only records what is different **here**.
 ## What's different here
 
 - **Scope is a curated subset.** Upstream carries ~20 tools; this site carries
-  only the EAL Benchmark tool, Graph Paper and Time Counter.
+  only the EAL Benchmark tool, Graph Paper, Time Counter, Class Schedule and the
+  Report Card Redactor.
 - **No shared Class Lists.** The shared roster panel (localStorage
   `teachingtools:rosters`) is not on this homepage, and the EAL tool no
   longer reads it. The tool has its own class list instead (see below).
@@ -42,6 +43,14 @@ Those files change upstream; this one only records what is different **here**.
 - `tools/time-counter/self-test.js` and `tools/time-counter/tests/` — the tests, kept
   out of `index.html` so the tool itself stays small. See *Time Counter — how it's
   built*.
+- `tools/class-schedule/index.html` — **native to this repo.** A printable class
+  timetable: one to four grids (days or rotation letters × periods) with full-width
+  rows for breaks and lunch, each class coloured automatically by name. The sheet is
+  HTML in physical units (inches), so the scaled preview and the print are the same
+  markup; printing is plain CSS with `print-color-adjust: exact`. Saved under
+  `teachingtools:classSchedule:settings`; shared as a JSON file
+  (`format: 'class-schedule'`) or a `#s=` link (the link leaves out the logo).
+  Everything loaded goes through `sanitize()`.
 - `tools/report-card-redactor/index.html` — **copied from
   [`EthanPullan/ReportCardRedactor`](https://github.com/EthanPullan/ReportCardRedactor)**
   (MIT, licence alongside). Strips student names and IDs out of exported HTML report

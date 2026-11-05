@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Make a printable class schedule — one or more grids of days and periods, with breaks and lunch across the full width, and each class in its own colour.">
+<meta name="theme-color" content="#1f3d35">
+<title>Class Schedule</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23e0982e'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --app-bg:#e9edf0; --panel:#fff; --panel-2:#f4f6f8; --room-bg:#f7f8f6;
+    --ink:#16241f; --muted:#67756f; --line:#d8dee2; --grid-line:rgba(31,61,53,.07);
+    --board:#1f3d35; --board-2:#173029; --board-line:#2c5247;
+    --accent:#e0982e; --accent-soft:#fbe6c8; --accent-deep:#b9781f;
+    --danger:#c43d35; --danger-soft:#f7e0de; --together:#2f6f9f; --together-soft:#dde9f3;
+    --ok:#3f9e6b;
+    --shadow:0 1px 2px rgba(20,40,33,.06),0 6px 18px rgba(20,40,33,.06);
+    --shadow-sm:0 1px 2px rgba(20,40,33,.10); --radius:12px;
+    --sans:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;} html,body{height:100%;}
+  [hidden]{display:none !important;}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--app-bg);
+    -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45;}
+  button{font-family:inherit;}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+
+  /* toolbar */
+  .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 16px;
+    background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;font-size:13px;color:var(--ink);white-space:nowrap;text-decoration:none;}
+  .brand .mark{width:16px;height:16px;border-radius:4px;background:var(--accent);
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.06);flex:none;}
+  .brand small{font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--muted);font-size:11px;}
+  .spacer{flex:1;}
+  .progress-pill{font-family:var(--mono);font-size:11px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--muted);white-space:nowrap;}
+
+  .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 13px;
+    border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;
+    gap:7px;transition:background .12s,border-color .12s,transform .05s;white-space:nowrap;}
+  .btn:hover{background:var(--panel-2);} .btn:active{transform:translateY(1px);}
+  .btn.primary{background:var(--board);border-color:var(--board);color:#fff;}
+  .btn.primary:hover{background:var(--board-2);}
+  .btn.danger{color:var(--danger);border-color:var(--danger-soft);background:#fff;}
+  .btn.danger:hover{background:var(--danger-soft);}
+  .btn.small{padding:5px 9px;font-size:12px;border-radius:7px;}
+  .btn.icon{padding:4px 7px;font-size:12px;border-radius:7px;min-width:26px;justify-content:center;}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;}
+
+  /* layout — settings on the left, the page and its grids on the right */
+  .layout{display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:18px;
+    max-width:1500px;margin:0 auto;padding:18px 16px 60px;align-items:start;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px;margin-bottom:14px;}
+  .section-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 12px;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
+
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .field label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  select,input[type=text],input[type=time]{
+    border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--panel-2);width:100%;}
+  select:focus,input:focus{outline:none;border-color:var(--accent);}
+  .row{display:grid;gap:10px;}
+  .row.cols2{grid-template-columns:1fr 1fr;}
+  .row + .row{margin-top:10px;}
+  .btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+
+  .logo-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+  .logo-row img{width:34px;height:34px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff;}
+
+  /* colours */
+  .legend{display:flex;flex-direction:column;gap:8px;}
+  .lg{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;
+    padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .lg:last-child{border-bottom:0;padding-bottom:0;}
+  .lg-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;min-width:0;}
+  .lg-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lg-name i{width:14px;height:14px;border-radius:4px;border:1px solid rgba(0,0,0,.15);flex:none;}
+  .lg input[type=color]{width:30px;height:24px;border:1px solid var(--line);border-radius:6px;
+    padding:2px;background:var(--panel-2);cursor:pointer;}
+  .sws{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:4px;}
+  .sw{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0;}
+  .sw.on{outline:2px solid var(--board);outline-offset:1px;}
+  .empty{font-size:12.5px;color:var(--muted);}
+
+  /* preview */
+  .preview-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;margin-bottom:14px;}
+  .preview-stage{background:var(--room-bg);border-radius:9px;padding:18px;
+    background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+    background-size:22px 22px;}
+  .preview-fit{position:relative;margin:0 auto;}
+  .preview-fit .sheet{position:absolute;top:0;left:0;transform-origin:0 0;
+    box-shadow:0 1px 3px rgba(20,40,33,.18),0 10px 26px rgba(20,40,33,.14);}
+
+  /* grid editors */
+  .ged-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .ged-head .section-title{margin:0;flex:1;}
+  .tablewrap{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:9px;}
+  table.ed{border-collapse:collapse;width:100%;min-width:640px;}
+  table.ed th,table.ed td{padding:4px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.ed tr:last-child td{border-bottom:0;}
+  table.ed th{background:var(--panel-2);font-size:10.5px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);text-align:left;white-space:nowrap;}
+  table.ed input[type=text],table.ed input[type=time],table.ed select{padding:5px 6px;font-size:13px;border-radius:6px;}
+  table.ed input[type=time]{min-width:92px;}
+  table.ed .colhead{display:flex;gap:3px;align-items:center;min-width:110px;}
+  table.ed .colhead input{font-weight:600;}
+  table.ed td.cell{min-width:110px;}
+  table.ed td.bandnote{font-size:12px;color:var(--muted);font-style:italic;text-align:center;
+    background:repeating-linear-gradient(90deg,transparent 0 8px,rgba(31,61,53,.04) 8px 16px);}
+  table.ed tr.band td{background-color:var(--panel-2);}
+  table.ed .acts{display:flex;gap:3px;white-space:nowrap;}
+  table.ed .kind{width:96px;}
+  table.ed .lbl{min-width:120px;}
+  input.bad{border-color:var(--danger) !important;background:var(--danger-soft) !important;}
+
+  /* the printed sheet: physical units, so the preview and the paper match */
+  .sheet{background:#fff;color:#111;display:flex;flex-direction:column;overflow:hidden;
+    font-family:"Century Gothic","Avenir Next",Avenir,"Segoe UI",var(--sans);
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .s-head{display:flex;align-items:center;justify-content:center;gap:.14in;margin-bottom:.16in;flex:none;}
+  .s-head img{max-height:.5in;max-width:1.2in;object-fit:contain;}
+  .s-title{font-size:calc(var(--fs) * 1.75);font-weight:400;letter-spacing:.01em;text-align:center;line-height:1.15;}
+  .s-sub{font-size:calc(var(--fs) * 1.05);color:#444;text-align:center;margin-top:.03in;}
+  .s-grids{flex:1;display:flex;gap:.22in;min-height:0;}
+  .s-grid{display:grid;min-width:0;min-height:0;}
+  .c{border-right:1px solid #333;border-bottom:1px solid #333;display:flex;align-items:center;
+    justify-content:center;text-align:center;padding:.03in .05in;overflow:hidden;
+    font-size:var(--fs);line-height:1.2;overflow-wrap:anywhere;min-height:0;}
+  .c .nw{white-space:nowrap;}
+  .c.first{border-left:1px solid #333;}
+  .c.h{border-top:1px solid #333;}
+  .c.t{flex-direction:column;}
+  .c.t small{font-size:var(--fs);display:block;}
+  .c.band{border-left:1.2px dashed #333;border-right:1.2px dashed #333;border-bottom:1.2px dashed #333;}
+  .c.preband{border-bottom:1.2px dashed #333;}
+  .c.band b{font-weight:700;margin-right:.3em;}
+
+  @media (max-width:980px){ .layout{grid-template-columns:minmax(0,1fr);} .side{order:2;} }
+  @media (max-width:560px){ .progress-pill{display:none;} .preview-card,.preview-stage{padding:10px;} }
+
+  /* toast */
+  .toast-wrap{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;
+    display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .toast{background:var(--ink);color:#fff;padding:10px 15px;border-radius:10px;font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:min(92vw,560px);
+    border-left:3px solid var(--accent);animation:tin .2s ease both;}
+  .toast.err{border-left-color:var(--danger);}
+  .toast.ok{border-left-color:var(--ok);}
+  @keyframes tin{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  @media (prefers-reduced-motion:reduce){ .btn:active{transform:none;} .toast{animation:none;} }
+
+  /* printing — only the sheet, at full size */
+  #printArea{display:none;}
+  @media print{
+    body > *:not(#printArea){display:none !important;}
+    html,body{background:#fff;height:auto;}
+    #printArea{display:block;}
+  }
+</style>
+<style id="pageStyle"></style>
+</head>
+<body>
+  <header class="toolbar">
+    <a class="brand" href="../../index.html" title="All tools"><span class="mark"></span>Class Schedule <small>print your timetable</small></a>
+    <div class="spacer"></div>
+    <span class="progress-pill" id="pill"></span>
+    <button class="btn primary" id="printBtn"><span class="ic">⎙</span>Print or save PDF</button>
+  </header>
+
+  <div class="layout">
+    <div class="side">
+      <section class="card">
+        <h3 class="section-title">Page</h3>
+        <div class="field"><label for="title">Title</label>
+          <input type="text" id="title" data-k="title" maxlength="80"></div>
+        <div class="row"><div class="field" style="margin-top:10px"><label for="sub">Subtitle <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional — name, room, year)</span></label>
+          <input type="text" id="sub" data-k="sub" maxlength="80"></div></div>
+        <div class="logo-row">
+          <img id="logoImg" alt="Logo" hidden>
+          <button class="btn small" id="logoBtn">Add a logo…</button>
+          <button class="btn small danger" id="logoDel" hidden>Remove</button>
+          <input type="file" id="logoFile" accept="image/*" hidden>
+        </div>
+        <div class="row cols2" style="margin-top:12px">
+          <div class="field"><label for="paper">Paper</label>
+            <select id="paper" data-k="paper">
+              <option value="letter">Letter</option><option value="legal">Legal</option><option value="a4">A4</option>
+            </select></div>
+          <div class="field"><label for="orient">Orientation</label>
+            <select id="orient" data-k="orient">
+              <option value="landscape">Landscape</option><option value="portrait">Portrait</option>
+            </select></div>
+        </div>
+        <div class="row cols2">
+          <div class="field"><label for="layoutSel">Grids</label>
+            <select id="layoutSel" data-k="layout">
+              <option value="row">Side by side</option><option value="column">One above the other</option>
+            </select></div>
+          <div class="field"><label for="size">Text size</label>
+            <select id="size" data-k="size">
+              <option value="s">Small</option><option value="m">Medium</option><option value="l">Large</option>
+            </select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="timefmt">Times</label>
+            <select id="timefmt" data-k="timefmt">
+              <option value="12">8:05 – 1:07</option>
+              <option value="12ap">8:05 am – 1:07 pm</option>
+              <option value="24">08:05 – 13:07</option>
+              <option value="none">Don't show times</option>
+            </select></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Colours</h3>
+        <div class="legend" id="legend"></div>
+        <p class="hint">Each class gets its own colour, and the same name is the same colour everywhere.
+          Give two names one colour (say <i>Sci 8-4</i> and <i>Science 8-4</i>) by picking it for both.</p>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Save and share</h3>
+        <p class="hint" style="margin-top:0">Your schedule is kept in this browser. To move it or give a copy to a colleague, save a file or copy a link.</p>
+        <div class="btn-row">
+          <button class="btn small" id="saveFile">Save file</button>
+          <button class="btn small" id="openFile">Open file…</button>
+          <button class="btn small" id="copyLink">Copy link</button>
+          <input type="file" id="openInput" accept=".json,application/json" hidden>
+        </div>
+        <div class="btn-row">
+          <button class="btn small" id="clearClasses">Clear the classes</button>
+          <button class="btn small danger" id="resetAll">Start again from the example</button>
+        </div>
+        <p class="hint">A link leaves out the logo. <i>Clear the classes</i> keeps the grids and times.</p>
+      </section>
+    </div>
+
+    <div class="main">
+      <section class="preview-card">
+        <div class="preview-stage"><div class="preview-fit" id="previewFit"></div></div>
+      </section>
+      <div id="editors"></div>
+      <button class="btn" data-a="addGrid">+ Add a grid</button>
+      <p class="hint">A grid is one table of days (or rotation letters) and periods. Most schools need one;
+        a second suits a day with its own bell times, such as a Friday rotation.</p>
+    </div>
+  </div>
+
+  <datalist id="classNames"></datalist>
+  <div id="printArea"></div>
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const LS = 'teachingtools:classSchedule:settings';
+  const FORMAT = 'class-schedule';
+  const PAPERS = { letter:[8.5, 11], legal:[8.5, 14], a4:[8.27, 11.69] };
+  const SIZES = { s:9, m:11, l:13 };            // points
+  const PALETTE = ['#cfe2f3','#d9ead3','#dccbec','#ead1dc','#fce5cd','#fff2cc','#f4cccc','#d0e0e3','#c9daf8','#e6e6e6'];
+  const MAX_GRIDS = 4, MAX_COLS = 10, MAX_ROWS = 30;
+
+  /* ---------- the example: a Mon–Thu block grid and a Friday rotation ---------- */
+  function P(label, start, end, cells){ return { kind:'period', label, start, end, cells }; }
+  function B(label, start, end){ return { kind:'band', label, start, end, cells:[] }; }
+  function example(){
+    return {
+      title:'Class Schedule', sub:'', logo:'', paper:'letter', orient:'landscape', layout:'row', size:'m', timefmt:'12',
+      grids:[
+        { heading:'Time/Day M – R', cols:['Monday','Tuesday','Wednesday','Thursday'], rows:[
+          P('Block 1','08:05','08:56',['Math 8-4','Math 8-3','Math 8-4','Math 8-3']),
+          P('Block 2','08:58','09:45',['Science 8-4','Science 8-3','Science 8-4','Science 8-3']),
+          B('Break','09:45','09:53'),
+          P('Block 3','09:53','10:40',['Math 8-3','Numeracy 8-4','Math 8-3','Numeracy 8-4']),
+          P('Block 4','10:42','11:29',['Science 8-3','Prep','Science 8-3','Prep']),
+          P('Block 5','11:31','12:18',['Numeracy 8-3','Support','Numeracy 8-3','Support']),
+          B('Block 6 – Lunch','12:18','13:07'),
+          P('Block 7','13:09','13:56',['Leadership','Math 8-4','Leadership','Math/Sci 8-9']),
+          P('Block 8','13:58','14:45',['Prep','Science 8-4','Prep','Math/Sci 8-9'])
+        ]},
+        { heading:'Time/Day F', cols:['A','B','C','D'], rows:[
+          P('Period 1','08:05','08:56',['Math 8-4','Numeracy 8-3','Math 8-3','Support']),
+          P('Period 2','08:58','09:48',['Sci 8-4','Math 8-4','Sci 8-3','Math 8-3']),
+          B('Break','09:48','09:56'),
+          B('Odyssey Time','09:56','10:26'),
+          P('Period 3','10:28','11:19',['Math 8-3','Leadership','Numeracy 8-4','Math 8-4']),
+          P('Period 4','11:21','12:10',['Sci 8-3','Prep','Prep','Sci 8-4'])
+        ]}
+      ],
+      colors:{
+        'math 8-4':PALETTE[0], 'science 8-4':PALETTE[0], 'sci 8-4':PALETTE[0],
+        'math 8-3':PALETTE[1], 'science 8-3':PALETTE[1], 'sci 8-3':PALETTE[1], 'math/sci 8-9':PALETTE[1],
+        'numeracy 8-4':PALETTE[2], 'numeracy 8-3':PALETTE[2],
+        'prep':PALETTE[3], 'leadership':PALETTE[4], 'support':PALETTE[4]
+      }
+    };
+  }
+
+  /* ---------- sanitising: anything loaded (storage, file, link) goes through here ---------- */
+  const str = (v, max) => typeof v === 'string' ? v.slice(0, max || 80) : '';
+  const tm = v => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : '';
+  const pick = (v, ok, d) => ok.includes(v) ? v : d;
+  function sanitize(o){
+    const d = example();
+    if(!o || typeof o !== 'object') return d;
+    const out = {
+      title: typeof o.title === 'string' ? str(o.title) : d.title,
+      sub: str(o.sub),
+      logo: typeof o.logo === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(o.logo) && o.logo.length < 400000 ? o.logo : '',
+      paper: pick(o.paper, Object.keys(PAPERS), d.paper),
+      orient: pick(o.orient, ['landscape','portrait'], d.orient),
+      layout: pick(o.layout, ['row','column'], d.layout),
+      size: pick(o.size, Object.keys(SIZES), d.size),
+      timefmt: pick(o.timefmt, ['12','12ap','24','none'], d.timefmt),
+      colors: {}, grids: []
+    };
+    if(o.colors && typeof o.colors === 'object'){
+      Object.keys(o.colors).slice(0, 200).forEach(k => {
+        const c = o.colors[k];
+        if(typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) out.colors[str(k)] = c.toLowerCase();
+      });
+    }
+    if(Array.isArray(o.grids)){
+      o.grids.slice(0, MAX_GRIDS).forEach(g => {
+        if(!g || typeof g !== 'object') return;
+        const cols = Array.isArray(g.cols) ? g.cols.slice(0, MAX_COLS).map(c => str(c, 40)) : [];
+        if(!cols.length) return;
+        const rows = (Array.isArray(g.rows) ? g.rows : []).slice(0, MAX_ROWS).filter(r => r && typeof r === 'object').map(r => ({
+          kind: r.kind === 'band' ? 'band' : 'period',
+          label: str(r.label, 60), start: tm(r.start), end: tm(r.end),
+          cells: cols.map((_, i) => Array.isArray(r.cells) ? str(r.cells[i], 60) : '')
+        }));
+        out.grids.push({ heading: str(g.heading, 40), cols, rows });
+      });
+    }
+    if(!out.grids.length) out.grids = d.grids;
+    return out;
+  }
+
+  let S;
+
+  /* ---------- colours ---------- */
+  const key = s => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  function classes(){                       // key -> name as first written, in reading order
+    const m = new Map();
+    S.grids.forEach(g => g.rows.forEach(r => { if(r.kind === 'period') r.cells.forEach(c => {
+      const k = key(c); if(k && !m.has(k)) m.set(k, c.trim());
+    }); }));
+    return m;
+  }
+  // Give every class in use a colour, keeping the ones already chosen, and forget classes no longer used.
+  function assignColours(){
+    const used = classes(), next = {};
+    used.forEach((_, k) => { if(S.colors[k]) next[k] = S.colors[k]; });
+    let i = 0;
+    used.forEach((_, k) => {
+      if(next[k]) return;
+      const taken = new Set(Object.values(next));
+      const free = PALETTE.find(c => !taken.has(c));
+      next[k] = free || PALETTE[i++ % PALETTE.length];
+    });
+    S.colors = next;
+  }
+
+  /* ---------- times ---------- */
+  function fmt(t){
+    if(!t) return '';
+    let [h, m] = t.split(':').map(Number);
+    if(S.timefmt === '24') return t;
+    const ap = h < 12 ? 'am' : 'pm';
+    h = h % 12 || 12;
+    return h + ':' + String(m).padStart(2, '0') + (S.timefmt === '12ap' ? ' ' + ap : '');
+  }
+  function span(r){
+    if(S.timefmt === 'none' || (!r.start && !r.end)) return '';
+    return [fmt(r.start), fmt(r.end)].filter(Boolean).join(' – ');
+  }
+  const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const hhmm = n => { n = Math.max(0, Math.min(1439, n)); return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); };
+
+  /* ---------- the sheet ---------- */
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  // Printed text: keep codes like "8-4" on one line, and never start a line with a dash.
+  const txt = s => '<span>' + esc(s.trim()).replace(/\S*\w-\w\S*/g, '<span class="nw">$&</span>').replace(/ ([–-]) /g, '&nbsp;$1 ') + '</span>';
+  function pageSize(){
+    const [w, h] = PAPERS[S.paper];
+    return S.orient === 'landscape' ? [h, w] : [w, h];
+  }
+  function gridHtml(g){
+    const n = g.cols.length;
+    const tracks = ['minmax(0,auto)'].concat(g.rows.map(r => r.kind === 'band' ? 'minmax(0,1fr)' : 'minmax(0,2fr)'));
+    const weight = S.layout === 'row' ? n + 1 : Math.max(1, g.rows.reduce((a, r) => a + (r.kind === 'band' ? 1 : 2), 1));
+    let h = '<div class="s-grid" style="flex:' + weight + ' 1 0;grid-template-columns:minmax(0,1.05fr) repeat(' + n + ',minmax(0,1fr));grid-template-rows:' + tracks.join(' ') + '">';
+    h += '<div class="c h first t" style="padding:.06in .05in">' + txt(g.heading) + '</div>';
+    g.cols.forEach(c => { h += '<div class="c h">' + txt(c) + '</div>'; });
+    g.rows.forEach((r, i) => {
+      const pre = g.rows[i + 1] && g.rows[i + 1].kind === 'band' ? ' preband' : '';
+      const t = span(r);
+      if(r.kind === 'band'){
+        h += '<div class="c band first" style="grid-column:1 / -1"><span>' +
+          (r.label ? '<b>' + txt(r.label) + (t ? ':' : '') + '</b>' : '') + esc(t) + '</span></div>';
+        return;
+      }
+      h += '<div class="c t first' + pre + '"><span>' + txt(r.label) + '</span>' + (t ? '<small>' + esc(t) + '</small>' : '') + '</div>';
+      r.cells.forEach(c => {
+        const bg = key(c) ? S.colors[key(c)] || '#fff' : '#fff';
+        h += '<div class="c' + pre + '" style="background:' + bg + '">' + txt(c) + '</div>';
+      });
+    });
+    return h + '</div>';
+  }
+  function sheetHtml(){
+    const [w, h] = pageSize();
+    let s = '<div class="sheet" style="width:' + w + 'in;height:' + h + 'in;padding:.4in .4in .45in;--fs:' + SIZES[S.size] + 'pt">';
+    if(S.title || S.sub || S.logo){
+      s += '<div class="s-head">' + (S.logo ? '<img src="' + S.logo + '" alt="">' : '') +
+        '<div>' + (S.title ? '<div class="s-title">' + esc(S.title) + '</div>' : '') +
+        (S.sub ? '<div class="s-sub">' + esc(S.sub) + '</div>' : '') + '</div></div>';
+    }
+    s += '<div class="s-grids" style="flex-direction:' + S.layout + '">' + S.grids.map(gridHtml).join('') + '</div>';
+    return s + '</div>';
+  }
+  function renderPreview(){
+    assignColours();
+    const html = sheetHtml();
+    const fit = $('previewFit');
+    fit.innerHTML = html;
+    $('printArea').innerHTML = html;
+    const [w, h] = pageSize();
+    $('pageStyle').textContent = '@page{size:' + w + 'in ' + h + 'in;margin:0;}';
+    scalePreview();
+    const n = classes().size;
+    $('pill').textContent = S.grids.length + (S.grids.length === 1 ? ' grid' : ' grids') + ' · ' + n + (n === 1 ? ' class' : ' classes');
+    save();
+  }
+  function scalePreview(){
+    const fit = $('previewFit'), sheet = fit.firstElementChild;
+    if(!sheet) return;
+    const [w, h] = pageSize();
+    const avail = fit.parentElement.clientWidth - parseFloat(getComputedStyle(fit.parentElement).paddingLeft) * 2;
+    const k = Math.min(1, avail / (w * 96), S.orient === 'portrait' ? 900 / (h * 96) : 1);
+    fit.style.width = (w * 96 * k) + 'px';
+    fit.style.height = (h * 96 * k) + 'px';
+    sheet.style.transform = 'scale(' + k + ')';
+  }
+
+  /* ---------- colour legend ---------- */
+  function renderLegend(){
+    const used = classes(), el = $('legend');
+    if(!used.size){ el.innerHTML = '<p class="empty">Type a class into a grid and it appears here.</p>'; return; }
+    let h = '';
+    used.forEach((name, k) => {
+      const c = S.colors[k] || '#ffffff';
+      h += '<div class="lg" data-key="' + esc(k) + '"><div class="lg-name"><i style="background:' + c + '"></i><span title="' + esc(name) + '">' + esc(name) + '</span></div>' +
+        '<input type="color" value="' + c + '" aria-label="Colour for ' + esc(name) + '" data-a="colour">' +
+        '<div class="sws">' + PALETTE.concat(['#ffffff']).map(p =>
+          '<button class="sw' + (p === c ? ' on' : '') + '" style="background:' + p + '" data-a="swatch" data-c="' + p + '" aria-label="' + (p === '#ffffff' ? 'White' : 'Colour ' + p) + '"></button>').join('') +
+        '</div></div>';
+    });
+    el.innerHTML = h;
+    $('classNames').innerHTML = [...used.values()].map(n => '<option value="' + esc(n) + '">').join('');
+  }
+  $('legend').addEventListener('click', e => {
+    const b = e.target.closest('[data-a="swatch"]'); if(!b) return;
+    S.colors[b.closest('.lg').dataset.key] = b.dataset.c;
+    renderPreview(); renderLegend();
+  });
+  $('legend').addEventListener('input', e => {
+    if(e.target.dataset.a !== 'colour') return;
+    const lg = e.target.closest('.lg');
+    S.colors[lg.dataset.key] = e.target.value.toLowerCase();
+    lg.querySelector('.lg-name i').style.background = e.target.value;
+    lg.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.c === e.target.value.toLowerCase()));
+    renderPreview();
+  });
+
+  /* ---------- grid editors ---------- */
+  function renderEditors(){
+    $('editors').innerHTML = S.grids.map((g, gi) => {
+      const n = g.cols.length;
+      let h = '<section class="card" data-g="' + gi + '"><div class="ged-head"><h3 class="section-title">Grid ' + (gi + 1) + '</h3>' +
+        (S.grids.length > 1 ? '<button class="btn icon" data-a="gridUp" title="Move this grid earlier" aria-label="Move grid ' + (gi + 1) + ' earlier"' + (gi ? '' : ' disabled') + '>↑</button>' +
+          '<button class="btn icon" data-a="gridDown" title="Move this grid later" aria-label="Move grid ' + (gi + 1) + ' later"' + (gi < S.grids.length - 1 ? '' : ' disabled') + '>↓</button>' +
+          '<button class="btn small danger" data-a="delGrid">Delete grid</button>' : '') + '</div>' +
+        '<div class="field" style="max-width:320px"><label>Corner heading</label><input type="text" data-f="heading" maxlength="40" value="' + esc(g.heading) + '"></div>' +
+        '<div class="tablewrap"><table class="ed"><thead><tr><th>Row</th><th>Label</th><th>Starts</th><th>Ends</th>';
+      g.cols.forEach((c, ci) => {
+        h += '<th><div class="colhead"><input type="text" data-f="col" data-c="' + ci + '" maxlength="40" value="' + esc(c) + '" aria-label="Column ' + (ci + 1) + ' heading">' +
+          (n > 1 ? '<button class="btn icon" data-a="delCol" data-c="' + ci + '" title="Delete this column" aria-label="Delete column ' + esc(c || ci + 1) + '">×</button>' : '') + '</div></th>';
+      });
+      h += '<th>' + (n < MAX_COLS ? '<button class="btn icon" data-a="addCol" title="Add a column">+ Col</button>' : '') + '</th></tr></thead><tbody>';
+      g.rows.forEach((r, ri) => {
+        const bad = r.start && r.end && mins(r.end) <= mins(r.start) ? ' bad' : '';
+        h += '<tr class="' + r.kind + '" data-r="' + ri + '"><td><select class="kind" data-f="kind" aria-label="Row type">' +
+          '<option value="period"' + (r.kind === 'period' ? ' selected' : '') + '>Period</option>' +
+          '<option value="band"' + (r.kind === 'band' ? ' selected' : '') + '>Full width</option></select></td>' +
+          '<td><input type="text" class="lbl" data-f="label" maxlength="60" value="' + esc(r.label) + '" aria-label="Row label"></td>' +
+          '<td><input type="time" data-f="start" value="' + r.start + '" aria-label="Starts"></td>' +
+          '<td><input type="time" class="' + bad + '" data-f="end" value="' + r.end + '" aria-label="Ends"></td>';
+        if(r.kind === 'band') h += '<td class="bandnote" colspan="' + n + '">runs across the whole grid — for a break, lunch or assembly</td>';
+        else r.cells.forEach((c, ci) => {
+          h += '<td class="cell"><input type="text" list="classNames" data-f="cell" data-c="' + ci + '" maxlength="60" value="' + esc(c) + '" aria-label="' + esc((r.label || 'Row ' + (ri + 1)) + ', ' + (g.cols[ci] || 'column ' + (ci + 1))) + '"></td>';
+        });
+        h += '<td><div class="acts"><button class="btn icon" data-a="rowUp" aria-label="Move row up"' + (ri ? '' : ' disabled') + '>↑</button>' +
+          '<button class="btn icon" data-a="rowDown" aria-label="Move row down"' + (ri < g.rows.length - 1 ? '' : ' disabled') + '>↓</button>' +
+          '<button class="btn icon" data-a="delRow" aria-label="Delete row">×</button></div></td></tr>';
+      });
+      h += '</tbody></table></div><div class="btn-row">' +
+        (g.rows.length < MAX_ROWS ? '<button class="btn small" data-a="addPeriod">+ Period</button><button class="btn small" data-a="addBand">+ Break or lunch</button>' : '') +
+        '</div></section>';
+      return h;
+    }).join('');
+    document.querySelector('[data-a="addGrid"]').hidden = S.grids.length >= MAX_GRIDS;
+  }
+
+  function newRow(g, kind){
+    const last = g.rows[g.rows.length - 1];
+    const lastP = [...g.rows].reverse().find(r => r.kind === 'period' && r.start && r.end);
+    const len = kind === 'band' ? 10 : (lastP ? mins(lastP.end) - mins(lastP.start) : 50);
+    const start = last && last.end ? last.end : '';
+    const nPeriods = g.rows.filter(r => r.kind === 'period').length;
+    const word = lastP && /^(\D*?)\s*\d+$/.test(lastP.label) ? lastP.label.replace(/\s*\d+$/, '') : 'Period';
+    return {
+      kind, label: kind === 'band' ? 'Break' : word + ' ' + (nPeriods + 1),
+      start, end: start ? hhmm(mins(start) + len) : '', cells: g.cols.map(() => '')
+    };
+  }
+
+  const editors = $('editors');
+  editors.addEventListener('input', e => {
+    const t = e.target, f = t.dataset.f;
+    if(!f || f === 'kind') return;
+    const g = S.grids[+t.closest('[data-g]').dataset.g];
+    const tr = t.closest('[data-r]'), r = tr ? g.rows[+tr.dataset.r] : null;
+    if(f === 'heading') g.heading = t.value;
+    else if(f === 'col') g.cols[+t.dataset.c] = t.value;
+    else if(f === 'label') r.label = t.value;
+    else if(f === 'start' || f === 'end'){
+      r[f] = tm(t.value);
+      const end = tr.querySelector('[data-f="end"]');
+      end.classList.toggle('bad', !!(r.start && r.end && mins(r.end) <= mins(r.start)));
+    }
+    else if(f === 'cell') r.cells[+t.dataset.c] = t.value;
+    renderPreview();
+    if(f === 'cell') renderLegend();
+  });
+  editors.addEventListener('change', e => {
+    const t = e.target;
+    if(t.dataset.f !== 'kind') return;
+    const g = S.grids[+t.closest('[data-g]').dataset.g];
+    g.rows[+t.closest('[data-r]').dataset.r].kind = t.value;
+    structural(t);
+  });
+  editors.addEventListener('click', e => {
+    const b = e.target.closest('button[data-a]'); if(!b || b.disabled) return;
+    const gi = +b.closest('[data-g]').dataset.g, g = S.grids[gi];
+    const tr = b.closest('[data-r]'), ri = tr ? +tr.dataset.r : -1;
+    const a = b.dataset.a;
+    let focusSel = null;
+    if(a === 'addPeriod' || a === 'addBand'){
+      g.rows.push(newRow(g, a === 'addBand' ? 'band' : 'period'));
+      focusSel = '[data-g="' + gi + '"] [data-r="' + (g.rows.length - 1) + '"] [data-f="label"]';
+    }
+    else if(a === 'delRow'){
+      const r = g.rows[ri];
+      if(r.kind === 'period' && r.cells.some(c => c.trim()) && !confirm('Delete ' + (r.label || 'this row') + ' and its classes?')) return;
+      g.rows.splice(ri, 1);
+    }
+    else if(a === 'rowUp' || a === 'rowDown'){
+      const j = ri + (a === 'rowUp' ? -1 : 1);
+      [g.rows[ri], g.rows[j]] = [g.rows[j], g.rows[ri]];
+      focusSel = '[data-g="' + gi + '"] [data-r="' + j + '"] [data-a="' + a + '"]';
+    }
+    else if(a === 'addCol'){
+      g.cols.push('');
+      g.rows.forEach(r => r.cells.push(''));
+      focusSel = '[data-g="' + gi + '"] [data-f="col"][data-c="' + (g.cols.length - 1) + '"]';
+    }
+    else if(a === 'delCol'){
+      const ci = +b.dataset.c;
+      if(g.rows.some(r => r.kind === 'period' && r.cells[ci].trim()) && !confirm('Delete the ' + (g.cols[ci] || 'column') + ' column and its classes?')) return;
+      g.cols.splice(ci, 1);
+      g.rows.forEach(r => r.cells.splice(ci, 1));
+    }
+    else if(a === 'delGrid'){
+      if(!confirm('Delete grid ' + (gi + 1) + ' (' + (g.heading || 'untitled') + ') and everything in it?')) return;
+      S.grids.splice(gi, 1);
+    }
+    else if(a === 'gridUp' || a === 'gridDown'){
+      const j = gi + (a === 'gridUp' ? -1 : 1);
+      [S.grids[gi], S.grids[j]] = [S.grids[j], S.grids[gi]];
+      focusSel = '[data-g="' + j + '"] [data-a="' + a + '"]';
+    }
+    structural(null, focusSel);
+  });
+  function structural(keep, focusSel){
+    const sel = keep && keep.closest('[data-r]') ? '[data-g="' + keep.closest('[data-g]').dataset.g + '"] [data-r="' + keep.closest('[data-r]').dataset.r + '"] [data-f="' + keep.dataset.f + '"]' : focusSel;
+    renderEditors(); renderPreview(); renderLegend();
+    const f = sel && document.querySelector(sel);
+    if(f && !f.disabled) f.focus();
+  }
+  document.querySelector('[data-a="addGrid"]').addEventListener('click', () => {
+    S.grids.push({ heading:'Time/Day', cols:['Monday','Tuesday','Wednesday','Thursday','Friday'],
+      rows:[1, 2, 3, 4].map(i => P('Period ' + i, '', '', ['', '', '', '', ''])) });
+    structural(null, '[data-g="' + (S.grids.length - 1) + '"] [data-f="heading"]');
+  });
+
+  /* ---------- page settings ---------- */
+  function fillSettings(){
+    document.querySelectorAll('[data-k]').forEach(el => { el.value = S[el.dataset.k]; });
+    $('logoImg').hidden = $('logoDel').hidden = !S.logo;
+    if(S.logo) $('logoImg').src = S.logo;
+    $('logoBtn').textContent = S.logo ? 'Change logo…' : 'Add a logo…';
+  }
+  document.querySelectorAll('[data-k]').forEach(el => el.addEventListener('input', () => {
+    S[el.dataset.k] = el.value;
+    renderPreview();
+  }));
+  $('logoBtn').addEventListener('click', () => $('logoFile').click());
+  $('logoDel').addEventListener('click', () => { S.logo = ''; fillSettings(); renderPreview(); });
+  $('logoFile').addEventListener('change', e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if(!file) return;
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      // Shrink to a size that prints sharply at half an inch tall and still fits in browser storage.
+      const k = Math.min(1, 240 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      S.logo = c.toDataURL('image/png');
+      fillSettings(); renderPreview();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('That file could not be read as a picture.', 'err'); };
+    img.src = url;
+  });
+
+  /* ---------- saving, files and links ---------- */
+  let saveTimer = 0;
+  function save(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try{ localStorage.setItem(LS, JSON.stringify(S)); }
+      catch(e){ toast('This browser would not save the schedule — save a file to keep it.', 'err'); }
+    }, 250);
+  }
+  const b64enc = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64dec = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+  function load(){
+    const h = location.hash.match(/^#s=([A-Za-z0-9_-]+)/);
+    if(h){
+      history.replaceState(null, '', location.pathname + location.search);
+      try{
+        const shared = sanitize(JSON.parse(b64dec(h[1])));
+        let mine = null;
+        try{ mine = localStorage.getItem(LS); }catch(e){}
+        if(!mine || confirm('Open the shared schedule? It replaces the one saved in this browser.')){
+          S = shared;
+          toast('Opened the shared schedule.', 'ok');
+          return;
+        }
+      }catch(e){ toast('That link could not be read — showing your saved schedule.', 'err'); }
+    }
+    try{ S = sanitize(JSON.parse(localStorage.getItem(LS) || 'null')); }catch(e){ S = example(); }
+  }
+  function fileName(){
+    const n = (S.title || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '').replace(/\s+/g, ' ').trim();
+    return (n || 'class-schedule') + '.json';
+  }
+  $('saveFile').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ format:FORMAT, version:1, schedule:S }, null, 1)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = fileName();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+  $('openFile').addEventListener('click', () => $('openInput').click());
+  $('openInput').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if(!file) return;
+    let data;
+    try{ data = JSON.parse(await file.text()); }catch(err){ toast('That file is not a saved schedule.', 'err'); return; }
+    if(!data || data.format !== FORMAT || !data.schedule){ toast('That file is not a saved schedule.', 'err'); return; }
+    if(!confirm('Open ' + file.name + '? It replaces the schedule on this page.')) return;
+    S = sanitize(data.schedule);
+    everything();
+    toast('Opened ' + file.name + '.', 'ok');
+  });
+  $('copyLink').addEventListener('click', async () => {
+    const url = location.href.split('#')[0] + '#s=' + b64enc(JSON.stringify(Object.assign({}, S, { logo:'' })));
+    try{ await navigator.clipboard.writeText(url); toast('Link copied — opening it shows this schedule.', 'ok'); }
+    catch(e){ prompt('Copy this link:', url); }
+  });
+  $('clearClasses').addEventListener('click', () => {
+    if(!confirm('Clear every class from every grid? The grids, rows and times stay.')) return;
+    S.grids.forEach(g => g.rows.forEach(r => { r.cells = r.cells.map(() => ''); }));
+    everything();
+  });
+  $('resetAll').addEventListener('click', () => {
+    if(!confirm('Start again from the example? Everything on this page is replaced.')) return;
+    S = example();
+    everything();
+  });
+
+  function toast(msg, kind){
+    const t = document.createElement('div');
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.textContent = msg;
+    $('toastWrap').appendChild(t);
+    setTimeout(() => t.remove(), kind === 'err' ? 5200 : 2800);
+  }
+
+  $('printBtn').addEventListener('click', () => window.print());
+  function everything(){ fillSettings(); renderEditors(); renderPreview(); renderLegend(); }
+  new ResizeObserver(scalePreview).observe($('previewFit').parentElement);
+
+  load();
+  everything();
+})();
+</script>
+</body>
+</html>

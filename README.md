@@ -13,6 +13,7 @@ works offline, and can be downloaded on its own.
 | --- | --- |
 | [EAL Benchmark PDF Template](https://ethanpullan.github.io/PublicTeachingTools/tools/eal-benchmark/) | Fill in a Div 2/3 EAL annotation benchmark on screen, then download a PDF whose file name you build yourself by dragging the parts you want into order |
 | [Graph Paper](https://ethanpullan.github.io/PublicTeachingTools/tools/graph-paper/) | Blank graph paper to print — square, dot, cross, isometric, hexagon, polar, log and lined paper, coordinate planes and number lines — on any paper size, then print it or download a true-size PDF, SVG or PNG |
+| [Class Schedule](https://ethanpullan.github.io/PublicTeachingTools/tools/class-schedule/) | A printable timetable: one or more grids of days and periods, with breaks and lunch across the full width and each class in its own colour. Print it, save it as a PDF, or share it as a file or link |
 | [Report Card Redactor](https://ethanpullan.github.io/PublicTeachingTools/tools/report-card-redactor/) | Strip student names, ID numbers and other identifying details out of exported HTML report cards. Build a redaction list (auto-detects students and teachers), blank ID-length numbers, preview original vs. redacted, then download or copy a clean copy |
 
 ## About
