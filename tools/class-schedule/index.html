@@ -277,31 +277,33 @@
     return {
       title:'Class Schedule', sub:'', logo:'', paper:'letter', orient:'landscape', layout:'row', size:'m', timefmt:'12',
       grids:[
-        { heading:'Time/Day M – R', cols:['Monday','Tuesday','Wednesday','Thursday'], rows:[
-          P('Block 1','08:05','08:56',['Math 8-4','Math 8-3','Math 8-4','Math 8-3']),
-          P('Block 2','08:58','09:45',['Science 8-4','Science 8-3','Science 8-4','Science 8-3']),
+        { heading:'Time/Day M – R', cols:['M / W','T / R'], rows:[
+          P('Block 1','08:05','08:56',['Math 9-7','Math 9-8']),
+          P('Block 2','08:58','09:45',['Science 9-7','Science 9-8']),
           B('Break','09:45','09:53'),
-          P('Block 3','09:53','10:40',['Math 8-3','Numeracy 8-4','Math 8-3','Numeracy 8-4']),
-          P('Block 4','10:42','11:29',['Science 8-3','Prep','Science 8-3','Prep']),
-          P('Block 5','11:31','12:18',['Numeracy 8-3','Support','Numeracy 8-3','Support']),
+          P('Block 3','09:53','10:40',['Numeracy 9-7','Math 9-7']),
+          P('Block 4','10:42','11:29',['Prep','Science 9-7']),
+          P('Block 5','11:31','12:18',['Comm Tech','Numeracy 9-8']),
           B('Block 6 – Lunch','12:18','13:07'),
-          P('Block 7','13:09','13:56',['Leadership','Math 8-4','Leadership','Math/Sci 8-9']),
-          P('Block 8','13:58','14:45',['Prep','Science 8-4','Prep','Math/Sci 8-9'])
+          P('Block 7','13:09','13:56',['Math 9-8','Comp Sci']),
+          P('Block 8','13:58','14:45',['Science 9-8','Prep'])
         ]},
+        // Friday A–D run the M / W morning, M / W afternoon, T / R morning and T / R afternoon.
+        // An afternoon has three blocks around lunch, so Numeracy takes the lunch slot.
         { heading:'Time/Day F', cols:['A','B','C','D'], rows:[
-          P('Period 1','08:05','08:56',['Math 8-4','Numeracy 8-3','Math 8-3','Support']),
-          P('Period 2','08:58','09:48',['Sci 8-4','Math 8-4','Sci 8-3','Math 8-3']),
+          P('Period 1','08:05','08:56',['Math 9-7','Comm Tech','Math 9-8','Numeracy 9-8']),
+          P('Period 2','08:58','09:48',['Science 9-7','Numeracy 9-7','Science 9-8','Numeracy 9-8']),
           B('Break','09:48','09:56'),
           B('Odyssey Time','09:56','10:26'),
-          P('Period 3','10:28','11:19',['Math 8-3','Leadership','Numeracy 8-4','Math 8-4']),
-          P('Period 4','11:21','12:10',['Sci 8-3','Prep','Prep','Sci 8-4'])
+          P('Period 3','10:28','11:19',['Numeracy 9-7','Math 9-8','Math 9-7','Comp Sci']),
+          P('Period 4','11:21','12:10',['Prep','Science 9-8','Science 9-7','Prep'])
         ]}
       ],
       colors:{
-        'math 8-4':PALETTE[0], 'science 8-4':PALETTE[0], 'sci 8-4':PALETTE[0],
-        'math 8-3':PALETTE[1], 'science 8-3':PALETTE[1], 'sci 8-3':PALETTE[1], 'math/sci 8-9':PALETTE[1],
-        'numeracy 8-4':PALETTE[2], 'numeracy 8-3':PALETTE[2],
-        'prep':PALETTE[3], 'leadership':PALETTE[4], 'support':PALETTE[4]
+        'math 9-7':PALETTE[0], 'science 9-7':PALETTE[0],
+        'math 9-8':PALETTE[1], 'science 9-8':PALETTE[1],
+        'numeracy 9-7':PALETTE[2], 'numeracy 9-8':PALETTE[2],
+        'prep':PALETTE[3], 'comm tech':PALETTE[4], 'comp sci':PALETTE[5]
       }
     };
   }
